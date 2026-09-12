@@ -793,6 +793,45 @@ What this means in practice:
 `win/` is the reference implementation. Get a feature working and proven there before
 porting it; `mac/` is empty and not yet started.
 
+### Starting the macOS app
+
+Development moves to a Mac from here; this is the handoff. Everything below was worked out on
+Windows and none of it has been tried on macOS.
+
+**One decision is open, and it is the first to make: what the shell is written in.** "Native
+everywhere" is satisfied by either —
+
+- **Swift/AppKit**, as documented above. Nothing reused but the config schema and the server
+  contract. Every behaviour in `PlaybackService` and the search pipeline is re-derived, and
+  none of the 450+ tests carry over.
+- **C# over AppKit via `Microsoft.macOS`** (`net8.0-macos`). The UI is still `NSPanel` and
+  friends, driven from C#. Measured on the current tree: ~3,700 lines are portable as they
+  stand — `PlaybackService`, the Jellyfin client, `MusicLibrary`, `SearchQuery`, collections,
+  queue persistence, config models — ~1,900 are Windows-bound services, and ~5,600 are WPF that
+  is rewritten on either path. Three "Windows-bound" files are only lightly so: the sleep timer
+  uses `DispatcherTimer`, `ConfigService` has one DPAPI call, `HotkeyBinding` parses onto WPF's
+  `Key` enum. This path starts by extracting a `Yinyue.Core` project behind five interfaces —
+  audio engine, media controls, global hotkeys, secret store, startup registration — plus a
+  platform-neutral key model. That extraction is best done on Windows, where it can be tested.
+
+**What the Mac shell must provide, in either language:**
+
+- Overlay: `NSPanel` with `.nonactivatingPanel`, floating level, no title bar, carrying the
+  same reserved vertical stack as Windows — hold row, toast row, applet, search bar, results,
+  queue — so the two look the same by design even though they share no UI code.
+- Global hotkeys: Carbon `RegisterEventHotKey` still works and needs no Accessibility
+  permission. **Unverified: tap/hold detection.** Windows polls `GetAsyncKeyState`; the macOS
+  equivalent (`CGEventSource.keyState`) may need Accessibility for non-modifier keys. Test this
+  first — four shortcuts depend on it.
+- Media keys: `MPRemoteCommandCenter` and `MPNowPlayingInfoCenter`. See `media-integration`.
+- Audio: `AVPlayer` handles both HTTP and local files, FLAC included since 10.13.
+- Secrets: Keychain, replacing DPAPI. Never the password; only the Jellyfin token.
+- Startup: `SMAppService` (macOS 13+), replacing the Run key.
+- Distribution: a `.app`, signed and notarised (Apple Developer Program) or right-click-to-open.
+
+**Toolchain reality:** `win/` and `tests/` target `net8.0-windows` and will not build on a Mac.
+That is expected, not a defect. The Windows app is built on Windows.
+
 ## Known issues
 
 Verified against the current tree — these are real, not speculative.

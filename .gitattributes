@@ -1,0 +1,8 @@
+# Normalise line endings across Windows and macOS checkouts.
+* text=auto
+
+# Never rewrite binaries.
+*.png binary
+*.ico binary
+*.ai  binary
+*.msi binary

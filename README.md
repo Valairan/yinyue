@@ -47,6 +47,9 @@ summon the overlay, or use the tray menu.
 
 On first run, open settings with `Ctrl+Alt+I` to add a library folder or sign in to Jellyfin.
 
+The Windows app and its tests target `net8.0-windows` and build only on Windows. The macOS app
+will live in `mac/`.
+
 For a standalone build:
 
 ```bash
