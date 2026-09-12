@@ -1,0 +1,480 @@
+<Window x:Class="Yinyue.SettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Yinyue Settings"
+        Width="600"
+        Height="700"
+        MinWidth="520"
+        MinHeight="560"
+        Background="{StaticResource BaseBrush}"
+        Icon="pack://application:,,,/Yinyue;component/Assets/yinyue.ico"
+        WindowStartupLocation="CenterScreen"
+        ShowInTaskbar="True">
+
+    <Window.Resources>
+        <!-- Each tab scrolls independently, so a long shortcut list does not push the
+             other tabs' content around. -->
+        <Style x:Key="TabScrollStyle" TargetType="ScrollViewer">
+            <Setter Property="VerticalScrollBarVisibility" Value="Auto"/>
+            <Setter Property="Padding" Value="20,16,14,16"/>
+        </Style>
+    </Window.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- ============================ Header ============================ -->
+        <Border Grid.Row="0"
+                Background="{StaticResource MantleBrush}"
+                Padding="20,14,20,12">
+            <StackPanel Orientation="Horizontal">
+                <Image Source="pack://application:,,,/Yinyue;component/Assets/yinyue.ico"
+                       Width="28" Height="28"
+                       RenderOptions.BitmapScalingMode="HighQuality"/>
+                <StackPanel Margin="12,0,0,0" VerticalAlignment="Center">
+                    <TextBlock Text="Yinyue" Style="{StaticResource SectionHeaderStyle}" Margin="0"/>
+                    <TextBlock Text="Settings" Foreground="{StaticResource Surface2Brush}" FontSize="11"/>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <TabControl Grid.Row="1" Style="{StaticResource ModernTabControlStyle}">
+
+            <!-- ============================ Remote ============================ -->
+            <TabItem Header="Remote">
+                <ScrollViewer Style="{StaticResource TabScrollStyle}">
+                    <StackPanel>
+                        <Border Style="{StaticResource CardStyle}">
+                            <StackPanel>
+                                <TextBlock Text="Jellyfin server" Style="{StaticResource SectionHeaderStyle}"/>
+                                <TextBlock Style="{StaticResource SectionCaptionStyle}"
+                                           Text="The password is used once to obtain an access token and is never saved. The token is encrypted for your Windows account."/>
+
+                                <TextBlock Text="Server URL" Style="{StaticResource FieldLabelStyle}"/>
+                                <TextBox x:Name="TxtServerUrl"
+                                         Style="{StaticResource TextBoxStyle}"
+                                         ToolTip="For example: http://192.168.1.10:8096"/>
+
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="12"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock Text="Username" Style="{StaticResource FieldLabelStyle}"/>
+                                        <TextBox x:Name="TxtUsername" Style="{StaticResource TextBoxStyle}"/>
+                                    </StackPanel>
+
+                                    <StackPanel Grid.Column="2">
+                                        <TextBlock Text="Password" Style="{StaticResource FieldLabelStyle}"/>
+                                        <PasswordBox x:Name="TxtPassword" Style="{StaticResource PasswordBoxStyle}"/>
+                                    </StackPanel>
+                                </Grid>
+
+                                <StackPanel Orientation="Horizontal" Margin="0,2,0,10">
+                                    <Button x:Name="BtnConnect"
+                                            Content="Connect"
+                                            Style="{StaticResource PrimaryButtonStyle}"
+                                            Click="BtnConnect_Click"/>
+                                    <Button x:Name="BtnSignOut"
+                                            Content="Sign out"
+                                            Style="{StaticResource ActionButtonStyle}"
+                                            Click="BtnSignOut_Click"/>
+                                </StackPanel>
+
+                                <TextBlock x:Name="TxtJellyfinStatus"
+                                           Text="Not connected."
+                                           Foreground="{StaticResource SubtextBrush}"
+                                           FontSize="11"
+                                           TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Style="{StaticResource CardStyle}">
+                            <StackPanel>
+                                <TextBlock Text="Streaming" Style="{StaticResource SectionHeaderStyle}"/>
+                                <TextBlock Style="{StaticResource SectionCaptionStyle}"
+                                           Text="Original sends the file untouched, which is what you want on a local network. Lower settings ask the server to transcode, trading quality for bandwidth."/>
+
+                                <TextBlock Text="Quality" Style="{StaticResource FieldLabelStyle}"/>
+                                <ComboBox x:Name="CmbQuality"
+                                          Style="{StaticResource ModernComboBoxStyle}"
+                                          DisplayMemberPath="Label"/>
+
+                                <CheckBox x:Name="ChkPrebuffer"
+                                          Content="Pre-buffer the next track"
+                                          Style="{StaticResource SettingToggleStyle}"
+                                          Margin="0"
+                                          ToolTip="Opens the next track's stream while the current one plays, so skipping does not stall"/>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Style="{StaticResource CardStyle}">
+                            <StackPanel>
+                                <TextBlock Text="Offline mode" Style="{StaticResource SectionHeaderStyle}"/>
+                                <TextBlock Style="{StaticResource SectionCaptionStyle}"
+                                           Text="Ignores every remote source, including favourites, and searches the local library only. Its shortcut is listed under the Hotkeys tab."/>
+
+                                <CheckBox x:Name="ChkOfflineMode"
+                                          Content="Use the local library only"
+                                          Style="{StaticResource SettingToggleStyle}"
+                                          Margin="0"/>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- ============================ Local ============================ -->
+            <TabItem Header="Local">
+                <ScrollViewer Style="{StaticResource TabScrollStyle}">
+                    <StackPanel>
+                        <Border Style="{StaticResource CardStyle}">
+                            <StackPanel>
+                                <TextBlock Text="Music library" Style="{StaticResource SectionHeaderStyle}"/>
+                                <TextBlock Style="{StaticResource SectionCaptionStyle}"
+                                           Text="Folders scanned for local audio. Supported types: mp3, flac, wav, m4a, ogg."/>
+
+                                <Border Background="{StaticResource CrustBrush}"
+                                        BorderBrush="{StaticResource Surface0Brush}"
+                                        BorderThickness="1"
+                                        CornerRadius="6"
+                                        Padding="4"
+                                        Margin="0,0,0,10">
+                                    <ListBox x:Name="LstFolders"
+                                             Height="140"
+                                             Style="{StaticResource ModernListBoxStyle}"/>
+                                </Border>
+
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                                    <Button x:Name="BtnAddFolder" Content="Add folder…"
+                                            Style="{StaticResource ActionButtonStyle}" Click="BtnAddFolder_Click"/>
+                                    <Button x:Name="BtnRemoveFolder" Content="Remove"
+                                            Style="{StaticResource ActionButtonStyle}" Click="BtnRemoveFolder_Click"/>
+                                    <Button x:Name="BtnScan" Content="Scan library"
+                                            Style="{StaticResource ActionButtonStyle}" Click="BtnScan_Click"/>
+                                </StackPanel>
+
+                                <CheckBox x:Name="ChkScanOnStartup"
+                                          Content="Rescan folders on startup"
+                                          Style="{StaticResource SettingToggleStyle}"/>
+
+                                <ProgressBar x:Name="ScanProgress"
+                                             Style="{StaticResource ThinProgressStyle}"
+                                             Minimum="0" Maximum="100"
+                                             Visibility="Collapsed"
+                                             Margin="0,0,0,6"/>
+
+                                <TextBlock x:Name="TxtScanStatus"
+                                           Foreground="{StaticResource SubtextBrush}"
+                                           FontSize="11"
+                                           TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- ============================ Overlay ============================ -->
+            <TabItem Header="General">
+                <ScrollViewer Style="{StaticResource TabScrollStyle}">
+                    <StackPanel>
+                        <Border Style="{StaticResource CardStyle}">
+                            <StackPanel>
+                                <TextBlock Text="Startup" Style="{StaticResource SectionHeaderStyle}"/>
+                                <TextBlock Style="{StaticResource SectionCaptionStyle}"
+                                           Text="Yinyue lives in the tray, so starting with Windows is usually what you want. This adds a per-user entry under the Run key — no elevation, and easy to remove."/>
+
+                                <CheckBox x:Name="ChkRunAtLogin"
+                                          Content="Start Yinyue when I sign in"
+                                          Style="{StaticResource SettingToggleStyle}"
+                                          Margin="0,0,0,6"/>
+
+                                <TextBlock x:Name="TxtStartupStatus"
+                                           Style="{StaticResource HintStyle}"/>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Style="{StaticResource CardStyle}">
+                            <StackPanel>
+                                <TextBlock Text="Overlay position" Style="{StaticResource SectionHeaderStyle}"/>
+                                <TextBlock Style="{StaticResource SectionCaptionStyle}"
+                                           Text="Where the panel appears when you summon it. Margins are measured from the edge of the monitor's work area, so the panel never lands under the taskbar."/>
+
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="12"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock Text="Anchor" Style="{StaticResource FieldLabelStyle}"/>
+                                        <ComboBox x:Name="CmbAnchor" Style="{StaticResource ModernComboBoxStyle}"/>
+                                    </StackPanel>
+
+                                    <StackPanel Grid.Column="2">
+                                        <TextBlock Text="Monitor" Style="{StaticResource FieldLabelStyle}"/>
+                                        <ComboBox x:Name="CmbMonitor" Style="{StaticResource ModernComboBoxStyle}"/>
+                                    </StackPanel>
+                                </Grid>
+
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="12"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock Text="Horizontal margin (px)" Style="{StaticResource FieldLabelStyle}"/>
+                                        <TextBox x:Name="TxtMarginX" Style="{StaticResource TextBoxStyle}"/>
+                                    </StackPanel>
+
+                                    <StackPanel Grid.Column="2">
+                                        <TextBlock Text="Vertical margin (px)" Style="{StaticResource FieldLabelStyle}"/>
+                                        <TextBox x:Name="TxtMarginY" Style="{StaticResource TextBoxStyle}"/>
+                                    </StackPanel>
+                                </Grid>
+
+                                <CheckBox x:Name="ChkAnimations"
+                                          Content="Fade the overlay in and out"
+                                          Style="{StaticResource SettingToggleStyle}"
+                                          ToolTip="Turning this off also drops window transparency, which is the part that costs performance"/>
+
+                                <TextBlock x:Name="TxtAnimationsNote"
+                                           Style="{StaticResource HintStyle}"
+                                           Margin="0,0,0,12"
+                                           Text="Fading needs a transparent window, which Windows composites in software. Turning it off drops transparency as well — worth having on a slower machine. Takes effect after a restart."/>
+
+                                <Grid Margin="0,0,0,4">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="12"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock Text="Fade duration (ms)" Style="{StaticResource FieldLabelStyle}"/>
+                                        <TextBox x:Name="TxtAnimationMs"
+                                                 Style="{StaticResource TextBoxStyle}"
+                                                 ToolTip="0 to 1000. Zero fades instantly but keeps transparency."/>
+                                    </StackPanel>
+
+                                    <StackPanel Grid.Column="2">
+                                        <TextBlock Text="Background opacity" Style="{StaticResource FieldLabelStyle}"/>
+                                        <TextBox x:Name="TxtBackgroundOpacity"
+                                                 Style="{StaticResource TextBoxStyle}"
+                                                 ToolTip="0.2 to 1.0, where 1 is fully opaque"/>
+                                    </StackPanel>
+                                </Grid>
+
+                                <TextBlock x:Name="TxtOpacityNote"
+                                           Style="{StaticResource HintStyle}"
+                                           Margin="0,0,0,12"
+                                           Text="Background opacity affects the overlay and the toast only — the settings window keeps its chrome and stays opaque. It needs transparency, so it does nothing while fading is off."/>
+
+                                <CheckBox x:Name="ChkHideOnFocusLoss"
+                                          Content="Hide the overlay when it loses focus"
+                                          Style="{StaticResource SettingToggleStyle}"/>
+
+                                <CheckBox x:Name="ChkAutoHide"
+                                          Content="Hide the overlay after a spell of inactivity"
+                                          Style="{StaticResource SettingToggleStyle}"/>
+
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="Inactivity (seconds)"
+                                               Style="{StaticResource FieldLabelStyle}"
+                                               VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                    <TextBox x:Name="TxtAutoHideSeconds" Grid.Column="1"
+                                             Style="{StaticResource TextBoxStyle}"
+                                             Margin="0,0,0,6" Width="90" HorizontalAlignment="Left"
+                                             ToolTip="2 to 120 seconds"/>
+                                </Grid>
+
+                                <TextBlock Style="{StaticResource HintStyle}"
+                                           Text="Typing, clicking or moving the pointer restarts the countdown, and an open search or queue suspends it."/>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Style="{StaticResource CardStyle}">
+                            <StackPanel>
+                                <TextBlock Text="Sleep timer" Style="{StaticResource SectionHeaderStyle}"/>
+                                <TextBlock Style="{StaticResource SectionCaptionStyle}"
+                                           Text="Pauses playback after a set time. Unrelated to hiding the overlay above: this stops the music, and nothing you do resets it. Its shortcut cycles through off and then each step below."/>
+
+                                <CheckBox x:Name="ChkSleepTimer"
+                                          Content="Allow the sleep timer"
+                                          Style="{StaticResource SettingToggleStyle}"
+                                          ToolTip="With this off the shortcut does nothing and any running timer is cancelled"/>
+
+                                <TextBlock Text="Steps (minutes)" Style="{StaticResource FieldLabelStyle}"/>
+                                <TextBox x:Name="TxtSleepSteps"
+                                         Style="{StaticResource TextBoxStyle}"
+                                         ToolTip="Separate with commas, for example: 30, 60, 120, 480"/>
+
+                                <TextBlock x:Name="TxtSleepStepsNote"
+                                           Style="{StaticResource HintStyle}"
+                                           Margin="0,6,0,0"/>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- ============================ Hotkeys ============================ -->
+            <TabItem Header="Hotkeys">
+                <ScrollViewer Style="{StaticResource TabScrollStyle}">
+                    <StackPanel>
+                        <Border Style="{StaticResource CardStyle}">
+                            <StackPanel>
+                                <TextBlock Text="Global shortcuts" Style="{StaticResource SectionHeaderStyle}"/>
+                                <TextBlock Style="{StaticResource SectionCaptionStyle}"
+                                           Margin="0,0,0,8"
+                                           Text="Click a shortcut and press the combination you want. Every shortcut needs at least one of Ctrl, Alt, Shift or Win. Press Escape to cancel. Turn on Hold to require the keys be held down before the action fires."/>
+
+                                <!-- Advisory only. The arrow keys are navigation inside the
+                                     overlay, but a global shortcut using them is still
+                                     perfectly valid and must not be blocked. -->
+                                <Border Background="{StaticResource Surface0Brush}"
+                                        CornerRadius="6"
+                                        Padding="10,8"
+                                        Margin="0,0,0,14">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="&#x2139;"
+                                                   Foreground="{StaticResource AccentBrush}"
+                                                   FontSize="13"
+                                                   VerticalAlignment="Top"
+                                                   Margin="0,0,8,0"/>
+                                        <TextBlock Style="{StaticResource HintStyle}"
+                                                   MaxWidth="440"
+                                                   Text="The arrow keys navigate the overlay — moving through search results and the queue. You can still bind them here; they only act as navigation when the overlay itself has focus."/>
+                                    </StackPanel>
+                                </Border>
+
+                                <Grid Margin="0,0,0,10">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="Hold delay (seconds)"
+                                               Style="{StaticResource FieldLabelStyle}"
+                                               VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                    <TextBox x:Name="TxtHoldDelay" Grid.Column="1"
+                                             Style="{StaticResource TextBoxStyle}"
+                                             Margin="0" Width="90" HorizontalAlignment="Left"
+                                             ToolTip="0.2 to 5 seconds, up to three decimal places"/>
+                                </Grid>
+
+                                <!-- Column headings for the generated rows below -->
+                                <Grid Margin="0,4,0,4">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="160"/>
+                                        <ColumnDefinition Width="64"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="Action" Style="{StaticResource HintStyle}"/>
+                                    <TextBlock Grid.Column="1" Text="Shortcut" Style="{StaticResource HintStyle}"/>
+                                    <TextBlock Grid.Column="2" Text="Hold" Style="{StaticResource HintStyle}"
+                                               HorizontalAlignment="Center"/>
+                                </Grid>
+
+                                <!--
+                                    Generated from HotkeyActions.All rather than hand-written rows, so
+                                    adding an action cannot leave the settings window out of step.
+                                -->
+                                <ItemsControl x:Name="LstHotkeys">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Background="Transparent" Padding="0,3">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="160"/>
+                                                        <ColumnDefinition Width="64"/>
+                                                    </Grid.ColumnDefinitions>
+
+                                                    <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,10,0">
+                                                        <TextBlock Text="{Binding Label}"
+                                                                   Foreground="{StaticResource TextBrush}"
+                                                                   FontSize="12"/>
+                                                        <TextBlock Text="{Binding Note}"
+                                                                   Style="{StaticResource HintStyle}"
+                                                                   Visibility="{Binding NoteVisibility}"/>
+                                                        <!-- Inline, because a clash disables both
+                                                             shortcuts and the cause needs to be
+                                                             visible next to the row that caused it. -->
+                                                        <TextBlock Text="{Binding Conflict}"
+                                                                   Visibility="{Binding ConflictVisibility}"
+                                                                   Foreground="{StaticResource DangerBrush}"
+                                                                   FontSize="11"
+                                                                   TextWrapping="Wrap"/>
+                                                    </StackPanel>
+
+                                                    <TextBox Grid.Column="1"
+                                                             Text="{Binding Keys, Mode=OneWay}"
+                                                             Tag="{Binding Action}"
+                                                             Style="{StaticResource KeyCaptureStyle}"
+                                                             VerticalAlignment="Center"
+                                                             PreviewKeyDown="HotkeyBox_PreviewKeyDown"
+                                                             GotFocus="HotkeyBox_GotFocus"/>
+
+                                                    <CheckBox Grid.Column="2"
+                                                              IsChecked="{Binding Hold, Mode=TwoWay}"
+                                                              IsEnabled="{Binding SupportsHold}"
+                                                              Style="{StaticResource ToggleSwitchStyle}"
+                                                              HorizontalAlignment="Center"
+                                                              ToolTip="{Binding HoldTooltip}"/>
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+
+                                <StackPanel Orientation="Horizontal" Margin="0,10,0,6">
+                                    <Button x:Name="BtnResetHotkeys"
+                                            Content="Reset to defaults"
+                                            Style="{StaticResource SubtleButtonStyle}"
+                                            Click="BtnResetHotkeys_Click"/>
+                                </StackPanel>
+
+                                <TextBlock x:Name="TxtHotkeyStatus"
+                                           Foreground="{StaticResource SubtextBrush}"
+                                           FontSize="11"
+                                           TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+        </TabControl>
+
+        <!-- ============================ Footer ============================ -->
+        <Border Grid.Row="2"
+                Background="{StaticResource MantleBrush}"
+                BorderBrush="{StaticResource Surface0Brush}"
+                BorderThickness="0,1,0,0"
+                Padding="20,12">
+            <Grid>
+                <TextBlock x:Name="TxtSaveStatus"
+                           VerticalAlignment="Center"
+                           Foreground="{StaticResource SuccessBrush}"
+                           FontSize="11"/>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <Button Content="Save" Style="{StaticResource PrimaryButtonStyle}" Click="BtnSave_Click"/>
+                    <Button Content="Close" Style="{StaticResource ActionButtonStyle}" Margin="0" Click="BtnClose_Click"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

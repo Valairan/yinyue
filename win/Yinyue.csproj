@@ -1,0 +1,52 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <!-- Enable Windows Forms for NotifyIcon system tray support -->
+    <UseWindowsForms>true</UseWindowsForms>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\yinyue.ico</ApplicationIcon>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+
+    <!--
+      WFAC010 fires because WinForms (enabled only for the tray NotifyIcon) wants DPI mode
+      set via ApplicationHighDpiMode. That property only takes effect through WinForms'
+      ApplicationConfiguration.Initialize(), which a WPF app never calls. The manifest is
+      the correct mechanism here, so the warning is deliberately suppressed.
+    -->
+    <NoWarn>$(NoWarn);WFAC010</NoWarn>
+
+    <!-- Binary Metadata -->
+    <AssemblyName>Yinyue</AssemblyName>
+    <RootNamespace>Yinyue</RootNamespace>
+    <Version>1.0.0</Version>
+    <Title>Yinyue</Title>
+    <Description>Lightweight cross-platform background music daemon and overlay.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Embedded Metadata & Tag Scraping -->
+    <PackageReference Include="TagLibSharp" Version="2.3.0" />
+
+    <!-- Local Indexing DB -->
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.0" />
+
+    <!-- JSON Serialization for Jellyfin DTOs & Config (Updated to patch vulnerability) -->
+    <PackageReference Include="System.Text.Json" Version="8.0.5" />
+
+    <!-- DPAPI protection for the stored Jellyfin access token -->
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- WPF SDK projects do not glob image assets; pack:// URIs need them declared. -->
+    <Resource Include="Resources\**\*.png" />
+
+    <!-- Tray icons are loaded at runtime by theme, so they must ship inside the assembly. -->
+    <Resource Include="Assets\*.ico" />
+  </ItemGroup>
+</Project>

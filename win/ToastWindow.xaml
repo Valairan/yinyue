@@ -1,0 +1,74 @@
+<Window x:Class="Yinyue.ToastWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Yinyue"
+        Width="{StaticResource PanelWidth}"
+        Height="{StaticResource ToastRowHeight}"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
+        ResizeMode="NoResize"
+        ShowInTaskbar="False"
+        ShowActivated="False"
+        Topmost="True"
+        Focusable="False"
+        IsHitTestVisible="False"
+        WindowStartupLocation="Manual">
+
+    <Border x:Name="RootBorder"
+            BorderBrush="{StaticResource Surface0Brush}"
+            BorderThickness="1"
+            Background="{StaticResource BaseBrush}"
+            CornerRadius="8"
+            Padding="14,11">
+        <!--
+            One row, a fixed height, the same width as the applet. Every surface in this app
+            now has a reserved slot in one vertical stack, so nothing ever moves or overlaps.
+        -->
+        <StackPanel VerticalAlignment="Center">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <Grid Grid.Column="0" Width="22" Height="22" Margin="0,0,10,0"
+                      VerticalAlignment="Center">
+                    <TextBlock x:Name="TxtGlyph"
+                               FontSize="15"
+                               Foreground="{StaticResource AccentBrush}"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center"/>
+
+                    <!-- Hold dial: an unfilled track with an arc sweeping over it. -->
+                    <Ellipse x:Name="HoldTrack"
+                             Visibility="Collapsed"
+                             Stroke="{StaticResource Surface1Brush}"
+                             StrokeThickness="2.5"
+                             Width="20" Height="20"/>
+
+                    <Path x:Name="HoldArc"
+                          Visibility="Collapsed"
+                          Stroke="{StaticResource AccentBrush}"
+                          StrokeThickness="2.5"
+                          StrokeStartLineCap="Round"
+                          StrokeEndLineCap="Round"/>
+                </Grid>
+
+                <TextBlock x:Name="TxtMessage"
+                           Grid.Column="1"
+                           FontSize="12"
+                           Foreground="{StaticResource TextBrush}"
+                           VerticalAlignment="Center"
+                           TextTrimming="CharacterEllipsis"/>
+            </Grid>
+
+            <!-- Only shown for levels, where a bar reads faster than a number. -->
+            <ProgressBar x:Name="LevelBar"
+                         Style="{StaticResource ThinProgressStyle}"
+                         Minimum="0" Maximum="1"
+                         Visibility="Collapsed"
+                         Margin="0,9,0,1"/>
+        </StackPanel>
+    </Border>
+</Window>

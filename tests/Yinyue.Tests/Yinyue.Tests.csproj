@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+
+    <!--
+      The suite constructs real windows and registers real hotkeys, so it needs WPF, the
+      WinForms types the app pulls in, and an STA thread.
+    -->
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+
+    <AssemblyName>Yinyue.Tests</AssemblyName>
+    <RootNamespace>Yinyue.Tests</RootNamespace>
+    <NoWarn>$(NoWarn);WFAC010</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\win\Yinyue.csproj" />
+  </ItemGroup>
+
+</Project>

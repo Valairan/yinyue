@@ -1,0 +1,23 @@
+## .NET build output
+bin/
+obj/
+[Dd]ebug/
+[Rr]elease/
+*.user
+*.suo
+*.cache
+
+## Publish output
+publish/
+*.pubxml.user
+
+## Rider / VS / VS Code
+.vs/
+.idea/
+*.DotSettings.user
+
+## macOS
+.DS_Store
+
+## Claude Code local overrides (project CLAUDE.md and skills are tracked)
+.claude/settings.local.json

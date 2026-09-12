@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dotnet build:*)",
+      "Bash(dotnet restore:*)",
+      "Bash(dotnet publish:*)",
+      "Bash(dotnet test:*)",
+      "Bash(dotnet list:*)",
+      "Bash(dotnet --info)",
+      "Bash(dotnet --version)",
+      "Bash(dotnet --list-sdks)",
+      "Bash(dotnet --list-runtimes)",
+      "Bash(tasklist:*)",
+      "Bash(taskkill //F //IM Yinyue.exe)",
+      "PowerShell(Get-Process Yinyue*)",
+      "PowerShell(dotnet build:*)"
+    ]
+  }
+}
