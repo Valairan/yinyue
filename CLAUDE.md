@@ -100,10 +100,12 @@ Use the **`run-yinyue` skill** to launch it. It is a tray app with a single-inst
 a stray process from a previous run makes the next launch pop a modal dialog and exit, and
 naive launches leave orphans behind.
 
-Release / self-contained publish:
+Release publish. **`--no-self-contained`, not `--self-contained false`** — the .NET 10 SDK
+silently ignores the latter and produces a 172 MB self-contained build instead of a 26 MB
+framework-dependent one. Measured, twice, before it was believed:
 
 ```bash
-dotnet publish win/Yinyue.csproj -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true
+dotnet publish win/Yinyue.csproj -c Release -r win-x64 --no-self-contained -p:PublishSingleFile=true
 ```
 
 ## Architecture and conventions

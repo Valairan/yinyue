@@ -50,7 +50,7 @@ On first run, open settings with `Ctrl+Alt+I` to add a library folder or sign in
 For a standalone build:
 
 ```bash
-dotnet publish win/Yinyue.csproj -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true
+dotnet publish win/Yinyue.csproj -c Release -r win-x64 --no-self-contained -p:PublishSingleFile=true
 ```
 
 ## Keyboard
