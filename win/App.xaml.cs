@@ -154,7 +154,9 @@ namespace Yinyue
 
         private void BuildServices()
         {
-            _config = new ConfigService();
+            // The composition root is the one place that knows which platform this is, so it
+            // is the one place that names DPAPI. Core only knows ISecretStore.
+            _config = new ConfigService(new DpapiSecretStore());
 
             // Whatever was chosen in the installer, applied once. Before anything reads the
             // config, so the overlay is placed where the user asked on its very first show.

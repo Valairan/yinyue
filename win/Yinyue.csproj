@@ -29,16 +29,16 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- Embedded Metadata & Tag Scraping -->
-    <PackageReference Include="TagLibSharp" Version="2.3.0" />
+    <!--
+      The platform-neutral half: models, playback, the Jellyfin client, the library and the
+      local index. It brings TagLibSharp, Microsoft.Data.Sqlite and System.Text.Json with it
+      transitively, which is why they are no longer named here.
+    -->
+    <ProjectReference Include="..\core\Yinyue.Core\Yinyue.Core.csproj" />
+  </ItemGroup>
 
-    <!-- Local Indexing DB -->
-    <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.0" />
-
-    <!-- JSON Serialization for Jellyfin DTOs & Config (Updated to patch vulnerability) -->
-    <PackageReference Include="System.Text.Json" Version="8.0.5" />
-
-    <!-- DPAPI protection for the stored Jellyfin access token -->
+  <ItemGroup>
+    <!-- DPAPI, for DpapiSecretStore. The Windows half of ISecretStore. -->
     <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" />
   </ItemGroup>
 

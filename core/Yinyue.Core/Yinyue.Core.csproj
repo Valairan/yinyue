@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!--
+      Plain net8.0 with no OS suffix, deliberately. This is the half of Yinyue that has no
+      opinion about the platform it runs on, so it must build on macOS as readily as on
+      Windows — which is also what lets the logic tests run on either machine. Adding a
+      -windows suffix here would silently undo the entire point of the project.
+    -->
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>Yinyue.Core</AssemblyName>
+
+    <!--
+      Namespaces stay Yinyue.Models / Yinyue.Services, unchanged from when these files lived
+      in win/. That is why the extraction touched no `using` directive in the WPF code.
+    -->
+    <RootNamespace>Yinyue</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Embedded metadata and tag scraping for the local library. -->
+    <PackageReference Include="TagLibSharp" Version="2.3.0" />
+
+    <!-- Local index. -->
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.0" />
+
+    <!-- Jellyfin DTOs and config. -->
+    <PackageReference Include="System.Text.Json" Version="8.0.5" />
+  </ItemGroup>
+
+</Project>

@@ -22,4 +22,14 @@
     <ProjectReference Include="..\..\win\Yinyue.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!--
+      The harness and the fakes, shared with tests/Yinyue.Core.Tests as linked source rather
+      than through a project reference — the two runners are separate executables and should
+      not know about each other.
+    -->
+    <Compile Include="..\Shared\Check.cs" Link="Check.cs" />
+    <Compile Include="..\Shared\Fakes.cs" Link="Fakes.cs" />
+  </ItemGroup>
+
 </Project>

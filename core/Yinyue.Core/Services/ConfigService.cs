@@ -1,6 +1,5 @@
 using System;
 using System.IO;
-using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -9,9 +8,9 @@ using Yinyue.Models;
 namespace Yinyue.Services
 {
     /// <summary>
-    /// Loads and saves %APPDATA%\Yinyue\config.json, and handles DPAPI protection for the
-    /// Jellyfin access token. Kept synchronous and tiny deliberately: it runs during
-    /// startup, which has a sub-200ms budget.
+    /// Loads and saves config.json, and hands the Jellyfin access token to the platform's
+    /// secret store on the way past. Kept synchronous and tiny deliberately: it runs during
+    /// startup, and startup has a budget.
     /// </summary>
     public class ConfigService
     {
@@ -23,26 +22,28 @@ namespace Yinyue.Services
         };
 
         private readonly string _configPath;
+        private readonly ISecretStore _secrets;
 
         public AppConfig Current { get; private set; } = new();
 
         /// <summary>Raised after a successful Save so live components can re-read settings.</summary>
         public event EventHandler<AppConfig>? ConfigChanged;
 
-        public static string AppDataFolder
-        {
-            get
-            {
-                string folder = Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                    "Yinyue");
-                Directory.CreateDirectory(folder);
-                return folder;
-            }
-        }
+        /// <summary>
+        /// Kept as the name every caller already uses; the per-OS resolution lives in
+        /// <see cref="AppPaths"/> so the indexer and the artwork cache cannot disagree.
+        /// </summary>
+        public static string AppDataFolder => AppPaths.DataFolder;
 
-        public ConfigService()
+        /// <summary>
+        /// <paramref name="secrets"/> is optional so that the many call sites which never
+        /// touch a token — the whole test suite among them — need not supply one. Omitting
+        /// it does not mean "store the token unprotected": the fallback declines to store it
+        /// at all. See <see cref="UnavailableSecretStore"/>.
+        /// </summary>
+        public ConfigService(ISecretStore? secrets = null)
         {
+            _secrets = secrets ?? UnavailableSecretStore.Instance;
             _configPath = Path.Combine(AppDataFolder, "config.json");
             Load();
         }
@@ -121,8 +122,8 @@ namespace Yinyue.Services
         #region Token protection
 
         /// <summary>
-        /// Encrypts a Jellyfin access token for the current Windows user and stores it.
-        /// The password is never persisted — only the token the server issued in exchange.
+        /// Protects a Jellyfin access token for the current user and stores it. The password
+        /// is never persisted — only the token the server issued in exchange.
         /// </summary>
         public void SetAccessToken(string? token)
         {
@@ -132,46 +133,22 @@ namespace Yinyue.Services
                 return;
             }
 
-            try
-            {
-                byte[] protectedBytes = ProtectedData.Protect(
-                    Encoding.UTF8.GetBytes(token),
-                    optionalEntropy: null,
-                    scope: DataProtectionScope.CurrentUser);
-
-                Current.Jellyfin.ProtectedAccessToken = Convert.ToBase64String(protectedBytes);
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"[Config] Token protection failed: {ex.Message}");
-                Current.Jellyfin.ProtectedAccessToken = null;
-            }
+            // A store that cannot protect returns null, and null is written through as
+            // "nothing stored". Never fall back to writing the token as it stands.
+            Current.Jellyfin.ProtectedAccessToken = _secrets.Protect(token);
         }
 
         /// <summary>
-        /// Returns the decrypted access token, or null if absent or undecryptable.
-        /// Undecryptable means the config was copied from another machine or user profile;
-        /// treat that as "not logged in" rather than an error.
+        /// Returns the token, or null if absent or unreadable. Unreadable means the config
+        /// was copied from another machine or user account; treat that as "not signed in"
+        /// rather than as an error.
         /// </summary>
         public string? GetAccessToken()
         {
             string? stored = Current.Jellyfin.ProtectedAccessToken;
             if (string.IsNullOrEmpty(stored)) return null;
 
-            try
-            {
-                byte[] unprotectedBytes = ProtectedData.Unprotect(
-                    Convert.FromBase64String(stored),
-                    optionalEntropy: null,
-                    scope: DataProtectionScope.CurrentUser);
-
-                return Encoding.UTF8.GetString(unprotectedBytes);
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"[Config] Token unprotect failed: {ex.Message}");
-                return null;
-            }
+            return _secrets.Unprotect(stored);
         }
 
         public void ClearCredentials()

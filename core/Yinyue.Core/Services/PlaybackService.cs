@@ -37,7 +37,7 @@ namespace Yinyue.Services
     /// </summary>
     public class PlaybackService : IDisposable
     {
-        private readonly AudioPlayerService _audio;
+        private readonly IAudioPlayer _audio;
         private readonly MusicLibrary _library;
         private readonly object _gate = new();
         private readonly Random _rng = new();
@@ -209,7 +209,7 @@ namespace Yinyue.Services
             get { lock (_gate) return _orderPosition; }
         }
 
-        public PlaybackService(AudioPlayerService audio, MusicLibrary library)
+        public PlaybackService(IAudioPlayer audio, MusicLibrary library)
         {
             _audio = audio;
             _library = library;

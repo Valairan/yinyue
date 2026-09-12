@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+
+    <!-- Plain net8.0, so this runs on a Mac as readily as on Windows. -->
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+
+    <AssemblyName>Yinyue.Core.Tests</AssemblyName>
+    <RootNamespace>Yinyue.Tests</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\core\Yinyue.Core\Yinyue.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!--
+      Compiled into both suites rather than shared through a project reference: the two
+      runners are separate executables that never reference each other, and linking the
+      source keeps it that way.
+    -->
+    <Compile Include="..\Shared\Check.cs" Link="Check.cs" />
+    <Compile Include="..\Shared\Fakes.cs" Link="Fakes.cs" />
+  </ItemGroup>
+
+</Project>
