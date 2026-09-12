@@ -56,6 +56,7 @@ namespace Yinyue
         private Icon? _trayIcon;
         private ToastWindow? _toast;
         private ToastWindow? _holdToast;
+        private bool _openSettingsOnStart;
         private SleepTimerService? _sleepTimer;
 
         /// <summary>
@@ -97,6 +98,15 @@ namespace Yinyue
 
             // Everything from here on is the user's doing, so it may announce itself.
             _ready = true;
+
+            if (_openSettingsOnStart)
+            {
+                // ApplicationIdle runs once startup has drained entirely, so this is safe
+                // wherever _ready is set: the overlay exists by then, and the window opens in
+                // front of the installer's exit dialog rather than behind it.
+                Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.ApplicationIdle,
+                    () => _overlay?.ShowSettings());
+            }
         }
 
         #region Single instance
@@ -158,8 +168,15 @@ namespace Yinyue
 
             // Whatever was chosen in the installer, applied once. Before anything reads the
             // config, so the overlay is placed where the user asked on its very first show.
-            if (SetupSeedService.Take() is { } seed && SetupSeedService.Apply(seed, _config.Current))
-                _config.Save();
+            if (SetupSeedService.Take() is { } seed)
+            {
+                if (SetupSeedService.Apply(seed, _config.Current)) _config.Save();
+
+                // The installer's one request of the first launch: put settings in front. A
+                // fresh install has a server to sign in to and shortcuts worth checking, and
+                // an empty tray icon explains none of that.
+                _openSettingsOnStart = seed.OpenSettings;
+            }
 
             _indexer = new LibraryIndexerService();
             _artwork = new ArtworkCache();

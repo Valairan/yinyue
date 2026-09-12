@@ -30,9 +30,12 @@ namespace Yinyue.Services
             public bool? StartWithWindows { get; init; }
             public string? LibraryFolder { get; init; }
 
+            /// <summary>Open the settings window on this launch — the installer's first-boot request.</summary>
+            public bool OpenSettings { get; init; }
+
             /// <summary>False when every value was absent or unusable.</summary>
             public bool HasAnything =>
-                Anchor.HasValue || StartWithWindows.HasValue || LibraryFolder != null;
+                Anchor.HasValue || StartWithWindows.HasValue || LibraryFolder != null || OpenSettings;
         }
 
         /// <summary>
@@ -82,7 +85,15 @@ namespace Yinyue.Services
                 catch { /* An unreadable path is simply not offered. */ }
             }
 
-            return new Seed { Anchor = anchor, StartWithWindows = startup, LibraryFolder = folder };
+            bool openSettings = key.GetValue("OpenSettings") is int request && request != 0;
+
+            return new Seed
+            {
+                Anchor = anchor,
+                StartWithWindows = startup,
+                LibraryFolder = folder,
+                OpenSettings = openSettings,
+            };
         }
 
         /// <summary>

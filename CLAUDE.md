@@ -82,6 +82,13 @@ a live WPF `Application` for `StaticResource` lookups, and real Win32 hotkey reg
 getting a conventional runner to supply all three costs more than it saves at this size, and
 an exe's exit code is all CI needs.
 
+**Close Yinyue before running it.** The suite registers the app's real global hotkeys, and
+a running instance already owns every default — so registration returns 0 of 17, and the first
+exception that follows shuts the test `Application` down, failing every later window test with
+"The Application object is being shut down". Main checks for a running process and refuses
+with one line rather than letting that cascade happen; `ShutdownMode.OnExplicitShutdown` stops
+a single throwing group from taking the rest with it.
+
 It constructs every window for real, which is the only way XAML errors surface: the build
 only proves the C# compiles, and `SettingsWindow` is created lazily so a normal launch never
 touches it.
@@ -129,17 +136,20 @@ no `WixUI` dialog sets.
 values under `HKCU\Software\Yinyue\Setup`. It does not write `config.json`.
 `SetupSeedService` reads those values on the next launch, applies them, and deletes the key.
 
-Precisely: **no custom action is authored here, and none runs during installation.** The
-compiled MSI does contain three, and it is worth knowing what they are —
-`SetLIBRARYFOLDER` is type 51, which assigns a property and executes no code, while
-`WixUIPrintEula` and `WixUIValidatePath` come from the standard `WixUI` dialog library and
-run only in the interactive UI sequence. Check with
-`SELECT \`Action\`, \`Type\` FROM \`CustomAction\`` before repeating the claim.
+Precisely: **nothing runs during the install sequence.** The compiled MSI contains four
+custom actions, and it is worth knowing what they are — `SetLIBRARYFOLDER` is type 51, which
+assigns a property and executes no code; `WixUIPrintEula` and `WixUIValidatePath` come from
+the standard `WixUI` dialog library; and `LaunchYinyue`, the one authored here, is the Util
+extension's `WixShellExec` entry point, fired from the exit dialog's Finish button under a
+default-on "Start Yinyue now" checkbox. All three that execute code do so only in the
+interactive UI sequence, never during installation, and a silent install runs none of them.
+Check the `CustomAction` table before repeating any of this.
 
 That split is the point:
 
-- Custom actions are the fragile half of any MSI. None is authored here, and nothing runs
-  during installation — so there is nothing of ours to go wrong.
+- Custom actions are the fragile half of any MSI. The one authored here launches the app from
+  the exit dialog and nothing else; nothing runs during installation, so nothing of ours can
+  break an install.
 - The logic lands somewhere testable — the suite writes seeds to the registry and checks what
   the app makes of them, including an unrecognised anchor and a folder that has since gone.
 - **An installer cannot validate a hotkey.** Nothing but `RegisterHotKey` at runtime can say
@@ -152,6 +162,23 @@ That split is the point:
 - The seed applies **once**. Left in place it would re-apply on every launch, silently undoing
   anything changed in settings since. Re-running the installer writes it again, which is what
   someone picking a different corner expects.
+- **First launch opens settings.** The installer writes `OpenSettings` into the seed, and the
+  app puts the settings window in front on the launch that consumes it — a fresh install has a
+  server to sign in to and shortcuts worth checking, and an empty tray icon explains none of
+  that. Written only on a fresh install (`NOT WIX_UPGRADE_DETECTED`), so an upgrade does not
+  pop settings on every update. Deferred to `ApplicationIdle` so it opens in front of the
+  installer's exit dialog, not behind it.
+- **A rebuilt MSI is a different product.** `Package` carries no fixed `ProductCode`, so every
+  `wix build` mints a new one. That is what `MajorUpgrade` wants for real upgrades, but during
+  development install-rebuild-install leaves Windows Installer holding two Yinyue products.
+- **Never `msiexec /x` while the exe is still exiting.** The components' files were skipped
+  with "Disallowing uninstallation of component ... since another client exists" — a stranded
+  second product owned them — and `/x` returned 0 having removed nothing; the retry then said
+  1605, product unknown. Diagnose with the COM `WindowsInstaller.Installer`: `Products` filtered
+  by `ProductInfo(code, "ProductName")`, and `ComponentClients` for the exe's component GUID.
+  Cure it with `msiexec /x {thatCode}`, which removes the files too. Do not delete the files by
+  hand — the registration would still be wrong. In verification scripts, `Wait-Process` after
+  `Stop-Process` before touching MSI.
 
 ## Architecture and conventions
 
@@ -871,6 +898,11 @@ Verified against the current tree — these are real, not speculative.
 - There is no loading or buffering indicator, and there cannot be one while tracks stream —
   see the note above on WinRT reporting no buffering state. A slow start looks like nothing
   happening.
+- Upgrading or uninstalling while Yinyue is running is not handled. A resident tray app is
+  running at login, which is exactly when an upgrade happens, so a real user hits files-in-use
+  on their first update. The fix is `util:CloseApplication` in the install sequence; it has not
+  been added because it is a custom action that executes during installation, which the
+  package currently avoids on principle — a trade to make deliberately, not by default.
 - A restored queue holds whatever metadata was saved. If a local file moved or a Jellyfin
   item was deleted, that only surfaces as a playback error when the user presses play —
   entries are not validated on restore, because doing so would mean I/O on the startup path.

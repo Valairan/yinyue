@@ -24,8 +24,23 @@ public static class Program
         // The suite builds real windows, so it needs a WPF Application for StaticResource
         // lookups. InitializeComponent loads App.xaml without running OnStartup, which
         // would take the single-instance mutex and put an icon in the tray.
+        // The suite registers the app's real global hotkeys. A running Yinyue already owns
+        // them, so every registration would fail and the run would report a dozen unrelated
+        // failures — window tests included, once the first exception shut the Application
+        // down. Say the one true thing instead.
+        if (System.Diagnostics.Process.GetProcessesByName("Yinyue").Length > 0)
+        {
+            Console.Error.WriteLine("Yinyue is running. Close it first: the suite registers the same global hotkeys.");
+            return 2;
+        }
+
         var app = new App();
         app.InitializeComponent();
+
+        // Groups close their windows as they finish. Under the default OnLastWindowClose, a
+        // group that throws part-way can leave the last window closed and take the whole
+        // Application down with it, failing everything after with "being shut down".
+        app.ShutdownMode = ShutdownMode.OnExplicitShutdown;
 
         HotkeyTests.Run();
         QueueTests.Run().GetAwaiter().GetResult();
@@ -1560,6 +1575,31 @@ public static class WindowTests
                 !SetupSeedService.Apply(new SetupSeedService.Seed { Anchor = OverlayAnchor.TopLeft }, config));
 
             try { Directory.Delete(folder, true); } catch { }
+        });
+
+        Check.Group("the installer can ask for settings on first launch", () =>
+        {
+            // Path.Combine builds the registry path, which keeps this file free of escapes.
+            string keyPath = Path.Combine("Software", "Yinyue", "Setup");
+            Microsoft.Win32.Registry.CurrentUser.DeleteSubKeyTree(keyPath, false);
+
+            using (var key = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(keyPath))
+                key!.SetValue("OpenSettings", 1);
+
+            var seed = SetupSeedService.Take();
+            Check.That("a seed carrying only the request still counts", seed != null);
+            Check.That("and asks for settings", seed!.OpenSettings);
+
+            // Opening a window is the app's job, not a configuration change.
+            Check.That("applying it leaves the config alone", !SetupSeedService.Apply(seed, new AppConfig()));
+
+            using (var key = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(keyPath))
+                key!.SetValue("OverlayAnchor", "Center");
+
+            var plain = SetupSeedService.Take();
+            Check.That("absent means no request", plain != null && !plain.OpenSettings);
+
+            Microsoft.Win32.Registry.CurrentUser.DeleteSubKeyTree(keyPath, false);
         });
 
         Check.Group("a bad seed is discarded, not obeyed", () =>

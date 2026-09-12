@@ -12,6 +12,7 @@
 
         dotnet tool install --global wix --version "5.*"
         wix extension add -g WixToolset.UI.wixext/5.0.2
+        wix extension add -g WixToolset.Util.wixext/5.0.2
 
     v5 deliberately, not v6 or later: those require accepting the Open Source Maintenance Fee
     agreement before the tool will run at all. v5 is the last MS-RL release.
@@ -55,6 +56,7 @@ Write-Host "Packaging $msi..." -ForegroundColor Cyan
 
 wix build (Join-Path $PSScriptRoot "Yinyue.wxs") `
     -ext WixToolset.UI.wixext `
+    -ext WixToolset.Util.wixext `
     -d Version=$Version `
     -d PublishDir=$publishDir `
     -d RepoRoot=$repoRoot `

@@ -15,7 +15,8 @@
     belonging to the same account, and needs no administrator prompt.
 -->
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
-     xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
+     xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui"
+     xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
 
   <Package Name="Yinyue"
            Manufacturer="Valairan"
@@ -88,6 +89,17 @@
           <RegistryValue Name="LibraryFolder" Type="string" Value="[LIBRARYFOLDER]" />
         </RegistryKey>
       </Component>
+
+      <!--
+          Asks the app to open settings on the launch that consumes the seed. Its own
+          component, conditioned on a fresh install, so an upgrade does not pop the settings
+          window on every update.
+      -->
+      <Component Id="FirstRunSeed" Guid="*" Condition="NOT WIX_UPGRADE_DETECTED">
+        <RegistryKey Root="HKCU" Key="Software\Yinyue\Setup" ForceDeleteOnUninstall="yes">
+          <RegistryValue Name="OpenSettings" Type="integer" Value="1" KeyPath="yes" />
+        </RegistryKey>
+      </Component>
     </ComponentGroup>
 
     <Feature Id="Main" Title="Yinyue" Level="1">
@@ -108,10 +120,28 @@
     <SetProperty Id="LIBRARYFOLDER" Value="[PersonalFolder]Music" Before="AppSearch"
                  Sequence="first" Condition="NOT LIBRARYFOLDER" />
 
+    <!--
+        Offer to start Yinyue from the exit dialog, on by default. The app then reads the
+        OpenSettings seed and puts the settings window in front, so the first thing a new user
+        sees is where to add a server or a folder rather than an empty tray icon. A silent
+        install never shows the dialog, so it never launches anything.
+    -->
+    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="Start Yinyue now" />
+    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOX" Value="1" />
+    <Property Id="WixShellExecTarget" Value="[#YinyueExeFile]" />
+
+    <CustomAction Id="LaunchYinyue"
+                  BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)"
+                  DllEntry="WixShellExec"
+                  Impersonate="yes" />
+
     <ui:WixUI Id="WixUI_InstallDir" InstallDirectory="INSTALLFOLDER" />
     <UIRef Id="WixUI_ErrorProgressText" />
 
     <UI>
+      <Publish Dialog="ExitDialog" Control="Finish" Event="DoAction" Value="LaunchYinyue"
+               Condition="WIXUI_EXITDIALOGOPTIONALCHECKBOX = 1 and NOT Installed" />
+
       <!--
           Slot the options page between choosing the folder and confirming. Both directions
           are published, or Back from the verify page would skip it.

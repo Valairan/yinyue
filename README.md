@@ -61,14 +61,18 @@ dotnet publish win/Yinyue.csproj -c Release -r win-x64 --no-self-contained -p:Pu
 ```powershell
 dotnet tool install --global wix --version "5.*"
 wix extension add -g WixToolset.UI.wixext/5.0.2
+wix extension add -g WixToolset.Util.wixext/5.0.2
 
 .\installeruild.ps1 -Version 0.1.0
 ```
 
 This produces a per-user MSI of about 6 MB. It installs without an administrator prompt,
 into `%LOCALAPPDATA%\Programs\Yinyue`, and its wizard asks where the overlay should appear,
-whether to start Yinyue at sign-in, and optionally a music folder to scan. All three can be
-changed later in the app.
+whether to start Yinyue at sign-in, and optionally a music folder to scan. All three can be changed later in the app.
+
+When setup finishes it offers to start Yinyue, and that first launch opens the settings window
+— a fresh install has a server to sign in to and shortcuts worth checking. Upgrades and silent
+installs skip both.
 
 WiX **v5** specifically: v6 and later require accepting the Open Source Maintenance Fee
 agreement before the tool will run. v5 is MS-RL licensed, which is OSI-approved, so building
