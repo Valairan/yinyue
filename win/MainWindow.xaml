@@ -545,8 +545,14 @@
                             Content="🔁"
                             Style="{StaticResource MediaBtnStyle}"
                             ToolTip="Loop off"/>
+                    <!--
+                        The same text heart as the header's shuffle-favourites button, not the
+                        emoji heart: the emoji font draws an outlined shape that did not match,
+                        and the favourite state is shown by colouring the glyph, which a text
+                        glyph does cleanly.
+                    -->
                     <Button x:Name="BtnFavorite"
-                            Content="❤️"
+                            Content="♥"
                             Style="{StaticResource MediaBtnStyle}"
                             ToolTip="Toggle Favorite"/>
                 </StackPanel>
