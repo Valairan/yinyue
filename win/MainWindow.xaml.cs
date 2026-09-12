@@ -648,8 +648,7 @@ namespace Yinyue
         {
             if (e.Key == Key.Down && SearchPopup.IsOpen && _searchResults.Count > 0)
             {
-                LstSearchResults.Focus();
-                LstSearchResults.SelectedIndex = 0;
+                FocusSearchResult(0);
                 e.Handled = true;
             }
             else if (e.Key == Key.Enter && _searchResults.Count > 0)
@@ -658,6 +657,30 @@ namespace Yinyue
                 _ = PlayFromResultsAsync(Math.Max(0, LstSearchResults.SelectedIndex));
                 e.Handled = true;
             }
+        }
+
+        /// <summary>
+        /// Puts keyboard focus on a result <em>row</em>, never on the list itself.
+        ///
+        /// The distinction is the whole bug it fixes. Focusing the ListBox and setting
+        /// SelectedIndex highlights the row, but keyboard focus sits on the list; the next
+        /// Down then only moves focus onto that already-highlighted row and nothing visible
+        /// happens, so the highlight appears stuck for one keypress. It was easy to miss on
+        /// the first entry from the search box and obvious after arrowing back up, because
+        /// the row was still selected and the second Down changed nothing at all.
+        /// </summary>
+        private void FocusSearchResult(int index)
+        {
+            LstSearchResults.SelectedIndex = index;
+
+            // The popup is open, so the containers exist — but make sure layout has run
+            // before asking for one rather than trusting the moment.
+            LstSearchResults.UpdateLayout();
+
+            if (LstSearchResults.ItemContainerGenerator.ContainerFromIndex(index) is ListBoxItem row)
+                row.Focus();
+            else
+                LstSearchResults.Focus();
         }
 
         /// <summary>

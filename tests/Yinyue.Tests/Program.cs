@@ -13,6 +13,8 @@ using Yinyue.Services;
 using System.IO;
 using Application = System.Windows.Application;
 using TabControl = System.Windows.Controls.TabControl;
+using ListBox = System.Windows.Controls.ListBox;
+using KeyEventArgs = System.Windows.Input.KeyEventArgs;
 
 namespace Yinyue.Tests;
 
@@ -633,6 +635,68 @@ public static class WindowTests
             overlay.Close();
         });
 
+        Check.Group("arrowing into the results lands on a row, and keeps moving", () =>
+        {
+            var config = new ConfigService();
+            var overlay = new MainWindow(config, FadeLibrary(), FadePlayback(), () => null!);
+
+            var box = (System.Windows.Controls.TextBox)overlay.FindName("SearchTextBox");
+            var list = (ListBox)overlay.FindName("LstSearchResults");
+            var results = (System.Windows.Controls.Primitives.Popup)overlay.FindName("SearchPopup");
+
+            ShowAndActivate(overlay);
+            overlay.ShowOverlay();
+            Pump();
+
+            // Results are filled directly rather than through the debounced search, so the
+            // test is about the keys and not about timing.
+            var items = (System.Collections.ObjectModel.ObservableCollection<object>)typeof(MainWindow)
+                .GetField("_searchResults", System.Reflection.BindingFlags.NonPublic |
+                                            System.Reflection.BindingFlags.Instance)!
+                .GetValue(overlay)!;
+            foreach (var track in Make.Tracks("r0", "r1", "r2")) items.Add(track);
+            results.IsOpen = true;
+            Pump();
+
+            box.Focus();
+            Keyboard.Focus(box);
+            Pump();
+            Check.That("typing starts in the box", Keyboard.FocusedElement == box);
+
+            int FocusedRow() => Keyboard.FocusedElement is ListBoxItem row
+                ? list.ItemContainerGenerator.IndexFromContainer(row)
+                : -1;
+
+            Press(box, Key.Down);
+            Pump();
+            Check.Equal("Down from the box focuses the first row itself, not the list", 0, FocusedRow());
+            Check.Equal("and highlights it", 0, list.SelectedIndex);
+
+            Press((UIElement)Keyboard.FocusedElement, Key.Down);
+            Pump();
+            Check.Equal("the next Down moves on", 1, FocusedRow());
+
+            Press((UIElement)Keyboard.FocusedElement, Key.Up);
+            Pump();
+            Check.Equal("Up comes back", 0, FocusedRow());
+
+            Press((UIElement)Keyboard.FocusedElement, Key.Up);
+            Pump();
+            Check.That("Up off the top returns to typing", Keyboard.FocusedElement == box);
+
+            // The reported bug: the row was still selected from the first visit, so the
+            // second entry changed nothing visible and the Down after it appeared stuck.
+            Press(box, Key.Down);
+            Pump();
+            Check.Equal("re-entering lands on the first row", 0, FocusedRow());
+
+            Press((UIElement)Keyboard.FocusedElement, Key.Down);
+            Pump();
+            Check.Equal("and the very next Down moves to the second", 1, FocusedRow());
+
+            overlay.Close();
+        });
+
         Check.Group("panels stack above the applet", () =>
         {
             var config = new ConfigService();
@@ -1116,6 +1180,36 @@ public static class WindowTests
     /// others is not active by default. Without this the panels close the moment they open,
     /// which looks like a placement bug and is not one.
     /// </summary>
+    /// <summary>
+    /// Presses a key on the focused element the way the OS would, through the input manager.
+    ///
+    /// Raising the routed events by hand is not enough: WPF's arrow navigation between list
+    /// rows happens in <c>KeyboardNavigation</c>'s post-processing of the input, after the
+    /// KeyDown event has finished unhandled — a raised event ends before that stage, so the
+    /// list highlights nothing and a test would fail against a control that works fine.
+    /// <c>ProcessInput</c> runs the whole staging area: Preview, promotion to KeyDown, and
+    /// the navigation afterwards. The routed event has no source, so the input manager
+    /// routes it to the keyboard's focused element — which is why the caller focuses first.
+    ///
+    /// One more thing real input does that a synthetic event does not: it marks the keyboard
+    /// as the most recent input device. <c>ListBox.OnGotKeyboardFocus</c> makes selection
+    /// follow focus only under that condition (see the WPF source), so without it the
+    /// highlight would stay behind while focus moved — a failure the app never shows.
+    /// </summary>
+    private static void Press(UIElement target, Key key)
+    {
+        var source = PresentationSource.FromVisual(target)!;
+
+        typeof(InputManager).GetProperty(nameof(InputManager.MostRecentInputDevice))!
+            .SetValue(InputManager.Current, Keyboard.PrimaryDevice);
+
+        InputManager.Current.ProcessInput(
+            new KeyEventArgs(Keyboard.PrimaryDevice, source, Environment.TickCount, key)
+            {
+                RoutedEvent = Keyboard.PreviewKeyDownEvent,
+            });
+    }
+
     private static void ShowAndActivate(Window window)
     {
         AnchorBottomRight(window);

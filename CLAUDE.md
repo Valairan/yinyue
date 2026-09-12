@@ -473,6 +473,13 @@ keeps its place, and `OpenSearch` only moves the caret — it reveals nothing.
   box dismisses the overlay.
 - `CloseSearch` puts the results away and empties the box but leaves the bar — it is part of
   the overlay, not something that was opened.
+- **Down from the box focuses a result *row*, never the list.** `FocusSearchResult` selects
+  the index and then focuses its `ListBoxItem`. Focusing the `ListBox` and setting
+  `SelectedIndex` looks identical — the row highlights — but keyboard focus is on the list, so
+  the next Down only moves focus onto the already-highlighted row and nothing visible happens.
+  On the first entry that read as a slow list; after arrowing back up to the box, where the
+  row stayed selected, it read as stuck. The suite drives the real key events through both
+  paths and checks which row holds focus, not just which is selected.
 
 **A Popup does not follow its window.** It is placed when it opens and never again, so moving
 the overlay — a changed anchor, a different monitor — strands every panel where the overlay
