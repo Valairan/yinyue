@@ -116,7 +116,14 @@ settings for whoever ran setup and leave every other account on defaults. It als
 administrator prompt.
 
 **WiX v5, pinned.** v6 and later refuse to run until the Open Source Maintenance Fee
-agreement is accepted; v5 is the last MS-RL release.
+agreement is accepted. v5 is the last MS-RL release — **MS-RL is OSI-approved**, and the
+package sets `requireLicenseAcceptance: false`, so the whole toolchain here is free and open
+source with nothing to agree to.
+
+The cost of the pin is maintenance, not licensing: fixes will increasingly land only in v6+.
+The escape routes are accepting the OSMF terms, or moving to `wixl` from GNU msitools
+(GPLv2+, and builds on Linux) — which would mean re-authoring the wizard pages, since it has
+no `WixUI` dialog sets.
 
 **The package is declarative — no custom actions.** It installs two files, a Start Menu
 shortcut, and three values under `HKCU\Software\Yinyue\Setup`. It does not write

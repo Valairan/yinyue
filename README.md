@@ -68,7 +68,8 @@ whether to start Yinyue at sign-in, and optionally a music folder to scan. All t
 changed later in the app.
 
 WiX **v5** specifically: v6 and later require accepting the Open Source Maintenance Fee
-agreement before the tool will run.
+agreement before the tool will run. v5 is MS-RL licensed, which is OSI-approved, so building
+Yinyue needs no proprietary or fee-bearing tooling.
 
 The installer writes no configuration itself. It records the wizard's answers under
 `HKCU\Software\Yinyue\Setup`, and the app applies them on its next launch and clears them.
