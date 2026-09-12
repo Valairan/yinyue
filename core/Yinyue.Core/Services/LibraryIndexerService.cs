@@ -16,11 +16,10 @@ namespace Yinyue.Services
 
         public LibraryIndexerService()
         {
-            string appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-            string yinyueFolder = Path.Combine(appData, "Yinyue");
-            Directory.CreateDirectory(yinyueFolder);
-
-            _dbPath = Path.Combine(yinyueFolder, "tracks.db");
+            // Through AppPaths rather than resolving it again here: this was the one place
+            // in the portable half that computed the data folder for itself, and on macOS
+            // that would have put tracks.db somewhere the rest of the app never looks.
+            _dbPath = Path.Combine(AppPaths.DataFolder, "tracks.db");
             InitializeDatabase();
         }
 

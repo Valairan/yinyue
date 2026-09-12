@@ -7,23 +7,15 @@ using Windows.Media.Playback;
 
 namespace Yinyue.Services
 {
-    public class AudioProgressEventArgs : EventArgs
-    {
-        public TimeSpan CurrentTime { get; }
-        public TimeSpan TotalTime { get; }
-        public double ProgressPercentage { get; }
-
-        public AudioProgressEventArgs(TimeSpan current, TimeSpan total)
-        {
-            CurrentTime = current;
-            TotalTime = total;
-            ProgressPercentage = total.TotalSeconds > 0 
-                ? (current.TotalSeconds / total.TotalSeconds) * 100.0 
-                : 0.0;
-        }
-    }
-
-    public class AudioPlayerService : IDisposable
+    /// <summary>
+    /// The Windows audio engine: <see cref="IAudioPlayer"/> over the WinRT
+    /// <see cref="MediaPlayer"/>, which handles local files and HTTP streams alike and feeds
+    /// SMTC naturally. macOS implements the same interface over AVPlayer.
+    ///
+    /// <see cref="AudioProgressEventArgs"/> now lives in Yinyue.Core beside the interface,
+    /// because PlaybackService re-raises it and the Jellyfin reporter consumes it.
+    /// </summary>
+    public class AudioPlayerService : IAudioPlayer
     {
         private readonly MediaPlayer _mediaPlayer;
         private readonly System.Timers.Timer _progressTimer;

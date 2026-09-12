@@ -47,8 +47,10 @@ summon the overlay, or use the tray menu.
 
 On first run, open settings with `Ctrl+Alt+I` to add a library folder or sign in to Jellyfin.
 
-The Windows app and its tests target `net8.0-windows` and build only on Windows. The macOS app
-will live in `mac/`.
+The Windows app and its Windows test suite target `net8.0-windows` and build only on Windows.
+Everything that has no platform in it — playback, the Jellyfin client, the library and search,
+persistence — lives in `core/Yinyue.Core`, targets plain `net8.0`, and builds anywhere. The
+macOS app will live in `mac/` and will be a second shell over that same core.
 
 For a standalone build:
 
@@ -161,10 +163,12 @@ Configuration lives in `%APPDATA%\Yinyue\`.
 
 The Windows app is complete and has been exercised against a live Jellyfin server.
 
-**macOS is not started.** The plan is a separate native AppKit menu-bar app sharing the
-config schema and the server contract — not a cross-platform toolkit, because both defining
-features (a borderless always-on-top overlay, and OS media-key integration) are
-platform-specific interop whichever toolkit you pick.
+**macOS is not started**, but the groundwork is: a third of the app — playback, the Jellyfin
+client, the library, search and persistence — now lives in `core/Yinyue.Core`, targets plain
+`net8.0`, and builds and tests on a Mac today. The plan is an AppKit menu-bar app as a second
+shell over that core, not a cross-platform toolkit: both defining features (a borderless
+always-on-top overlay, and OS media-key integration) are platform-specific interop whichever
+toolkit you pick, so the UI is written twice on purpose.
 
 Avalonia was measured as the alternative and rejected. It matched WPF on startup and memory,
 but kept about 1% of a core busy even with the overlay hidden, where WPF idles at zero; for an
@@ -178,12 +182,18 @@ Known limitations are listed at the end of [CLAUDE.md](CLAUDE.md).
 more usefully — the reasoning behind the decisions that are easy to get subtly wrong. Several
 of them were arrived at by measuring rather than reasoning, and the notes say which.
 
-There is a test suite:
+There are two test suites, and neither is a superset of the other:
 
 ```bash
-dotnet run --project tests/Yinyue.Tests    # exit code 0 on pass
+dotnet run --project tests/Yinyue.Core.Tests   # 198 checks, runs anywhere
+dotnet run --project tests/Yinyue.Tests        # Windows only
 ```
 
-It is a plain console runner rather than a test framework, because it needs an STA thread, a
-live WPF `Application`, and real Win32 hotkey registration. It builds every window for real,
-which is the only way XAML errors surface.
+Both exit 0 on pass. The Core suite covers what has no platform in it — the queue, play order,
+shuffle, volume and mute, search prefixes, collections, persistence — and runs on macOS as
+readily as on Windows. The Windows suite keeps what needs a real desktop: XAML that must parse,
+panel placement, and hotkeys the OS has to actually accept.
+
+Both are plain console runners rather than a test framework, because the Windows one needs an
+STA thread, a live WPF `Application`, and real Win32 hotkey registration. It builds every
+window for real, which is the only way XAML errors surface.

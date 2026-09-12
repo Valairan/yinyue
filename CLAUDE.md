@@ -23,14 +23,21 @@ These are the defining constraints. Weigh every design decision against them.
 ## Repository layout
 
 ```
-win/                      .NET 8 WPF app — the working implementation
+core/Yinyue.Core/         net8.0, no OS suffix — the platform-neutral half, shared by both apps
+  Models/                 Track, TrackCollection, SearchQuery, AppConfig, HotkeyConfig, Jellyfin DTOs
+  Services/               Playback, MusicLibrary + sources, Jellyfin client, local index, config, queue
+  Platform/               The seams: IAudioPlayer, ISecretStore, AppPaths
+win/                      .NET 8 WPF app — the working implementation, and the shell for Windows
   App.xaml.cs             Composition root: tray icon, single-instance mutex, service graph
   App.xaml                Catppuccin Mocha palette and shared control styles
   MainWindow.xaml(.cs)    The summon overlay — a view over PlaybackService
   SettingsWindow.xaml(.cs) Jellyfin sign-in, library folders, overlay position
-  Models/                 Track (source-neutral), AppConfig, LocalTrack, Jellyfin DTOs
-  Services/               Config, Playback, MusicLibrary + sources, Smtc, Hotkey, Overlay
-mac/                      Empty. Native Swift/AppKit menu-bar app, not yet started.
+  Models/                 HotkeyBinding — parses onto WPF's Key enum, so it stays here
+  Services/               Audio, Smtc, Hotkey, Overlay, WindowStyling, Startup, Setup, SleepTimer, Dpapi
+mac/                      Empty. Menu-bar shell over Yinyue.Core, not yet started.
+tests/Yinyue.Core.Tests/  net8.0 — runs on macOS or Windows. Logic, no desktop needed
+tests/Yinyue.Tests/       net8.0-windows — XAML, panel placement, real hotkey registration
+tests/Shared/             Check (the harness) and Fakes, compiled into both suites
 .claude/skills/           Project skills — read these before touching their domain
 ```
 
@@ -73,34 +80,57 @@ media keys all need a real desktop session. See the `run-yinyue` skill.
 
 ## Tests
 
+**Two suites. Run both** — neither is a superset of the other.
+
 ```bash
-dotnet run --project tests/Yinyue.Tests     # exit code 0 on pass
+dotnet run --project tests/Yinyue.Core.Tests   # anywhere, including macOS
+dotnet run --project tests/Yinyue.Tests        # Windows only
 ```
 
-A plain console runner rather than a test framework, because the suite needs an STA thread,
-a live WPF `Application` for `StaticResource` lookups, and real Win32 hotkey registration —
-getting a conventional runner to supply all three costs more than it saves at this size, and
-an exe's exit code is all CI needs.
+Both exit 0 on pass. The split follows the code: `Yinyue.Core.Tests` targets plain `net8.0`
+and covers what has no platform in it — queue bookkeeping, play order, shuffle, volume and
+mute, search prefixes, collections, persistence, hotkey *configuration*. 198 checks, and they
+run on a Mac. `Yinyue.Tests` targets `net8.0-windows` and keeps what genuinely needs a
+desktop: XAML that must parse, panel placement, hotkey *parsing and registration*, and the
+installer's registry seeds.
 
-**Close Yinyue before running it.** The suite registers the app's real global hotkeys, and
-a running instance already owns every default — so registration returns 0 of 17, and the first
-exception that follows shuts the test `Application` down, failing every later window test with
-"The Application object is being shut down". Main checks for a running process and refuses
-with one line rather than letting that cascade happen; `ShutdownMode.OnExplicitShutdown` stops
-a single throwing group from taking the rest with it.
+Both are plain console runners rather than a test framework. The Windows one needs an STA
+thread, a live WPF `Application` for `StaticResource` lookups, and real Win32 hotkey
+registration — getting a conventional runner to supply all three costs more than it saves at
+this size, and an exe's exit code is all CI needs. The Core one is a plain runner simply to
+match it.
 
-It constructs every window for real, which is the only way XAML errors surface: the build
-only proves the C# compiles, and `SettingsWindow` is created lazily so a normal launch never
-touches it.
+**Close Yinyue before running the Windows suite.** It registers the app's real global hotkeys,
+and a running instance already owns every default — so registration returns 0 of 17, and the
+first exception that follows shuts the test `Application` down, failing every later window
+test with "The Application object is being shut down". `Main` checks for a running process and
+refuses with one line rather than letting that cascade happen;
+`ShutdownMode.OnExplicitShutdown` stops a single throwing group from taking the rest with it.
+The Core suite registers nothing and is unaffected, so it runs whether or not the app is up.
+
+The Windows suite constructs every window for real, which is the only way XAML errors
+surface: the build only proves the C# compiles, and `SettingsWindow` is created lazily so a
+normal launch never touches it.
+
+`tests/Shared/` holds `Check` and the fakes, compiled into both by `<Compile Include>` rather
+than shared through a project reference — the two runners are separate executables and should
+not know about each other.
+
+**Tests use `SilentAudioPlayer`, not the real engine.** Queue bookkeeping is decided above
+the audio engine, so these tests never needed one; they used to construct a WinRT
+`MediaPlayer` purely to satisfy a constructor, and that was the only thing tying them to
+Windows.
 
 ## Build and run
 
-Requires the .NET 8 desktop runtime (present). The SDK on this machine is 10.0.202, which
-builds the `net8.0-windows10.0.19041.0` target fine.
+Requires the .NET 8 desktop runtime. Building `win/` needs an SDK on Windows; `core/` needs
+only a plain .NET 8 SDK and builds anywhere.
 
 ```bash
-dotnet build win/Yinyue.csproj              # ~3s
+dotnet build win/Yinyue.csproj              # ~3s — pulls in Yinyue.Core
 dotnet run  --project win/Yinyue.csproj
+
+dotnet build core/Yinyue.Core               # macOS or Windows
 ```
 
 Use the **`run-yinyue` skill** to launch it. It is a tray app with a single-instance mutex:
@@ -182,9 +212,44 @@ That split is the point:
 
 ## Architecture and conventions
 
-**Target framework.** `net8.0-windows10.0.19041.0`. The Windows-version suffix is what
-makes the WinRT surface (`Windows.Media.*`, `Windows.Storage.*`) callable directly with no
-CsWinRT package. Do not lower it — `SmtcService` and `AudioPlayerService` both depend on it.
+**Two projects, one rule: `Yinyue.Core` may not know what it is running on.** It targets
+plain `net8.0` with no OS suffix, which is not a detail — it is the thing that enforces the
+rule. Anything platform-specific fails to compile there rather than getting caught in review.
+If a change to Core needs a `#if WINDOWS`, the change is in the wrong project.
+
+What lives where is decided by that rule, not by taste. Core holds the queue, play order,
+shuffle, loop, retry and prebuffer logic; the Jellyfin client; `MusicLibrary` and its sources;
+the local SQLite index; `SearchQuery`; config and queue persistence. The shells hold the
+window, the audio engine, the media-key bridge, the global hotkeys, the secret store and the
+startup registration.
+
+**The seams are two interfaces, and both exist because something in Core needs them** —
+`IAudioPlayer` (what `PlaybackService` needs from an audio engine, and no more) and
+`ISecretStore` (what `ConfigService` needs to protect a token). There are no speculative
+interfaces for SMTC, hotkeys or startup registration: nothing in Core consumes those, so a
+contract for them would be guesswork written before the second implementation exists. Add
+them when the Mac shell is real and the shape is known, not before.
+
+- `ISecretStore` is optional on `ConfigService` so the many call sites that never touch a
+  token need not supply one. Omitting it does **not** mean the token is stored in the clear —
+  `UnavailableSecretStore` declines to store it at all. A forgotten wiring costs a sign-in,
+  which is visible; a plaintext fallback costs a readable token in `config.json`, which is
+  not. Fail in the recoverable direction.
+- `AppPaths.DataFolder` is the single resolver for the data folder, and it is explicit about
+  macOS: .NET maps `SpecialFolder.ApplicationData` to `~/.config` there, following XDG rather
+  than Apple, and a Mac user looks in `~/Library/Application Support`. `LibraryIndexerService`
+  was the one place in the portable half that resolved this for itself, which on macOS would
+  have put `tracks.db` somewhere nothing else looked.
+
+**Namespaces did not change.** Core keeps `Yinyue.Models` and `Yinyue.Services`, which is why
+the extraction touched no `using` directive in any WPF file. Do not "tidy" this into
+`Yinyue.Core.*` — the churn would be large and buys nothing.
+
+**Target framework.** Core is `net8.0`. The Windows app is
+`net8.0-windows10.0.19041.0`; the Windows-version suffix is what makes the WinRT surface
+(`Windows.Media.*`, `Windows.Storage.*`) callable directly with no CsWinRT package. Do not
+lower it — `SmtcService` and `AudioPlayerService` both depend on it, and do not add it to
+Core.
 
 **Playback failures recover rather than stopping.** `AudioPlayerService.MediaFailed`
 surfaces what the engine could not play; `PlaybackService` re-resolves and retries the track
@@ -773,9 +838,16 @@ Regenerate the icons from `Common/` rather than editing them directly.
 
 ## Cross-platform strategy
 
-**Decided: two native apps, each as fast as its platform allows.** `win/` stays .NET 8 WPF.
-`mac/` becomes a separate native Swift/AppKit menu-bar app. They share a config schema and
-the server API contract — not code.
+**Decided: two native shells over one shared core.** `win/` stays .NET 8 WPF. `mac/` becomes
+an AppKit menu-bar app on `net8.0-macos`. Both are shells over `core/Yinyue.Core`, and they
+share everything that has no platform in it — playback, the Jellyfin client, the library,
+search, persistence — plus the config schema and the server contract.
+
+This is a revision. This section previously said the two apps would share "a config schema and
+the server API contract — not code", on the reasoning that a Swift Mac app could share nothing
+else. Measuring the tree changed the premise rather than the conclusion: **a third of the app
+had no platform in it and moved wholesale**, so the choice was never between sharing UI and
+sharing nothing. The UI is still not shared, and never will be.
 
 Do not propose a shared UI framework. Avalonia, Electron, Tauri, and MAUI are all off the
 table. Both defining features (the borderless always-on-top summon overlay and OS media-key
@@ -807,41 +879,54 @@ separate hidden window) was identified but not measured.
 
 What this means in practice:
 
-- **Port behaviour, not code.** The two apps will diverge in structure, and that is fine.
-  Each should feel native: WPF conventions on Windows, AppKit conventions on macOS.
-- **Keep the two contracts in lockstep.** The `config.json` schema (anchor, margins, monitor
-  selection, hotkeys, server, `DeviceId`) and the source abstraction described above are the
-  only things both apps must agree on. Document schema changes in both when either moves.
-- **Credential storage is per-platform by design:** DPAPI on Windows, Keychain on macOS.
-  There is no shared secret store, and there should not be one.
+- **Share the logic, port the behaviour.** Anything in Core is shared outright. Anything above
+  it — the window, the input handling, the chrome — is ported by behaviour, and the two shells
+  will diverge in structure. That is fine: WPF conventions on Windows, AppKit on macOS.
+- **A shared core does not mean a shared look by accident.** The overlay's reserved vertical
+  stack is a design decision recorded in this file, not something Core enforces. The Mac shell
+  has to build it deliberately.
+- **Credential storage is per-platform by design:** `DpapiSecretStore` on Windows, a Keychain
+  implementation on macOS. `ISecretStore` is the seam; there is no shared secret store behind
+  it, and there should not be one.
 - The macOS app needs `LSUIElement = true` in `Info.plist` (menu-bar-only, no Dock icon),
   the AppKit equivalent of `ShowInTaskbar="False"` plus the tray icon.
 
-`win/` is the reference implementation. Get a feature working and proven there before
-porting it; `mac/` is empty and not yet started.
+`win/` is the reference implementation for anything above Core. Get a feature working and
+proven there before porting it; `mac/` is empty and not yet started.
 
 ### Starting the macOS app
 
-Development moves to a Mac from here; this is the handoff. Everything below was worked out on
-Windows and none of it has been tried on macOS.
+Development moves to a Mac from here. Everything below except the Core extraction was worked
+out on Windows and has not been tried on macOS.
 
-**One decision is open, and it is the first to make: what the shell is written in.** "Native
-everywhere" is satisfied by either —
+**Decided: C# over AppKit via `Microsoft.macOS`** (`net8.0-macos`), sharing `Yinyue.Core` with
+the Windows app. The UI is still `NSPanel` and friends, written against AppKit; only the
+platform-neutral half is shared. Swift/AppKit was the alternative and would have meant
+re-deriving every behaviour in `PlaybackService` and the search pipeline from the prose in
+this file.
 
-- **Swift/AppKit**, as documented above. Nothing reused but the config schema and the server
-  contract. Every behaviour in `PlaybackService` and the search pipeline is re-derived, and
-  none of the 450+ tests carry over.
-- **C# over AppKit via `Microsoft.macOS`** (`net8.0-macos`). The UI is still `NSPanel` and
-  friends, driven from C#. Measured on the current tree: ~3,700 lines are portable as they
-  stand — `PlaybackService`, the Jellyfin client, `MusicLibrary`, `SearchQuery`, collections,
-  queue persistence, config models — ~1,900 are Windows-bound services, and ~5,600 are WPF that
-  is rewritten on either path. Three "Windows-bound" files are only lightly so: the sleep timer
-  uses `DispatcherTimer`, `ConfigService` has one DPAPI call, `HotkeyBinding` parses onto WPF's
-  `Key` enum. This path starts by extracting a `Yinyue.Core` project behind five interfaces —
-  audio engine, media controls, global hotkeys, secret store, startup registration — plus a
-  platform-neutral key model. That extraction is best done on Windows, where it can be tested.
+**The extraction is done, and it was measured rather than estimated.** The earlier note here
+said ~3,700 lines looked portable and that the extraction was "best done on Windows, where it
+can be tested". The second half was wrong in a way worth recording: Core targets *plain*
+`net8.0`, so it builds and its tests run on a Mac. The split as built:
 
-**What the Mac shell must provide, in either language:**
+| | Lines | |
+|---|---|---|
+| `core/Yinyue.Core` | 3,916 | Moved unmodified but for the three seams below. Builds on macOS, 0 warnings |
+| Windows-only services | ~1,400 | Audio, SMTC, hotkeys, overlay positioning, window styling, startup, setup seed |
+| WPF UI | ~5,600 | Rewritten on either path — C# bought nothing here |
+
+The whole seam was **three types**, found by compiling rather than by reading:
+`PlaybackService` held the concrete `AudioPlayerService` (now `IAudioPlayer`),
+`AudioProgressEventArgs` happened to live in the WinRT file (now beside the interface), and
+`ConfigService` made two `ProtectedData` calls (now `ISecretStore`). Nothing else in 3,916
+lines touched Windows, and exactly one line made a platform assumption —
+`LibraryIndexerService` resolving its own data folder.
+
+**Still open, and still the first thing to find out: tap/hold detection.** See below. Four
+shortcuts depend on it and Core cannot answer it.
+
+**What the Mac shell must provide:**
 
 - Overlay: `NSPanel` with `.nonactivatingPanel`, floating level, no title bar, carrying the
   same reserved vertical stack as Windows — hold row, toast row, applet, search bar, results,
@@ -851,13 +936,21 @@ everywhere" is satisfied by either —
   equivalent (`CGEventSource.keyState`) may need Accessibility for non-modifier keys. Test this
   first — four shortcuts depend on it.
 - Media keys: `MPRemoteCommandCenter` and `MPNowPlayingInfoCenter`. See `media-integration`.
-- Audio: `AVPlayer` handles both HTTP and local files, FLAC included since 10.13.
-- Secrets: Keychain, replacing DPAPI. Never the password; only the Jellyfin token.
+- Audio: an `IAudioPlayer` over `AVPlayer`, which handles both HTTP and local files, FLAC
+  included since 10.13. The interface is the specification — implement it and
+  `PlaybackService` works as it does on Windows.
+- Secrets: an `ISecretStore` over Keychain, replacing `DpapiSecretStore`. Never the password;
+  only the Jellyfin token.
 - Startup: `SMAppService` (macOS 13+), replacing the Run key.
+- Hotkeys: a platform key model. `HotkeyBinding` stayed in `win/` because it parses onto WPF's
+  `Key` enum; `HotkeyConfig` — the vocabulary, the defaults and the migrations — is in Core
+  and is already covered by the Core suite. The Mac shell writes its own parser against the
+  same strings in `config.json`.
 - Distribution: a `.app`, signed and notarised (Apple Developer Program) or right-click-to-open.
 
-**Toolchain reality:** `win/` and `tests/` target `net8.0-windows` and will not build on a Mac.
-That is expected, not a defect. The Windows app is built on Windows.
+**Toolchain reality:** `win/` and `tests/Yinyue.Tests` target `net8.0-windows` and will not
+build on a Mac. That is expected, not a defect — but `core/` and `tests/Yinyue.Core.Tests`
+build and pass on either, which is what makes Mac-side work possible at all.
 
 ## Known issues
 
