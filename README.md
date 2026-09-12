@@ -73,7 +73,7 @@ Yinyue needs no proprietary or fee-bearing tooling.
 
 The installer writes no configuration itself. It records the wizard's answers under
 `HKCU\Software\Yinyue\Setup`, and the app applies them on its next launch and clears them.
-That keeps the package free of custom actions, and puts the logic somewhere it can be tested.
+Nothing of ours runs during installation, and the logic sits somewhere it can be tested.
 
 ## Keyboard
 

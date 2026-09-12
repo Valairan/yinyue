@@ -125,14 +125,21 @@ The escape routes are accepting the OSMF terms, or moving to `wixl` from GNU msi
 (GPLv2+, and builds on Linux) — which would mean re-authoring the wizard pages, since it has
 no `WixUI` dialog sets.
 
-**The package is declarative — no custom actions.** It installs two files, a Start Menu
-shortcut, and three values under `HKCU\Software\Yinyue\Setup`. It does not write
-`config.json`. `SetupSeedService` reads those values on the next launch, applies them, and
-deletes the key.
+**The package is declarative.** It installs two files, a Start Menu shortcut, and three
+values under `HKCU\Software\Yinyue\Setup`. It does not write `config.json`.
+`SetupSeedService` reads those values on the next launch, applies them, and deletes the key.
+
+Precisely: **no custom action is authored here, and none runs during installation.** The
+compiled MSI does contain three, and it is worth knowing what they are —
+`SetLIBRARYFOLDER` is type 51, which assigns a property and executes no code, while
+`WixUIPrintEula` and `WixUIValidatePath` come from the standard `WixUI` dialog library and
+run only in the interactive UI sequence. Check with
+`SELECT \`Action\`, \`Type\` FROM \`CustomAction\`` before repeating the claim.
 
 That split is the point:
 
-- Custom actions are the fragile half of any MSI. There are none to go wrong.
+- Custom actions are the fragile half of any MSI. None is authored here, and nothing runs
+  during installation — so there is nothing of ours to go wrong.
 - The logic lands somewhere testable — the suite writes seeds to the registry and checks what
   the app makes of them, including an unrecognised anchor and a folder that has since gone.
 - **An installer cannot validate a hotkey.** Nothing but `RegisterHotKey` at runtime can say
