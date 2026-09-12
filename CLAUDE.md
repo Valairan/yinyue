@@ -108,6 +108,37 @@ framework-dependent one. Measured, twice, before it was believed:
 dotnet publish win/Yinyue.csproj -c Release -r win-x64 --no-self-contained -p:PublishSingleFile=true
 ```
 
+## Installer
+
+`installer/build.ps1` publishes and packages a **per-user MSI** (~6 MB). Per-user because
+configuration lives in `%APPDATA%` per user: an elevated per-machine install would seed
+settings for whoever ran setup and leave every other account on defaults. It also means no
+administrator prompt.
+
+**WiX v5, pinned.** v6 and later refuse to run until the Open Source Maintenance Fee
+agreement is accepted; v5 is the last MS-RL release.
+
+**The package is declarative — no custom actions.** It installs two files, a Start Menu
+shortcut, and three values under `HKCU\Software\Yinyue\Setup`. It does not write
+`config.json`. `SetupSeedService` reads those values on the next launch, applies them, and
+deletes the key.
+
+That split is the point:
+
+- Custom actions are the fragile half of any MSI. There are none to go wrong.
+- The logic lands somewhere testable — the suite writes seeds to the registry and checks what
+  the app makes of them, including an unrecognised anchor and a folder that has since gone.
+- **An installer cannot validate a hotkey.** Nothing but `RegisterHotKey` at runtime can say
+  whether another app already owns `Ctrl+Alt+Space`, so the wizard does not ask for one. It
+  asks only for things it can be right about: the overlay corner, start-at-sign-in, and a
+  folder to scan.
+- Startup is recorded as a *preference*, not written to the Run key by the installer.
+  `StartupService` applies it against its own executable path, so the installer never has to
+  guess where the app ended up and there is one owner of that key.
+- The seed applies **once**. Left in place it would re-apply on every launch, silently undoing
+  anything changed in settings since. Re-running the installer writes it again, which is what
+  someone picking a different corner expects.
+
 ## Architecture and conventions
 
 **Target framework.** `net8.0-windows10.0.19041.0`. The Windows-version suffix is what

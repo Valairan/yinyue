@@ -1505,6 +1505,99 @@ public static class WindowTests
             Check.Equal("a sane value is kept", 12.5, overlay.AutoHideSeconds);
         });
 
+        Check.Group("installer choices reach the app", () =>
+        {
+            const string KeyPath = @"Software\Yinyue\Setup";
+
+            static void WriteSeed(string? anchor, int? startup, string? folder)
+            {
+                using var key = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(KeyPath);
+                if (anchor != null) key!.SetValue("OverlayAnchor", anchor);
+                if (startup.HasValue) key!.SetValue("StartWithWindows", startup.Value);
+                if (folder != null) key!.SetValue("LibraryFolder", folder);
+            }
+
+            static bool SeedExists() =>
+                Microsoft.Win32.Registry.CurrentUser.OpenSubKey(KeyPath) != null;
+
+            // Nothing left behind on an ordinary launch, which is every launch but the first
+            // after an install.
+            Microsoft.Win32.Registry.CurrentUser.DeleteSubKeyTree(KeyPath, false);
+            Check.That("no seed, nothing to do", SetupSeedService.Take() == null);
+
+            string folder = Path.Combine(Path.GetTempPath(), "yinyue-seed-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(folder);
+
+            WriteSeed("TopLeft", 0, folder);
+            var seed = SetupSeedService.Take();
+
+            Check.That("the seed is read", seed != null);
+            Check.Equal("the chosen corner", OverlayAnchor.TopLeft, seed!.Anchor);
+            Check.Equal("the startup choice", false, seed.StartWithWindows);
+            Check.Equal("the chosen folder", folder, seed.LibraryFolder);
+
+            // Once only: a value that stayed would be re-applied on every launch, silently
+            // undoing anything the user changed in settings afterwards.
+            Check.That("and consumed", !SeedExists());
+            Check.That("so a second launch finds nothing", SetupSeedService.Take() == null);
+
+            var config = new AppConfig();
+            config.Overlay.Anchor = OverlayAnchor.BottomRight;
+
+            Check.That("applying it changes the config", SetupSeedService.Apply(seed, config));
+            Check.Equal("the anchor moved", OverlayAnchor.TopLeft, config.Overlay.Anchor);
+            Check.Equal("the folder was added", 1, config.Library.Folders.Count);
+
+            // Re-running the installer must not throw away folders added since.
+            config.Library.Folders.Add(@"C:\Elsewhere");
+            SetupSeedService.Apply(seed, config);
+            Check.Equal("existing folders survive", 2, config.Library.Folders.Count);
+            Check.That("and the seeded one is not duplicated",
+                config.Library.Folders.Count(f => string.Equals(f, folder, StringComparison.OrdinalIgnoreCase)) == 1);
+
+            // Applying the same values twice is not a change the config needs saving for.
+            Check.That("an unchanged apply reports nothing to save",
+                !SetupSeedService.Apply(new SetupSeedService.Seed { Anchor = OverlayAnchor.TopLeft }, config));
+
+            try { Directory.Delete(folder, true); } catch { }
+        });
+
+        Check.Group("a bad seed is discarded, not obeyed", () =>
+        {
+            const string KeyPath = @"Software\Yinyue\Setup";
+
+            static void Write(string name, object value)
+            {
+                using var key = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(KeyPath);
+                key!.SetValue(name, value);
+            }
+
+            // An anchor the app does not recognise, from a hand-edited registry or a newer
+            // installer, must not stop the app or land as a default.
+            Microsoft.Win32.Registry.CurrentUser.DeleteSubKeyTree(KeyPath, false);
+            Write("OverlayAnchor", "SomewhereElse");
+            Check.That("an unknown anchor yields no seed", SetupSeedService.Take() == null);
+            Check.That("and is cleared anyway, not re-read forever",
+                Microsoft.Win32.Registry.CurrentUser.OpenSubKey(KeyPath) == null);
+
+            // The installer cannot know the folder still exists by the time the app runs.
+            Microsoft.Win32.Registry.CurrentUser.DeleteSubKeyTree(KeyPath, false);
+            Write("LibraryFolder", @"Z:\gone\missing");
+            Check.That("a vanished folder is not offered", SetupSeedService.Take() == null);
+
+            // An empty folder value is how "I chose nothing" arrives, since MSI properties
+            // cannot hold an empty string until one is set.
+            Microsoft.Win32.Registry.CurrentUser.DeleteSubKeyTree(KeyPath, false);
+            Write("LibraryFolder", "");
+            Write("OverlayAnchor", "Center");
+            var seed = SetupSeedService.Take();
+            Check.That("the rest of the seed still applies", seed != null);
+            Check.Equal("with the anchor", OverlayAnchor.Center, seed!.Anchor);
+            Check.That("and no folder", seed.LibraryFolder == null);
+
+            Microsoft.Win32.Registry.CurrentUser.DeleteSubKeyTree(KeyPath, false);
+        });
+
         Check.Group("sleep timer cycles the configured steps", () =>
         {
             using var timer = new SleepTimerService();

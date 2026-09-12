@@ -11,6 +11,9 @@ obj/
 publish/
 *.pubxml.user
 
+## Installer build output
+installer/out/
+
 ## Rider / VS / VS Code
 .vs/
 .idea/

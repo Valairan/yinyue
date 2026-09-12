@@ -1,0 +1,186 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<!--
+    Yinyue's installer.
+
+    Deliberately declarative: files, a Start Menu shortcut, and three registry values under
+    HKCU\Software\Yinyue\Setup. It does not write config.json and runs no custom actions.
+    Custom actions are the fragile half of any MSI, and an installer cannot validate what it
+    collects anyway — so the choices are handed to the app, which applies them on first launch
+    (see SetupSeedService) and can be tested doing it.
+
+    Per-user, not per-machine. Configuration lives in %APPDATA% per user, so an elevated
+    per-machine install would seed settings for whoever happened to run setup and leave every
+    other account on defaults. Per-user keeps the app, its settings and its startup entry
+    belonging to the same account, and needs no administrator prompt.
+-->
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
+
+  <Package Name="Yinyue"
+           Manufacturer="Valairan"
+           Version="$(var.Version)"
+           UpgradeCode="8f3a1d5c-2b64-4f3e-9a77-51b2c9d0e4a6"
+           Scope="perUser"
+           Compressed="yes">
+
+    <!-- Replaces an older build in place rather than installing alongside it. -->
+    <MajorUpgrade DowngradeErrorMessage="A newer version of Yinyue is already installed." />
+
+    <MediaTemplate EmbedCab="yes" />
+
+    <Icon Id="YinyueIcon" SourceFile="$(var.RepoRoot)\win\Assets\yinyue.ico" />
+    <Property Id="ARPPRODUCTICON" Value="YinyueIcon" />
+    <Property Id="ARPURLINFOABOUT" Value="https://github.com/Valairan/yinyue" />
+
+    <!-- ============================ What gets installed ============================ -->
+
+    <StandardDirectory Id="LocalAppDataFolder">
+      <Directory Id="ProgramsFolder" Name="Programs">
+        <Directory Id="INSTALLFOLDER" Name="Yinyue" />
+      </Directory>
+    </StandardDirectory>
+
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="ShortcutFolder" Name="Yinyue" />
+    </StandardDirectory>
+
+    <ComponentGroup Id="AppFiles" Directory="INSTALLFOLDER">
+      <Component Id="YinyueExe" Guid="*">
+        <File Id="YinyueExeFile"
+              Source="$(var.PublishDir)\Yinyue.exe"
+              KeyPath="yes" />
+      </Component>
+
+      <!-- The one native dependency the single-file bundle cannot swallow. -->
+      <Component Id="SqliteNative" Guid="*">
+        <File Id="SqliteNativeFile" Source="$(var.PublishDir)\e_sqlite3.dll" KeyPath="yes" />
+      </Component>
+    </ComponentGroup>
+
+    <ComponentGroup Id="AppShortcuts" Directory="ShortcutFolder">
+      <Component Id="StartMenuShortcut" Guid="*">
+        <Shortcut Id="YinyueStartMenu"
+                  Name="Yinyue"
+                  Description="Keyboard-driven music player"
+                  Target="[INSTALLFOLDER]Yinyue.exe"
+                  WorkingDirectory="INSTALLFOLDER" />
+
+        <RemoveFolder Id="RemoveShortcutFolder" Directory="ShortcutFolder" On="uninstall" />
+
+        <!-- A per-user component needs an HKCU key path; a shortcut cannot be one. -->
+        <RegistryValue Root="HKCU" Key="Software\Yinyue"
+                       Name="Installed" Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+    </ComponentGroup>
+
+    <!-- ======================= What the wizard collected ======================= -->
+
+    <!--
+        Read and deleted by the app on its next launch. Written under the same parent key as
+        the install marker so uninstalling takes the whole branch with it.
+    -->
+    <ComponentGroup Id="SetupSeed" Directory="INSTALLFOLDER">
+      <Component Id="SeedValues" Guid="*">
+        <RegistryKey Root="HKCU" Key="Software\Yinyue\Setup" ForceDeleteOnUninstall="yes">
+          <RegistryValue Name="OverlayAnchor" Type="string" Value="[OVERLAYANCHOR]" KeyPath="yes" />
+          <RegistryValue Name="StartWithWindows" Type="integer" Value="[STARTWITHWINDOWS]" />
+          <RegistryValue Name="LibraryFolder" Type="string" Value="[LIBRARYFOLDER]" />
+        </RegistryKey>
+      </Component>
+    </ComponentGroup>
+
+    <Feature Id="Main" Title="Yinyue" Level="1">
+      <ComponentGroupRef Id="AppFiles" />
+      <ComponentGroupRef Id="AppShortcuts" />
+      <ComponentGroupRef Id="SetupSeed" />
+    </Feature>
+
+    <!-- ============================ The wizard ============================ -->
+
+    <Property Id="OVERLAYANCHOR" Value="BottomRight" />
+    <Property Id="STARTWITHWINDOWS" Value="1" />
+    <!--
+        Offered as a starting point; the folder page can browse away from it or be cleared.
+        Declared via SetProperty rather than a default Value, because an MSI Property may not
+        hold an empty string and "no folder chosen" has to be expressible.
+    -->
+    <SetProperty Id="LIBRARYFOLDER" Value="[PersonalFolder]Music" Before="AppSearch"
+                 Sequence="first" Condition="NOT LIBRARYFOLDER" />
+
+    <ui:WixUI Id="WixUI_InstallDir" InstallDirectory="INSTALLFOLDER" />
+    <UIRef Id="WixUI_ErrorProgressText" />
+
+    <UI>
+      <!--
+          Slot the options page between choosing the folder and confirming. Both directions
+          are published, or Back from the verify page would skip it.
+      -->
+      <Publish Dialog="InstallDirDlg" Control="Next" Event="NewDialog" Value="YinyueOptionsDlg"
+               Order="3" Condition="NOT WIXUI_DONTVALIDATEPATH OR WIXUI_INSTALLDIR_VALID=&quot;1&quot;" />
+
+      <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="YinyueOptionsDlg"
+               Order="3" Condition="NOT Installed" />
+
+      <Dialog Id="YinyueOptionsDlg" Width="370" Height="270" Title="Yinyue Setup">
+        <Control Id="Title" Type="Text" X="15" Y="6" Width="340" Height="15"
+                 Transparent="yes" NoPrefix="yes" Text="{\WixUI_Font_Title}Set up Yinyue" />
+        <Control Id="Description" Type="Text" X="25" Y="23" Width="330" Height="20"
+                 Transparent="yes" NoPrefix="yes"
+                 Text="These can all be changed later in the app's settings." />
+        <Control Id="BannerBitmap" Type="Bitmap" X="0" Y="0" Width="370" Height="44"
+                 TabSkip="no" Text="!(loc.InstallDirDlgBannerBitmap)" />
+        <Control Id="BannerLine" Type="Line" X="0" Y="44" Width="370" Height="0" />
+        <Control Id="BottomLine" Type="Line" X="0" Y="234" Width="370" Height="0" />
+
+        <Control Id="AnchorLabel" Type="Text" X="20" Y="60" Width="290" Height="12"
+                 NoPrefix="yes" Text="Where should the overlay appear?" />
+        <Control Id="AnchorCombo" Type="ComboBox" X="20" Y="74" Width="180" Height="16"
+                 Property="OVERLAYANCHOR" ComboList="yes" Sorted="no">
+          <ComboBox Property="OVERLAYANCHOR">
+            <ListItem Value="BottomRight" Text="Bottom right" />
+            <ListItem Value="BottomCenter" Text="Bottom centre" />
+            <ListItem Value="BottomLeft" Text="Bottom left" />
+            <ListItem Value="Center" Text="Centre of the screen" />
+            <ListItem Value="TopRight" Text="Top right" />
+            <ListItem Value="TopCenter" Text="Top centre" />
+            <ListItem Value="TopLeft" Text="Top left" />
+          </ComboBox>
+        </Control>
+        <Control Id="AnchorHint" Type="Text" X="20" Y="94" Width="330" Height="20"
+                 NoPrefix="yes" Text="Summon it with Ctrl+Alt+Space. The shortcut, and every other one, is configurable in the app." />
+
+        <Control Id="FolderLabel" Type="Text" X="20" Y="124" Width="290" Height="12"
+                 NoPrefix="yes" Text="Music folder to scan (optional)" />
+        <Control Id="FolderEdit" Type="PathEdit" X="20" Y="138" Width="250" Height="17"
+                 Property="LIBRARYFOLDER" Indirect="no" />
+        <Control Id="FolderBrowse" Type="PushButton" X="277" Y="137" Width="73" Height="19"
+                 Text="B&amp;rowse...">
+          <Publish Property="_BrowseProperty" Value="LIBRARYFOLDER" Order="1" />
+          <Publish Event="SpawnDialog" Value="BrowseDlg" Order="2" />
+        </Control>
+        <Control Id="FolderHint" Type="Text" X="20" Y="160" Width="330" Height="20"
+                 NoPrefix="yes" Text="Leave this blank to add folders later, or if you only play from a Jellyfin server." />
+
+        <Control Id="StartupCheck" Type="CheckBox" X="20" Y="190" Width="330" Height="17"
+                 Property="STARTWITHWINDOWS" CheckBoxValue="1"
+                 Text="Start Yinyue when I sign in" />
+        <Control Id="StartupHint" Type="Text" X="34" Y="206" Width="316" Height="20"
+                 NoPrefix="yes" Text="It sits in the notification area and uses almost nothing while idle." />
+
+        <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17"
+                 Text="!(loc.WixUIBack)">
+          <Publish Event="NewDialog" Value="InstallDirDlg" />
+        </Control>
+        <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17"
+                 Default="yes" Text="!(loc.WixUINext)">
+          <Publish Event="NewDialog" Value="VerifyReadyDlg" />
+        </Control>
+        <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17"
+                 Cancel="yes" Text="!(loc.WixUICancel)">
+          <Publish Event="SpawnDialog" Value="CancelDlg" />
+        </Control>
+      </Dialog>
+    </UI>
+  </Package>
+</Wix>

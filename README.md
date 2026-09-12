@@ -53,6 +53,27 @@ For a standalone build:
 dotnet publish win/Yinyue.csproj -c Release -r win-x64 --no-self-contained -p:PublishSingleFile=true
 ```
 
+## Building the installer
+
+```powershell
+dotnet tool install --global wix --version "5.*"
+wix extension add -g WixToolset.UI.wixext/5.0.2
+
+.\installeruild.ps1 -Version 0.1.0
+```
+
+This produces a per-user MSI of about 6 MB. It installs without an administrator prompt,
+into `%LOCALAPPDATA%\Programs\Yinyue`, and its wizard asks where the overlay should appear,
+whether to start Yinyue at sign-in, and optionally a music folder to scan. All three can be
+changed later in the app.
+
+WiX **v5** specifically: v6 and later require accepting the Open Source Maintenance Fee
+agreement before the tool will run.
+
+The installer writes no configuration itself. It records the wizard's answers under
+`HKCU\Software\Yinyue\Setup`, and the app applies them on its next launch and clears them.
+That keeps the package free of custom actions, and puts the logic somewhere it can be tested.
+
 ## Keyboard
 
 ### Global shortcuts

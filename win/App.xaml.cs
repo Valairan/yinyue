@@ -156,6 +156,11 @@ namespace Yinyue
         {
             _config = new ConfigService();
 
+            // Whatever was chosen in the installer, applied once. Before anything reads the
+            // config, so the overlay is placed where the user asked on its very first show.
+            if (SetupSeedService.Take() is { } seed && SetupSeedService.Apply(seed, _config.Current))
+                _config.Save();
+
             _indexer = new LibraryIndexerService();
             _artwork = new ArtworkCache();
 
