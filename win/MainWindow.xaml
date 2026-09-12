@@ -197,7 +197,7 @@
                                 ToolTip="Offline mode"
                                 Click="BtnOfflineToggle_Click"/>
                         <Button x:Name="BtnShuffleFavorites"
-                                Content="♥"
+                                Content="❤️"
                                 Style="{StaticResource HeaderBtnStyle}"
                                 ToolTip="Shuffle all favourites"
                                 Click="BtnShuffleFavorites_Click"/>
@@ -546,13 +546,13 @@
                             Style="{StaticResource MediaBtnStyle}"
                             ToolTip="Loop off"/>
                     <!--
-                        The same text heart as the header's shuffle-favourites button, not the
-                        emoji heart: the emoji font draws an outlined shape that did not match,
-                        and the favourite state is shown by colouring the glyph, which a text
-                        glyph does cleanly.
+                        The same emoji heart as the header's shuffle-favourites button. The two
+                        used to differ — text heart above, emoji heart here — and the emoji one
+                        was preferred, so both are it. WPF draws it monochrome from the emoji
+                        font, so it still takes the Foreground that marks a favourite.
                     -->
                     <Button x:Name="BtnFavorite"
-                            Content="♥"
+                            Content="❤️"
                             Style="{StaticResource MediaBtnStyle}"
                             ToolTip="Toggle Favorite"/>
                 </StackPanel>

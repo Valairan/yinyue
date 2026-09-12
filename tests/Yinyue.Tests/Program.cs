@@ -834,8 +834,8 @@ public static class WindowTests
                 Check.Equal($"{name} uses the same glyph size", previous.FontSize, icon.FontSize);
             }
 
-            // Two hearts, one glyph. The emoji heart draws as an outline in the emoji font and
-            // did not match the header's text heart.
+            // Two hearts, one glyph. They used to differ — text heart above, emoji heart
+            // below — and the mismatch was noticed at once.
             var favourite = (System.Windows.Controls.Button)overlay.FindName("BtnFavorite");
             var shuffleFavourites = (System.Windows.Controls.Button)overlay.FindName("BtnShuffleFavorites");
             Check.Equal("both hearts are the same character", shuffleFavourites.Content, favourite.Content);
