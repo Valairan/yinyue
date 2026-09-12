@@ -61,6 +61,16 @@ namespace Yinyue.Services
         /// <summary>0.0–1.0, the app's own level, independent of the OS mixer.</summary>
         double Volume { get; set; }
 
+        /// <summary>
+        /// Containers this engine decodes natively, as lower-case Jellyfin container names
+        /// ("mp3", "flac", "m4a"…), which double as file extensions. Two things in Core are
+        /// decided by it: which local files the indexer admits, and which containers the
+        /// Jellyfin client asks the server to direct-play rather than transcode. Both used
+        /// to carry their own copy of the WinRT list; the engine is the only thing that can
+        /// actually answer, so it owns the list and Core carries no platform facts.
+        /// </summary>
+        IReadOnlyCollection<string> SupportedContainers { get; }
+
         /// <summary>Load <paramref name="pathOrUrl"/> and begin playing it.</summary>
         Task PlayAsync(string pathOrUrl);
 

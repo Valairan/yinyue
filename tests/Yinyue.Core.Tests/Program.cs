@@ -18,6 +18,7 @@ public static class Program
         QueueTests.Run().GetAwaiter().GetResult();
         VolumeTests.Run();
         PersistenceTests.Run().GetAwaiter().GetResult();
+        IndexerTests.Run().GetAwaiter().GetResult();
 
         return Check.Report();
     }

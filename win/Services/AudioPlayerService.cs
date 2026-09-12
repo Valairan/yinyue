@@ -52,6 +52,22 @@ namespace Yinyue.Services
             set => _mediaPlayer.Volume = Math.Clamp(value, 0.0, 1.0);
         }
 
+        /// <summary>
+        /// What the WinRT <see cref="MediaPlayer"/> decodes out of the box — the same list the
+        /// Jellyfin client advertised before the Core split, now stated once. Ogg Vorbis and
+        /// Opus are absent on purpose: Windows has no inbox decoder for either. The Store's
+        /// "Web Media Extensions" can add one, but a list that is right only on some machines
+        /// is not a list, so the server transcodes those and the indexer leaves them alone
+        /// rather than listing files that fail the moment they are played.
+        ///
+        /// Static as well as an instance member so a settings-only path can build an indexer
+        /// without an engine, as the suite does.
+        /// </summary>
+        public static readonly IReadOnlyCollection<string> NativeContainers =
+            new[] { "mp3", "aac", "m4a", "flac", "alac", "wav" };
+
+        public IReadOnlyCollection<string> SupportedContainers => NativeContainers;
+
         public AudioPlayerService()
         {
             _mediaPlayer = new MediaPlayer();

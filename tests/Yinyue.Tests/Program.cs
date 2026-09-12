@@ -53,6 +53,7 @@ public static class Program
         app.ShutdownMode = ShutdownMode.OnExplicitShutdown;
 
         HotkeyTests.Run();
+        ScanTests.Run();
         WindowTests.Run();
 
         return Check.Report();
@@ -157,9 +158,9 @@ public static class WindowTests
             }
 
             var config = new ConfigService();
-            var indexer = new LibraryIndexerService();
+            var indexer = new LibraryIndexerService(AudioPlayerService.NativeContainers);
             var artwork = new ArtworkCache();
-            var jellyfin = new JellyfinApiClient { DeviceId = config.Current.DeviceId };
+            var jellyfin = new JellyfinApiClient(AudioPlayerService.NativeContainers) { DeviceId = config.Current.DeviceId };
 
             var library = new MusicLibrary(config);
             library.Register(new LocalMusicSource(indexer, artwork));
@@ -168,6 +169,13 @@ public static class WindowTests
 
             var settings = new SettingsWindow(config, jellyfin, indexer);
             Check.That("SettingsWindow parses", true);
+
+            // The caption used to be a literal, and promised .ogg while the engine could not
+            // play it. It must now say what the engine says, and only that.
+            string caption = (settings.FindName("TxtLocalCaption") as TextBlock)!.Text;
+            Check.That("the local caption names the engine's formats",
+                AudioPlayerService.NativeContainers.All(caption.Contains));
+            Check.That("and nothing the engine lacks", !caption.Contains("ogg"));
 
             var overlay = new MainWindow(config, library, playback,
                 () => new SettingsWindow(config, jellyfin, indexer));
@@ -544,8 +552,8 @@ public static class WindowTests
         Check.Group("a clashing shortcut is flagged inline", () =>
         {
             var config = new ConfigService();
-            var indexer = new LibraryIndexerService();
-            var jellyfin = new JellyfinApiClient { DeviceId = config.Current.DeviceId };
+            var indexer = new LibraryIndexerService(AudioPlayerService.NativeContainers);
+            var jellyfin = new JellyfinApiClient(AudioPlayerService.NativeContainers) { DeviceId = config.Current.DeviceId };
 
             var settings = new SettingsWindow(config, jellyfin, indexer);
             var rows = (settings.FindName("LstHotkeys") as ItemsControl)?.ItemsSource
@@ -812,8 +820,8 @@ public static class WindowTests
             Check.That("the overlay panel is tinted", tint != null && tint.Color.A < 255);
             Check.Equal("to the configured amount", (byte)153, tint!.Color.A);
 
-            var indexer = new LibraryIndexerService();
-            var jellyfin = new JellyfinApiClient { DeviceId = config.Current.DeviceId };
+            var indexer = new LibraryIndexerService(AudioPlayerService.NativeContainers);
+            var jellyfin = new JellyfinApiClient(AudioPlayerService.NativeContainers) { DeviceId = config.Current.DeviceId };
             var settings = new SettingsWindow(config, jellyfin, indexer);
             Check.That("the settings window stays opaque", !settings.AllowsTransparency);
 

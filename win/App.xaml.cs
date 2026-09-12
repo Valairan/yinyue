@@ -180,10 +180,15 @@ namespace Yinyue
                 _openSettingsOnStart = seed.OpenSettings;
             }
 
-            _indexer = new LibraryIndexerService();
+            // The engine first: it is the one thing that knows which containers it decodes,
+            // and both the local indexer and the Jellyfin client take their format list from
+            // it rather than carrying a copy of their own.
+            _audio = new AudioPlayerService();
+
+            _indexer = new LibraryIndexerService(_audio.SupportedContainers);
             _artwork = new ArtworkCache();
 
-            _jellyfin = new JellyfinApiClient
+            _jellyfin = new JellyfinApiClient(_audio.SupportedContainers)
             {
                 DeviceId = _config.Current.DeviceId,
                 MaxStreamingBitrate = _config.Current.Jellyfin.MaxStreamingBitrate
@@ -198,7 +203,6 @@ namespace Yinyue
             _library.Register(new LocalMusicSource(_indexer, _artwork));
             _library.Register(new JellyfinMusicSource(_jellyfin, _artwork));
 
-            _audio = new AudioPlayerService();
             _playback = new PlaybackService(_audio, _library)
             {
                 PrebufferNext = _config.Current.Jellyfin.PrebufferNext

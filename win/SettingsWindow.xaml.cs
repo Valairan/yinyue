@@ -114,6 +114,9 @@ namespace Yinyue
         private bool _isScanning;
         private DateTime _lastProgressPush = DateTime.MinValue;
 
+        /// <summary>"mp3, aac, m4a, …" — whatever the engine declared, for the two captions.</summary>
+        private string SupportedTypes => string.Join(", ", _indexer.SupportedContainers);
+
         public SettingsWindow(ConfigService config, JellyfinApiClient jellyfin, LibraryIndexerService indexer)
         {
             InitializeComponent();
@@ -126,6 +129,10 @@ namespace Yinyue
 
             _indexer.OnScanProgress += OnScanProgress;
             Closed += (_, _) => _indexer.OnScanProgress -= OnScanProgress;
+
+            // Named from the engine's list rather than written into the markup, which is how
+            // the caption came to promise .ogg while the engine could not play it.
+            TxtLocalCaption.Text = $"Folders scanned for local audio. Supported types: {SupportedTypes}.";
 
             PopulateCombos();
             LoadFromConfig();
@@ -419,7 +426,7 @@ namespace Yinyue
                 SetStatus(TxtScanStatus,
                     indexed == 0
                         ? $"Scan finished in {stopwatch.Elapsed.TotalSeconds:F1}s, but found no readable audio files. " +
-                          "Supported types: mp3, flac, wav, m4a, ogg."
+                          $"Supported types: {SupportedTypes}."
                         : $"Indexed {indexed:N0} track(s) from {folders.Count} folder(s) in " +
                           $"{stopwatch.Elapsed.TotalSeconds:F1}s" +
                           (pruned > 0 ? $", removed {pruned:N0} stale" : string.Empty) +

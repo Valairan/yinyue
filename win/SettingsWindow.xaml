@@ -138,8 +138,9 @@
                         <Border Style="{StaticResource CardStyle}">
                             <StackPanel>
                                 <TextBlock Text="Music library" Style="{StaticResource SectionHeaderStyle}"/>
-                                <TextBlock Style="{StaticResource SectionCaptionStyle}"
-                                           Text="Folders scanned for local audio. Supported types: mp3, flac, wav, m4a, ogg."/>
+                                <!-- Completed in code: the supported types are the engine's list, not a literal. -->
+                                <TextBlock x:Name="TxtLocalCaption" Style="{StaticResource SectionCaptionStyle}"
+                                           Text="Folders scanned for local audio."/>
 
                                 <Border Background="{StaticResource CrustBrush}"
                                         BorderBrush="{StaticResource Surface0Brush}"

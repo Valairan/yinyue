@@ -34,7 +34,7 @@ win/                      .NET 8 WPF app — the working implementation, and the
   SettingsWindow.xaml(.cs) Jellyfin sign-in, library folders, overlay position
   Models/                 HotkeyBinding — parses onto WPF's Key enum, so it stays here
   Services/               Audio, Smtc, Hotkey, Overlay, WindowStyling, Startup, Setup, SleepTimer, Dpapi
-mac/                      Empty. Menu-bar shell over Yinyue.Core, not yet started.
+mac/                      A tap/hold spike only. Menu-bar shell over Yinyue.Core, not yet started.
 tests/Yinyue.Core.Tests/  net8.0 — runs on macOS or Windows. Logic, no desktop needed
 tests/Yinyue.Tests/       net8.0-windows — XAML, panel placement, real hotkey registration
 tests/Shared/             Check (the harness) and Fakes, compiled into both suites
@@ -89,10 +89,11 @@ dotnet run --project tests/Yinyue.Tests        # Windows only
 
 Both exit 0 on pass. The split follows the code: `Yinyue.Core.Tests` targets plain `net8.0`
 and covers what has no platform in it — queue bookkeeping, play order, shuffle, volume and
-mute, search prefixes, collections, persistence, hotkey *configuration*. 198 checks, and they
-run on a Mac. `Yinyue.Tests` targets `net8.0-windows` and keeps what genuinely needs a
-desktop: XAML that must parse, panel placement, hotkey *parsing and registration*, and the
-installer's registry seeds.
+mute, search prefixes, collections, persistence, hotkey *configuration*, and the local index
+over a real temporary tree. 214 checks, and they run on a Mac. `Yinyue.Tests` targets
+`net8.0-windows` and keeps what genuinely needs a desktop: XAML that must parse, panel
+placement, hotkey *parsing and registration*, the installer's registry seeds, and a library
+scan across a folder the ACL really denies.
 
 Both are plain console runners rather than a test framework. The Windows one needs an STA
 thread, a live WPF `Application` for `StaticResource` lookups, and real Win32 hotkey
@@ -230,6 +231,10 @@ interfaces for SMTC, hotkeys or startup registration: nothing in Core consumes t
 contract for them would be guesswork written before the second implementation exists. Add
 them when the Mac shell is real and the shape is known, not before.
 
+`IAudioPlayer` also *describes* the engine, not just drives it: `SupportedContainers` is the
+one statement of what can be decoded, and the indexer and the Jellyfin client are both handed
+it at construction. See *The engine owns the format list* below.
+
 - `ISecretStore` is optional on `ConfigService` so the many call sites that never touch a
   token need not supply one. Omitting it does **not** mean the token is stored in the clear —
   `UnavailableSecretStore` declines to store it at all. A forgotten wiring costs a sign-in,
@@ -328,6 +333,31 @@ live Jellyfin server: 276 ms cold versus 52 ms warm. Rules that keep it honest:
 and HTTP streams and is the cheapest option that also feeds SMTC naturally. Do not add a second
 audio stack alongside it — `NAudio` was declared and unused, and has been removed; another
 one costs startup time and memory for no gain.
+
+**The engine owns the format list.** `IAudioPlayer.SupportedContainers` decides two things
+in Core: which local files the indexer admits, and which containers the Jellyfin client asks
+the server to direct-play instead of transcoding. Until the Core split each carried its own
+copy of the WinRT list, the settings caption a third, and they disagreed — the indexer
+admitted `.ogg`, for which WinRT has no inbox decoder, so an Ogg file showed up in search and
+failed the moment it was played, while the Jellyfin client rightly had the server transcode
+the same format. Now `App.BuildServices` builds the engine first and hands its list to both,
+and the caption reads it back from the indexer.
+
+- **`.ogg` is no longer indexed on Windows.** The Store's Web Media Extensions can add a
+  Vorbis decoder, but a list that is right only on some machines is not a list. Pruning drops
+  any row whose extension the engine no longer admits, so an existing index loses its Ogg rows
+  on the next scan rather than keeping entries that cannot play.
+- The names are Jellyfin container names doubling as extensions. `alac` never matches a file
+  — ALAC lives in `.m4a` — and that is harmless; it is there for the server.
+- **A scan survives a subfolder it cannot open.** `Directory.GetFiles` with `AllDirectories`
+  enumerates with `IgnoreInaccessible = false`, so one denied directory anywhere in the tree
+  threw and took the whole folder with it. `EnumerateFiles` with explicit `EnumerationOptions`
+  skips it and carries on; a root that cannot be opened at all indexes zero rather than
+  throwing past the caller's remaining folders. Hidden and system entries are skipped too.
+  Verified in the Windows suite with a genuinely denied ACL, not a fake.
+- The indexer takes an optional database path so the suite can index a real temporary tree
+  without touching `tracks.db`. That is also the first coverage indexing and pruning have had:
+  the earlier claim that pruning was covered had no test behind it.
 
 **The sleep timer is not auto-hide.** They are the only two timers in the app and are easily
 confused: the sleep timer **pauses playback** after a long, absolute interval and nothing
@@ -892,7 +922,7 @@ What this means in practice:
   the AppKit equivalent of `ShowInTaskbar="False"` plus the tray icon.
 
 `win/` is the reference implementation for anything above Core. Get a feature working and
-proven there before porting it; `mac/` is empty and not yet started.
+proven there before porting it; the shell under `mac/` is not yet started.
 
 ### Starting the macOS app
 

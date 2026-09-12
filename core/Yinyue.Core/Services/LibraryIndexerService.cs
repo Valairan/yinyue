@@ -11,17 +11,54 @@ namespace Yinyue.Services
     public class LibraryIndexerService
     {
         private readonly string _dbPath;
+        private readonly HashSet<string> _extensions;
 
         public event Action<int, int>? OnScanProgress; // (scanned, total)
 
-        public LibraryIndexerService()
+        /// <summary>
+        /// The engine's list, kept as given so the settings caption can name it. The shell
+        /// supplies it from <see cref="IAudioPlayer.SupportedContainers"/>; this class used to
+        /// hard-code a list of its own, which admitted .ogg while the engine could not play it.
+        /// </summary>
+        public IReadOnlyCollection<string> SupportedContainers { get; }
+
+        /// <summary>
+        /// Recursive, and tolerant of a subfolder that cannot be opened. The SearchOption
+        /// overload of GetFiles is not — it enumerates with IgnoreInaccessible = false, so
+        /// one denied directory anywhere in the tree threw and took the whole folder's scan
+        /// with it. Hidden and system entries are skipped, as the default options do:
+        /// desktop.ini and thumbnail caches are not music.
+        /// </summary>
+        private static readonly EnumerationOptions ScanOptions = new()
         {
+            RecurseSubdirectories = true,
+            IgnoreInaccessible = true,
+            AttributesToSkip = FileAttributes.Hidden | FileAttributes.System,
+        };
+
+        /// <param name="supportedContainers">
+        /// What the audio engine decodes, as container names doubling as extensions. A name
+        /// that is not an extension ("alac" lives in .m4a) simply never matches, harmlessly.
+        /// </param>
+        /// <param name="dbPath">
+        /// Override for the suite, which indexes a real temporary tree and must not touch
+        /// the user's tracks.db. Null means the shared data folder.
+        /// </param>
+        public LibraryIndexerService(IReadOnlyCollection<string> supportedContainers, string? dbPath = null)
+        {
+            SupportedContainers = supportedContainers;
+            _extensions = new HashSet<string>(
+                supportedContainers.Select(c => "." + c.TrimStart('.')),
+                StringComparer.OrdinalIgnoreCase);
+
             // Through AppPaths rather than resolving it again here: this was the one place
             // in the portable half that computed the data folder for itself, and on macOS
             // that would have put tracks.db somewhere the rest of the app never looks.
-            _dbPath = Path.Combine(AppPaths.DataFolder, "tracks.db");
+            _dbPath = dbPath ?? Path.Combine(AppPaths.DataFolder, "tracks.db");
             InitializeDatabase();
         }
+
+        private bool IsSupported(string file) => _extensions.Contains(Path.GetExtension(file));
 
         private void InitializeDatabase()
         {
@@ -58,16 +95,20 @@ namespace Yinyue.Services
         {
             if (!Directory.Exists(directoryPath)) return 0;
 
-            var audioFiles = Directory.GetFiles(directoryPath, "*.*", SearchOption.AllDirectories);
-            List<string> validFiles = new();
-
-            foreach (var file in audioFiles)
+            List<string> validFiles;
+            try
             {
-                string ext = Path.GetExtension(file).ToLower();
-                if (ext is ".mp3" or ".flac" or ".wav" or ".m4a" or ".ogg")
-                {
-                    validFiles.Add(file);
-                }
+                validFiles = Directory
+                    .EnumerateFiles(directoryPath, "*", ScanOptions)
+                    .Where(IsSupported)
+                    .ToList();
+            }
+            catch (Exception ex) when (ex is UnauthorizedAccessException or IOException)
+            {
+                // The root itself could not be read. There is nothing to index in a folder
+                // we cannot open, and the caller's other folders should not pay for it.
+                System.Diagnostics.Debug.WriteLine($"[Indexer] Cannot read {directoryPath}: {ex.Message}");
+                return 0;
             }
 
             int total = validFiles.Count;
@@ -152,10 +193,11 @@ namespace Yinyue.Services
         }
 
         /// <summary>
-        /// Drops rows that no longer belong: files deleted from disk, and anything outside
-        /// the currently configured folders. Without this the index only ever grows — a
-        /// removed folder would keep serving its tracks in search forever.
-        /// Returns the number of rows removed.
+        /// Drops rows that no longer belong: files deleted from disk, anything outside the
+        /// currently configured folders, and anything the engine no longer admits. Without
+        /// this the index only ever grows — a removed folder would keep serving its tracks
+        /// in search forever, and a format dropped from the engine's list would keep
+        /// offering files that fail when played. Returns the number of rows removed.
         /// </summary>
         public async Task<int> PruneAsync(IEnumerable<string> configuredFolders)
         {
@@ -184,7 +226,7 @@ namespace Yinyue.Services
                             path.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) ||
                             string.Equals(path, root, StringComparison.OrdinalIgnoreCase));
 
-                        if (!insideConfiguredRoot || !File.Exists(path))
+                        if (!insideConfiguredRoot || !IsSupported(path) || !File.Exists(path))
                             doomed.Add(path);
                     }
                 }

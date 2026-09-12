@@ -185,7 +185,7 @@ of them were arrived at by measuring rather than reasoning, and the notes say wh
 There are two test suites, and neither is a superset of the other:
 
 ```bash
-dotnet run --project tests/Yinyue.Core.Tests   # 198 checks, runs anywhere
+dotnet run --project tests/Yinyue.Core.Tests   # 214 checks, runs anywhere
 dotnet run --project tests/Yinyue.Tests        # Windows only
 ```
 

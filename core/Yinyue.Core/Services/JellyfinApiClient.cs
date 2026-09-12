@@ -33,11 +33,13 @@ namespace Yinyue.Services
     public class JellyfinApiClient
     {
         /// <summary>
-        /// Containers WinRT MediaPlayer handles natively. Advertising these to the
-        /// /universal endpoint lets the server direct-play them untouched and transcode
-        /// only what we genuinely cannot decode (ogg, opus, wma).
+        /// Containers advertised to the /universal endpoint, comma-joined: the server
+        /// direct-plays these untouched and transcodes everything else to mp3. The list is
+        /// the audio engine's (<see cref="IAudioPlayer.SupportedContainers"/>), handed in by
+        /// the shell — this class used to hard-code the WinRT one, a platform fact Core has
+        /// no business knowing. Empty is safe: the server then transcodes everything.
         /// </summary>
-        private const string SupportedContainers = "mp3,aac,m4a,flac,alac,wav";
+        private readonly string _containers;
 
         private static readonly JsonSerializerOptions JsonOptions = new()
         {
@@ -63,8 +65,9 @@ namespace Yinyue.Services
         /// <summary>Raised when the server rejects our token, so the UI can prompt a re-login.</summary>
         public event EventHandler? Unauthorized;
 
-        public JellyfinApiClient(HttpClient? httpClient = null)
+        public JellyfinApiClient(IReadOnlyCollection<string> supportedContainers, HttpClient? httpClient = null)
         {
+            _containers = string.Join(",", supportedContainers);
             _httpClient = httpClient ?? new HttpClient();
             _httpClient.Timeout = TimeSpan.FromSeconds(15);
         }
@@ -386,7 +389,7 @@ namespace Yinyue.Services
                 .Append($"?userId={Uri.EscapeDataString(_userId ?? string.Empty)}")
                 .Append($"&deviceId={Uri.EscapeDataString(DeviceId ?? "Yinyue")}")
                 .Append($"&api_key={Uri.EscapeDataString(_accessToken!)}")
-                .Append($"&container={SupportedContainers}")
+                .Append($"&container={_containers}")
                 .Append("&transcodingContainer=mp3")
                 .Append("&audioCodec=mp3")
                 .Append("&enableRemoteMedia=true");
