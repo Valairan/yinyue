@@ -728,10 +728,15 @@ Regenerate the icons from `Common/` rather than editing them directly.
 
 ## Performance budget
 
-- Cold start to visible overlay: target **< 200 ms**. Keep `OnStartup` free of I/O; defer
+- Process start to a first-rendered window measures **~370 ms for a bare WPF window** on this
+  machine. ReadyToRun changes nothing — WPF is already precompiled as part of Windows. The
+  earlier "< 200 ms" target here was written down and never measured, and WPF cannot reach it.
+  It also matters less than it reads: the app is resident, so this is paid once at login, and
+  summoning is `Show()` on a live window. Keep `OnStartup` free of I/O regardless; defer
   library scans, config-heavy work, and network calls.
-- Idle CPU ~0%. The 250 ms progress timer in `AudioPlayerService` stops whenever playback
-  stops. It keeps running while playing with the overlay hidden, and has to: `App` feeds
+- Idle CPU ~0%, and for the framework itself that is a measured **0.00%** of a core with a
+  window open and nothing happening — the property Avalonia could not match. The 250 ms
+  progress timer in `AudioPlayerService` stops whenever playback stops. It keeps running while playing with the overlay hidden, and has to: `App` feeds
   `SmtcService.UpdateTimeline` from the same event, so the OS scrubber would freeze without
   it. Tying it to overlay visibility would be wrong, not an optimisation.
 - Do not add MVVM frameworks, DI containers, or reactive libraries for their own sake.
@@ -749,6 +754,29 @@ Do not propose a shared UI framework. Avalonia, Electron, Tauri, and MAUI are al
 table. Both defining features (the borderless always-on-top summon overlay and OS media-key
 integration) are platform-specific interop regardless of toolkit, so a shared framework
 would still need two interop layers while adding runtime cost against requirement 4.
+
+**Avalonia was measured, not merely ruled out.** The decision was reopened when the apps were
+asked to look identical on both platforms, which removes the "feel native" argument. Two bare
+420×170 transparent Catppuccin panels, WPF and Avalonia 11.3, both framework-dependent single
+file, five launches each:
+
+| | WPF | Avalonia + ReadyToRun |
+|---|---|---|
+| Warm startup | 366 ms | 371 ms |
+| Resting memory | 101 MB | 108 MB (66 MB software-rendered) |
+| Installer | ~6 MB | ~14 MB |
+| **Idle CPU, window hidden** | **0.00%** of a core | **~0.9%** of a core |
+
+On startup and memory it was a wash; ReadyToRun is mandatory for Avalonia (JIT cold launch is
+1.3 s). The deciding row is idle CPU. WPF sat at a true zero in every sample. Avalonia's
+compositor keeps a render loop alive on every open TopLevel, so it ran at 0.9–1.3% of a core
+continuously **and did not stop when the window was hidden**. Opaque changed nothing, so it is
+the compositor rather than transparency; software rendering was lower but too scattered
+(0.0 / 0.3 / 2.5%) to trust. Yinyue is hidden almost all day and its invariant is hide, never
+close, so that cost would run from login onward. Against requirement 4 — the requirement the
+owner named as the main one — that settled it: lightness over identical pixels, chosen
+knowingly. The likely mitigation (close the overlay on hide and bind hotkeys/SMTC to a
+separate hidden window) was identified but not measured.
 
 What this means in practice:
 

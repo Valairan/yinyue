@@ -159,6 +159,10 @@ config schema and the server contract — not a cross-platform toolkit, because 
 features (a borderless always-on-top overlay, and OS media-key integration) are
 platform-specific interop whichever toolkit you pick.
 
+Avalonia was measured as the alternative and rejected. It matched WPF on startup and memory,
+but kept about 1% of a core busy even with the overlay hidden, where WPF idles at zero; for an
+app that is resident all day, that was decisive. The numbers are in [CLAUDE.md](CLAUDE.md).
+
 Known limitations are listed at the end of [CLAUDE.md](CLAUDE.md).
 
 ## Contributing
