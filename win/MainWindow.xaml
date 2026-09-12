@@ -139,6 +139,17 @@
                                 Grid.Column="1"
                                 Orientation="Horizontal"
                                 VerticalAlignment="Center">
+                        <!--
+                            Only on screen while the timer runs. It lives here rather than on
+                            the status line because that line carries transient messages and
+                            would keep overwriting it.
+                        -->
+                        <TextBlock x:Name="TxtSleepRemaining"
+                                   Visibility="Collapsed"
+                                   Foreground="{StaticResource WarningBrush}"
+                                   FontSize="11"
+                                   Margin="0,0,8,0"
+                                   VerticalAlignment="Center"/>
                         <Button x:Name="BtnBurgerMenu"
                                 Content="≡"
                                 Style="{StaticResource HeaderBtnStyle}"

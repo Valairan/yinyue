@@ -191,6 +191,13 @@ namespace Yinyue
 
             _sleepTimer = new SleepTimerService();
             ApplySleepTimerSettings();
+
+            // Once a second while it runs, and once more when it stops.
+            _sleepTimer.Changed += remaining => Dispatcher.BeginInvoke(() =>
+            {
+                _overlay?.ShowSleepRemaining(remaining);
+                UpdateTrayTooltip();
+            });
             _sleepTimer.Elapsed += () =>
             {
                 _ = _playback!.PauseAsync();
@@ -213,12 +220,7 @@ namespace Yinyue
             {
                 bool muted = _playback!.IsMuted || volume <= 0.0001;
 
-                if (_notifyIcon != null)
-                {
-                    _notifyIcon.Text = muted
-                        ? "Yinyue — muted"
-                        : $"Yinyue — volume {volume * 100:F0}%";
-                }
+                UpdateTrayTooltip();
 
                 _volumeSaveTimer?.Stop();
                 _volumeSaveTimer?.Start();
@@ -435,6 +437,30 @@ namespace Yinyue
             string hourPart = $"{hours} hour{(hours == 1 ? "" : "s")}";
 
             return rest == 0 ? hourPart : $"{hourPart} {rest} min";
+        }
+
+        /// <summary>
+        /// Keeps the tray tooltip current. The sleep timer shares it with volume, so both
+        /// are written from one place rather than overwriting each other.
+        /// </summary>
+        private void UpdateTrayTooltip()
+        {
+            if (_notifyIcon == null) return;
+
+            string text = "Yinyue";
+
+            if (_playback != null)
+            {
+                text += _playback.IsMuted || _playback.Volume <= 0.0001
+                    ? " — muted"
+                    : $" — volume {_playback.Volume * 100:F0}%";
+            }
+
+            if (_sleepTimer is { IsRunning: true })
+                text += $" — sleeping in {SleepTimerService.Describe(_sleepTimer.Remaining)}";
+
+            // NotifyIcon.Text throws above 63 characters rather than truncating.
+            _notifyIcon.Text = text.Length > 63 ? text[..63] : text;
         }
 
         private void ApplySleepTimerSettings()

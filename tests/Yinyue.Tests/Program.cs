@@ -1539,6 +1539,44 @@ public static class WindowTests
             Check.That("cancelled", !timer.IsRunning);
         });
 
+        Check.Group("sleep timer says how long is left", () =>
+        {
+            // Coarse far out, precise near the end.
+            Check.Equal("hours and minutes", "2h 05m",
+                SleepTimerService.Describe(TimeSpan.FromMinutes(125)));
+            Check.Equal("whole hours drop the minutes", "8h",
+                SleepTimerService.Describe(TimeSpan.FromHours(8)));
+            Check.Equal("under an hour is minutes", "42m",
+                SleepTimerService.Describe(TimeSpan.FromMinutes(42)));
+            Check.Equal("the last minute counts seconds", "45s",
+                SleepTimerService.Describe(TimeSpan.FromSeconds(45)));
+
+            // Rounded up, or it would read "0m" with 30 seconds of music still to come.
+            Check.Equal("part-minutes round up", "3m",
+                SleepTimerService.Describe(TimeSpan.FromSeconds(121)));
+            Check.Equal("nothing left, nothing said", string.Empty,
+                SleepTimerService.Describe(TimeSpan.Zero));
+            Check.Equal("and the same past zero", string.Empty,
+                SleepTimerService.Describe(TimeSpan.FromSeconds(-5)));
+
+            // The overlay shows it only while the timer runs.
+            var config = new ConfigService();
+            var overlay = new MainWindow(config, FadeLibrary(), FadePlayback(), () => null!);
+            var readout = overlay.FindName("TxtSleepRemaining") as TextBlock;
+
+            Check.That("the readout exists", readout != null);
+            Check.Equal("hidden by default", Visibility.Collapsed, readout!.Visibility);
+
+            overlay.ShowSleepRemaining(TimeSpan.FromMinutes(90));
+            Check.Equal("shown while running", Visibility.Visible, readout.Visibility);
+            Check.That("and says how long", readout.Text.Contains("1h 30m"));
+
+            overlay.ShowSleepRemaining(TimeSpan.Zero);
+            Check.Equal("hidden again once it stops", Visibility.Collapsed, readout.Visibility);
+
+            overlay.Close();
+        });
+
         Check.Group("sleep timer can be turned off entirely", () =>
         {
             using var timer = new SleepTimerService();

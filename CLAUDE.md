@@ -212,6 +212,12 @@ names.
 - Changing the steps under a running timer stops it if its duration is no longer in the list,
   rather than stranding it outside the cycle.
 - Pressing the shortcut while disabled says so. Silence would read as a broken shortcut.
+- **It says how long is left.** A readout appears in the overlay header while the timer runs,
+  and the tray tooltip carries it too. Before this its only surface was the toast raised when
+  cycling, so checking it meant pressing the shortcut — which also changed the setting.
+  `SleepTimerService.Describe` is coarse far out and precise near the end, and rounds up, so
+  it never reads "0m" with music still to come. The tooltip is shared with volume and written
+  from one place, since `NotifyIcon.Text` throws above 63 characters rather than truncating.
 
 **Search prefixes.** A leading prefix narrows what a search returns. `SearchQuery.Parse`
 turns the raw box text into a term plus three orthogonal narrowings, and `MusicLibrary`
@@ -740,9 +746,6 @@ Verified against the current tree — these are real, not speculative.
   server carry junk names ("AC-DC - Discography 1975-2020 (FLAC) 88") and it returns no
   genre entities at all, so neither could be offered as a prefix that works.
 - Moving a queue entry cannot be undone once confirmed, beyond moving it back by hand.
-- The sleep timer still has no on-screen presence beyond its toast. With the overlay hidden
-  there is no way to see how long is left without pressing the shortcut, which also changes
-  the setting.
 - `StartupService` writes an absolute path to the Run key, so moving or republishing the app
   leaves a stale entry. Settings detects this and prompts, but does not repair it silently.
 - Shuffle-favourites caps at 1000 tracks (`MainWindow.FavoritesCap`) and holds them in

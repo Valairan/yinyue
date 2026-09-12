@@ -1220,6 +1220,26 @@ namespace Yinyue
             }
         }
 
+        /// <summary>
+        /// Shows how long the sleep timer has left, or nothing when it is not running.
+        ///
+        /// The timer's only previous surface was the toast it raised when cycled, so with the
+        /// overlay hidden there was no way to check it without pressing the shortcut — which
+        /// also changed the setting. Summoning the overlay now answers the question.
+        /// </summary>
+        public void ShowSleepRemaining(TimeSpan remaining)
+        {
+            if (remaining <= TimeSpan.Zero)
+            {
+                TxtSleepRemaining.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            TxtSleepRemaining.Text = "⏻ " + SleepTimerService.Describe(remaining);
+            TxtSleepRemaining.ToolTip = $"Playback pauses in {SleepTimerService.Describe(remaining)}";
+            TxtSleepRemaining.Visibility = Visibility.Visible;
+        }
+
         private void UpdateOfflineButton()
         {
             bool offline = _config.Current.OfflineMode;

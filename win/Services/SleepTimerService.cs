@@ -104,6 +104,27 @@ namespace Yinyue.Services
 
         public void Cancel() => Set(0);
 
+        /// <summary>
+        /// Coarse near the start, precise near the end: the exact second matters when the
+        /// music is about to stop and not at all when it is hours away. Rounded up, so it
+        /// never reads "0m" while still playing.
+        /// </summary>
+        public static string Describe(TimeSpan remaining)
+        {
+            if (remaining <= TimeSpan.Zero) return string.Empty;
+
+            if (remaining < TimeSpan.FromMinutes(1))
+                return $"{Math.Ceiling(remaining.TotalSeconds):F0}s";
+
+            int minutes = (int)Math.Ceiling(remaining.TotalMinutes);
+
+            if (minutes < 60) return $"{minutes}m";
+
+            return minutes % 60 == 0
+                ? $"{minutes / 60}h"
+                : $"{minutes / 60}h {minutes % 60:00}m";
+        }
+
         private void OnTick(object? sender, EventArgs e)
         {
             if (!IsRunning) return;
