@@ -13,7 +13,12 @@
         WindowStartupLocation="Manual">
 
     <Window.Resources>
-        <Style x:Key="HeaderBtnStyle" TargetType="Button">
+        <!--
+            The small text button in the queue panel ("Clear queue"). This was the header
+            icon style until the icons were sized to match the transport row; see
+            HeaderBtnStyle below.
+        -->
+        <Style x:Key="SmallTextBtnStyle" TargetType="Button">
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
             <Setter Property="FontSize" Value="13"/>
@@ -67,6 +72,23 @@
                 </Trigger>
             </Style.Triggers>
         </Style>
+
+        <!--
+            The header icons — queue, offline, favourites, settings — are the transport style
+            with a hover background added, so the four icons above the title measure exactly
+            what the six below the seek bar do. They used to be a 24×22 box at 13px against
+            the transport row's 30-wide 15px glyphs, and the mismatch read as two different
+            sets of controls. No horizontal margin: the header shares its row with the status
+            line, which needs the room.
+        -->
+        <Style x:Key="HeaderBtnStyle" TargetType="Button" BasedOn="{StaticResource MediaBtnStyle}">
+            <Setter Property="Margin" Value="0"/>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="{StaticResource Surface0Brush}"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
     </Window.Resources>
 
     <!--
@@ -89,13 +111,27 @@
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
 
-            <!-- Album Artwork Area -->
-            <Border Grid.Column="0"
+            <!--
+                Album artwork: a square centred in its column, not a box the full height of
+                the panel. The column is 130 wide and the content 148 tall, and UniformToFill
+                into a frame that tall scaled the art to 148 and clipped the excess off the
+                right edge only, so the mark sat visibly left of centre. Measured by rendering:
+                the image element was 148 wide from the frame's left edge. A square frame has
+                nothing to clip for square art, and the image is centre-aligned so non-square
+                art clips evenly on both sides rather than on one.
+            -->
+            <Border x:Name="ArtFrame"
+                    Grid.Column="0"
+                    Width="130"
+                    Height="130"
+                    VerticalAlignment="Center"
                     CornerRadius="6"
                     ClipToBounds="True"
                     Background="{StaticResource MantleBrush}">
                 <Image x:Name="ImgAlbumArt"
                        Stretch="UniformToFill"
+                       HorizontalAlignment="Center"
+                       VerticalAlignment="Center"
                        Source="pack://application:,,,/Yinyue;component/Resources/placeholder.png"/>
             </Border>
 
@@ -292,7 +328,7 @@
 
                                 <Button x:Name="BtnClearQueue"
                                         Content="Clear queue"
-                                        Style="{StaticResource HeaderBtnStyle}"
+                                        Style="{StaticResource SmallTextBtnStyle}"
                                         Width="Auto"
                                         Height="Auto"
                                         Padding="6,3"

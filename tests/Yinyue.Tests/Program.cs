@@ -814,6 +814,53 @@ public static class WindowTests
             previous!.Measure(new System.Windows.Size(double.PositiveInfinity, double.PositiveInfinity));
             Check.Equal("and match the rest of the row", previous.DesiredSize.Width, playing);
 
+            // The header icons share the transport row's size, so the two rows read as one
+            // set of controls rather than a large one and a small one. DesiredSize includes
+            // the margin, and only the transport row spaces its buttons out, so compare the
+            // button box itself.
+            static System.Windows.Size BoxOf(System.Windows.Controls.Button button)
+            {
+                button.Measure(new System.Windows.Size(double.PositiveInfinity, double.PositiveInfinity));
+                return new System.Windows.Size(
+                    button.DesiredSize.Width - button.Margin.Left - button.Margin.Right,
+                    button.DesiredSize.Height - button.Margin.Top - button.Margin.Bottom);
+            }
+
+            var transport = BoxOf(previous);
+            foreach (var name in new[] { "BtnBurgerMenu", "BtnOfflineToggle", "BtnShuffleFavorites", "BtnSettingsGear" })
+            {
+                var icon = (System.Windows.Controls.Button)overlay.FindName(name);
+                Check.Equal($"{name} is the size of a transport button", transport, BoxOf(icon));
+                Check.Equal($"{name} uses the same glyph size", previous.FontSize, icon.FontSize);
+            }
+
+            overlay.Close();
+        });
+
+        Check.Group("album art is a centred square", () =>
+        {
+            var config = new ConfigService();
+            var overlay = new MainWindow(config, FadeLibrary(), FadePlayback(), () => null!);
+            ShowAndActivate(overlay);
+            overlay.ShowOverlay();
+            Pump();
+
+            var frame = (Border)overlay.FindName("ArtFrame");
+            var art = (System.Windows.Controls.Image)overlay.FindName("ImgAlbumArt");
+            var column = (FrameworkElement)VisualTreeHelper.GetParent(frame);
+
+            Check.Equal("square", frame.ActualWidth, frame.ActualHeight);
+
+            // UniformToFill used to overflow the frame and clip on one side only, which is
+            // what put the mark off centre. Now the image fits, and sits centred.
+            Check.That("the image does not overflow its frame",
+                art.ActualWidth <= frame.ActualWidth + 0.5 && art.ActualHeight <= frame.ActualHeight + 0.5);
+
+            double top = frame.TranslatePoint(new System.Windows.Point(0, 0), column).Y;
+            double bottom = column.ActualHeight - (top + frame.ActualHeight);
+            Check.That("centred vertically in the column", Math.Abs(top - bottom) < 0.5,
+                $"{top:F1} above, {bottom:F1} below");
+
             overlay.Close();
         });
 

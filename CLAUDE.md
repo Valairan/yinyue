@@ -646,6 +646,19 @@ appeared to jump. `MediaBtnStyle` carries a `MinWidth` that covers the widest gl
 minimum rather than a fixed width, so a wider glyph still fits instead of being clipped. The
 suite measures the pairs rather than trusting the eye.
 
+**The header icons are transport-sized.** `HeaderBtnStyle` derives from `MediaBtnStyle`, so
+the four icons above the title measure exactly what the six below the seek bar do. They were a
+24×22 box at 13px and read as a different, smaller set of controls. `SmallTextBtnStyle` is the
+old style, kept for the queue panel's "Clear queue" text button. The suite measures a header
+icon against a transport button.
+
+**The album art is a square, centred in its column.** The column is 130 wide and the content
+148 tall; `UniformToFill` into a frame that tall scaled the art to 148 and clipped the excess
+off the right edge only, so the mark sat left of centre. Found by rendering the overlay to a
+bitmap and reading the element geometry, not by eye: the image measured 148 wide from the
+frame's left edge. A square frame has nothing to clip for square art, and the image is
+centre-aligned so anything non-square clips evenly.
+
 **Theme.** Catppuccin Mocha, defined once in `App.xaml` as colours, brushes, and shared
 control styles. WPF's stock `CheckBox`, `ComboBox` and `TabControl` all ignore `Background`
 and draw light chrome, so each is fully retemplated there — `ToggleSwitchStyle`,
