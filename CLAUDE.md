@@ -300,6 +300,18 @@ interaction, on by default at 10 s and switchable off. Any key, click or pointer
 restarts the countdown, and an open search or queue — or the settings window in front —
 suspends it entirely, because reading is not idling.
 
+**macOS diverges here, deliberately: nothing suspends auto-hide.** An open panel with no
+input for ten seconds is still an overlay nobody is using, and leaving it up was judged the
+more annoying half of the trade. Idle means idle. Input anywhere in the stack restarts the
+clock, which needs every panel to report it — typing goes to the search box, not to the
+applet that owns the timer, so an applet-only handler hides the overlay mid-search.
+
+**And hide-on-focus-loss watches the application, not the window.** On macOS key status moves
+between the app's own windows constantly — the search box takes it the instant the search
+shortcut is pressed — so hanging this off the overlay resigning key made it vanish the moment
+it was summoned into search. `NSApplicationDidResignActive` cannot fire for an internal focus
+move, which makes the distinction structural rather than a guard that has to be got right.
+
 **Tracks stream; they are not downloaded first.** Playback reads from the Jellyfin stream
 URL as it plays. A download-then-play cache was built and measured, and then removed: on a
 link that already runs ahead of playback it bought smoothness that was mostly already there,

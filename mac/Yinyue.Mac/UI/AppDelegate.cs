@@ -102,6 +102,9 @@ namespace Yinyue.UI
             if (_stack is null || _overlay is null) return e;
             if (!_overlay.IsVisible) return e;
 
+            // Any key while the overlay is up is use, whichever of our windows it lands on.
+            _overlay.RestartAutoHide();
+
             // Settings is a real window with its own text fields; it must keep every key.
             if (_settings is { IsKeyWindow: true }) return e;
 
@@ -187,12 +190,7 @@ namespace Yinyue.UI
             // wire here beyond the keys.
             _stack = new OverlayStack(_config.Current.Overlay, _library, _playback, _overlay);
 
-            // An open search or queue, or settings in front, means the user is reading rather
-            // than idling — so the countdown is suspended rather than reset.
-            _overlay.SuspendAutoHide = () =>
-                _stack?.QueueIsOpen == true
-                || _stack?.SearchBar.HasText == true
-                || _settings is { IsVisible: true };
+            _overlay.WatchForFocusLoss();
 
             // A local monitor rather than the panel's KeyDown.
             //

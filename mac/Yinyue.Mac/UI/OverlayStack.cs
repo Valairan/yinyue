@@ -77,6 +77,11 @@ namespace Yinyue.UI
             _applet.Shown += (_, _) => Show();
             _applet.Hidden += (_, _) => Hide();
 
+            // Input anywhere in the stack counts as using the overlay.
+            foreach (var (_, panel) in PanelsForTest)
+                if (panel is StackedPanel stacked)
+                    stacked.Interacted += (_, _) => _applet.RestartAutoHide();
+
             _results.OrderOut(null);
             _queue.OrderOut(null);
             Layout();

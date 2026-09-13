@@ -177,6 +177,15 @@ namespace Yinyue
 
             Check("an empty box means Escape falls through to dismiss", !stack.HandleEscape());
 
+            // The search shortcut must not dismiss what it just summoned. Focusing the box
+            // moves key status to the search bar, and hanging hide-on-focus-loss off this
+            // window resigning key made the overlay vanish the instant it was summoned.
+            applet.ShowOverlay();
+            stack.FocusSearch();
+
+            Check("focusing the search box leaves the overlay up", applet.IsVisible);
+            Check("and the box has key status", stack.SearchBar.IsKeyWindow);
+
             // Nothing that has not been asked for is on screen. The toasts were child
             // windows once, which AddChildWindow orders in -- so two empty rounded boxes sat
             // under the applet from launch. Counting windows is the check that catches that;

@@ -51,6 +51,29 @@ namespace Yinyue.UI
         /// </summary>
         public override bool CanBecomeKeyWindow => false;
 
+        /// <summary>
+        /// Raised on any input to this panel. The auto-hide countdown belongs to the applet,
+        /// but the input often lands on a panel above it — typing goes to the search box, not
+        /// to the overlay — so every panel has to report it or the overlay hides mid-search.
+        /// </summary>
+        public event EventHandler? Interacted;
+
+        public override void SendEvent(NSEvent theEvent)
+        {
+            switch (theEvent.Type)
+            {
+                case NSEventType.KeyDown:
+                case NSEventType.LeftMouseDown:
+                case NSEventType.RightMouseDown:
+                case NSEventType.MouseMoved:
+                case NSEventType.ScrollWheel:
+                    Interacted?.Invoke(this, EventArgs.Empty);
+                    break;
+            }
+
+            base.SendEvent(theEvent);
+        }
+
         public override bool CanBecomeMainWindow => false;
 
         /// <summary>The area inside the border and padding, where content goes.</summary>

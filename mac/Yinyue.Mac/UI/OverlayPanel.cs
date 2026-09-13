@@ -132,14 +132,14 @@ namespace Yinyue.UI
         private NSTimer? _autoHide;
 
         /// <summary>
-        /// Suspends auto-hide while something is genuinely being read — an open search or
-        /// queue, or the settings window in front. Reading is not idling.
-        /// </summary>
-        public Func<bool>? SuspendAutoHide { get; set; }
-
-        /// <summary>
         /// Restarts the idle countdown. Called from every interaction, so the overlay only
         /// disappears when it is genuinely left alone.
+        ///
+        /// <b>Nothing suspends it.</b> Windows keeps the overlay up while a search or queue
+        /// is open, on the argument that reading is not idling — but an open panel with no
+        /// input for ten seconds is still an overlay nobody is using, and leaving it up was
+        /// the more annoying half of the trade. Idle means idle here; any key, click, scroll
+        /// or pointer movement anywhere in the stack restarts the clock.
         ///
         /// This is <b>not</b> the sleep timer. They are the only two timers here and are
         /// easily confused: this hides a window after a few seconds and any input restarts
@@ -153,16 +153,7 @@ namespace Yinyue.UI
 
             if (!_config.AutoHide || !IsVisible) return;
 
-            _autoHide = NSTimer.CreateScheduledTimer(_config.AutoHideSeconds, _ =>
-            {
-                if (SuspendAutoHide?.Invoke() == true)
-                {
-                    RestartAutoHide();
-                    return;
-                }
-
-                HideOverlay();
-            });
+            _autoHide = NSTimer.CreateScheduledTimer(_config.AutoHideSeconds, _ => HideOverlay());
         }
 
         /// <summary>
@@ -186,28 +177,25 @@ namespace Yinyue.UI
         }
 
         /// <summary>
-        /// Dismisses when the overlay stops being the key window, if the user asked for that.
-        /// Deferred a turn of the run loop: focus moves through an intermediate state when a
-        /// child panel is ordered in, and acting on that would hide the overlay the moment
-        /// the search results opened.
+        /// Dismisses when the user goes to another application, if they asked for that.
+        ///
+        /// Watches the <b>application</b> deactivating, not this window resigning key status.
+        /// Key status moves between our own windows constantly — the search box takes it the
+        /// instant the search shortcut is pressed — so hanging this off ResignKeyWindow made
+        /// the overlay vanish the moment it was summoned into search. Application
+        /// deactivation cannot fire for an internal focus move, so the distinction is
+        /// structural rather than a guard that has to be got right.
         /// </summary>
-        public override void ResignKeyWindow()
+        public void WatchForFocusLoss()
         {
-            base.ResignKeyWindow();
-
-            if (!_config.HideOnFocusLoss || !IsVisible) return;
-
-            BeginInvokeOnMainThread(() =>
-            {
-                if (!IsVisible) return;
-                if (SuspendAutoHide?.Invoke() == true) return;
-
-                // Still ours? A child panel taking key status is not focus loss.
-                if (IsKeyWindow || ChildWindows.Any(w => w.IsKeyWindow)) return;
-
-                HideOverlay();
-            });
+            _deactivated = NSNotificationCenter.DefaultCenter.AddObserver(
+                NSApplication.DidResignActiveNotification, _ =>
+                {
+                    if (_config.HideOnFocusLoss && IsVisible) HideOverlay();
+                });
         }
+
+        private NSObject? _deactivated;
 
         public void HideOverlay()
         {
