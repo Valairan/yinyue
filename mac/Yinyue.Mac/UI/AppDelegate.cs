@@ -189,6 +189,7 @@ namespace Yinyue.UI
             // The stack subscribes to the applet's own Shown/Hidden, so there is nothing to
             // wire here beyond the keys.
             _stack = new OverlayStack(_config.Current.Overlay, _library, _playback, _overlay);
+            _stack.Status = message => applet.ShowStatus(message);
 
             _overlay.WatchForFocusLoss();
 

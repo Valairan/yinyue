@@ -361,6 +361,27 @@ namespace Yinyue
 
             Check("and keeps its term", queued.Term == "hello", queued.Term);
 
+            // queue: picks ONE entry rather than listing hits, so the ranking has to have a
+            // single defensible answer: title over artist over album, exact over leading over
+            // containing, ties to queue order.
+            var order = new[]
+            {
+                new Yinyue.Models.Track { Id = "1", Title = "Ramble On", Artist = "Zeppelin" },
+                new Yinyue.Models.Track { Id = "2", Title = "Hello", Artist = "Ramble" },
+                new Yinyue.Models.Track { Id = "3", Title = "Ramble", Artist = "Other" },
+            };
+
+            Check("an exact title outranks a leading one",
+                Yinyue.Services.QueueSearch.BestMatch(order, "Ramble") == 2,
+                Yinyue.Services.QueueSearch.BestMatch(order, "Ramble").ToString());
+
+            Check("a title outranks an artist",
+                Yinyue.Services.QueueSearch.BestMatch(order, "Rambl") == 0,
+                Yinyue.Services.QueueSearch.BestMatch(order, "Rambl").ToString());
+
+            Check("no match reports none",
+                Yinyue.Services.QueueSearch.BestMatch(order, "nothing here") == -1);
+
             var scoped = Yinyue.Models.SearchQuery.Parse("album:dark side");
             Check("album: narrows to albums",
                 scoped.Wants(Yinyue.Models.SearchScope.Albums)

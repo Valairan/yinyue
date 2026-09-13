@@ -89,6 +89,14 @@ namespace Yinyue.UI
 
         public SearchBarPanel SearchBar => _searchBar;
 
+        /// <summary>
+        /// Writes to the applet's status line. A hook rather than a reference to the applet,
+        /// because the stack is about the panels around it and should not reach inside it.
+        /// </summary>
+        public Action<string>? Status { get; set; }
+
+        private void ShowStatus(string message) => Status?.Invoke(message);
+
         /// <summary>Every surface in the stack, for the alignment checks in the suite.</summary>
         public IReadOnlyList<(string Name, NSWindow Panel)> PanelsForTest => new (string, NSWindow)[]
         {
@@ -178,6 +186,7 @@ namespace Yinyue.UI
 
             _searchBar.Clear();
             CloseResults();
+            CloseQueueOpenedBySearch();
             return true;
         }
 
@@ -191,6 +200,14 @@ namespace Yinyue.UI
         {
             if (_queue.IsVisible)
             {
+                // Down off the bottom of a queue the search opened returns to typing, so the
+                // term can be edited without reaching for the mouse.
+                if (delta > 0 && _queueOpenedBySearch && _queue.IsAtLast)
+                {
+                    FocusSearch();
+                    return;
+                }
+
                 _queue.MoveSelection(delta);
                 return;
             }
@@ -226,7 +243,20 @@ namespace Yinyue.UI
 
         public void GrabQueueEntry() => _queue.ToggleGrab();
 
-        public void JumpToQueueSelection() => _queue.JumpToSelected();
+        /// <summary>
+        /// Enter on a queue row jumps to it. A queue the search opened closes with the
+        /// search; one the user had open stays, because closing it would undo something they
+        /// did rather than something the search did.
+        /// </summary>
+        public void JumpToQueueSelection()
+        {
+            _queue.JumpToSelected();
+
+            if (!_queueOpenedBySearch) return;
+
+            _searchBar.Clear();
+            CloseQueueOpenedBySearch();
+        }
 
         /// <summary>Returns true if a held entry was put back, so Escape stops there.</summary>
         public bool CancelQueueGrab()
@@ -363,14 +393,13 @@ namespace Yinyue.UI
                 return;
             }
 
-            // queue: never consults a source. The tracks are already in hand, and asking a
-            // server about them would be slower and wrong. Handled here rather than in
-            // MusicLibrary because the queue belongs to playback, not to the library —
-            // sending it to the library, as this did, searched the whole collection instead.
+            // queue: does not list its hits. It brings the QUEUE up with one entry
+            // highlighted, because listing them means reading a second list to find something
+            // already visible in the first. In memory, so no debounce — it runs on every
+            // keystroke.
             if (parsed.Target == SearchTarget.Queue)
             {
-                _debounce = NSTimer.CreateScheduledTimer(Debounce.TotalSeconds,
-                    _ => ShowResults(parsed, SearchTheQueue(parsed)));
+                SearchTheQueue(parsed);
                 return;
             }
 
@@ -378,23 +407,63 @@ namespace Yinyue.UI
         }
 
         /// <summary>
-        /// Matches on title, artist or album — the same three fields the row shows, so a hit
-        /// is always explicable by what is on screen.
+        /// Opens the queue and highlights the entry the term most plausibly means.
+        ///
+        /// The ranking is <see cref="QueueSearch.BestMatch"/> in Core, so both apps agree
+        /// about which row a term picks out: title over artist over album, exact over leading
+        /// over containing, ties to queue order.
         /// </summary>
-        private SearchResult SearchTheQueue(SearchQuery query)
+        private void SearchTheQueue(SearchQuery query)
         {
-            var matches = _playback.PlayOrder
-                .Where(t => Matches(t, query.Term))
-                .Take(SearchLimit)
-                .ToList();
+            CloseResults();
 
-            return SearchResult.Ok(matches);
+            var order = _playback.PlayOrder;
+            if (order.Count == 0)
+            {
+                ShowStatus("The queue is empty");
+                return;
+            }
+
+            if (!_queue.IsVisible)
+            {
+                _queue.Open();
+                _queueOpenedBySearch = true;
+                Layout();
+            }
+
+            if (query.IsEmpty)
+            {
+                // "queue:" alone opens the queue at the playing track and says what to do next.
+                _queue.Select(Math.Max(0, _playback.CurrentOrderPosition));
+                ShowStatus("Type to find a queued track · ↑ moves onto it");
+                return;
+            }
+
+            int best = QueueSearch.BestMatch(order, query.Term);
+            if (best < 0)
+            {
+                _queue.Select(-1);
+                ShowStatus($"Nothing queued matches “{query.Term}”");
+                return;
+            }
+
+            _queue.Select(best);
+            ShowStatus($"↑ moves onto “{order[best].Title}” · Enter jumps to it");
         }
 
-        private static bool Matches(Track track, string term) =>
-            track.Title.Contains(term, StringComparison.OrdinalIgnoreCase)
-            || track.Artist.Contains(term, StringComparison.OrdinalIgnoreCase)
-            || track.Album.Contains(term, StringComparison.OrdinalIgnoreCase);
+        /// <summary>
+        /// A queue the search opened closes with the search; one the user opened stays.
+        /// </summary>
+        private bool _queueOpenedBySearch;
+
+        public void CloseQueueOpenedBySearch()
+        {
+            if (!_queueOpenedBySearch) return;
+
+            _queueOpenedBySearch = false;
+            _queue.OrderOut(null);
+            Layout();
+        }
 
         private void RunSearch(string text)
         {

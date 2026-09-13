@@ -166,6 +166,19 @@ namespace Yinyue.UI
 
         // ---------------------------------------------------------------- actions
 
+        /// <summary>
+        /// Highlights one entry outright, for a queue search: the gesture brings the queue up
+        /// with the answer already picked out rather than listing candidates. -1 clears it.
+        /// </summary>
+        public void Select(int index)
+        {
+            _selected = index < 0 ? -1 : Math.Clamp(index, 0, Math.Max(0, _tracks.Count - 1));
+            Refresh();
+        }
+
+        /// <summary>True when the highlight is on the last row, so Down can leave the list.</summary>
+        public bool IsAtLast => _tracks.Count > 0 && _selected >= _tracks.Count - 1;
+
         public void MoveSelection(int delta)
         {
             if (_tracks.Count == 0) return;
