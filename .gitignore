@@ -24,3 +24,7 @@ installer/out/
 
 ## Claude Code local overrides (project CLAUDE.md and skills are tracked)
 .claude/settings.local.json
+
+# .NET build output for the macOS shell
+mac/**/bin/
+mac/**/obj/

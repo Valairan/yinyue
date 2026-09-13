@@ -1,0 +1,34 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0-macos</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+
+    <AssemblyName>Yinyue</AssemblyName>
+    <RootNamespace>Yinyue</RootNamespace>
+
+    <ApplicationTitle>Yinyue</ApplicationTitle>
+    <ApplicationId>com.yinyue.player</ApplicationId>
+    <ApplicationVersion>1</ApplicationVersion>
+    <ApplicationDisplayVersion>1.0.0</ApplicationDisplayVersion>
+
+    <!--
+      Menu-bar only: no Dock icon, no app switcher entry. The AppKit equivalent of the
+      Windows app's ShowInTaskbar="False" plus its tray icon, and the reason requirement 1
+      ("summon overlay, not a window") holds here too. Set in Info.plist as LSUIElement.
+    -->
+    <SupportedOSPlatformVersion>13.0</SupportedOSPlatformVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!--
+      The platform-neutral half. Everything below the window — the queue, play order,
+      shuffle, loop, retry, prebuffer, the Jellyfin client, the library, search and
+      persistence — comes from here unmodified and is the same code the Windows app runs.
+    -->
+    <ProjectReference Include="..\..\core\Yinyue.Core\Yinyue.Core.csproj" />
+  </ItemGroup>
+
+</Project>
