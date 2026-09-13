@@ -302,29 +302,20 @@ h2 {
 .platform .facts { margin-top: 1.6rem; }
 
 /* The macOS button and its processor toggle share a row; on a narrow card they stack. */
-.download-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.8rem; }
+.download-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem; }
 
-.segmented {
-  display: inline-flex;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 999px;
-  padding: 3px;
-  background: rgba(255, 255, 255, 0.04);
-}
-.segmented button {
-  appearance: none;
-  border: 0;
-  background: transparent;
-  color: var(--subtext);
-  font: inherit;
+/* The processor toggle: the download button's quieter sibling — same pill, a step smaller,
+   and a muted fill so the eye lands on the download first. Its label is the build in hand. */
+.button--muted {
+  background: var(--surface1);
+  color: var(--text);
   font-size: 0.9rem;
-  font-weight: 600;
-  padding: 0.45rem 0.9rem;
-  border-radius: 999px;
+  padding: 0.65rem 1.1rem;
   cursor: pointer;
+  font-family: inherit;
 }
-.segmented button:hover { color: var(--white); }
-.segmented button[aria-pressed="true"] { background: var(--white); color: var(--crust); }
+.button--muted:hover { background: var(--surface2); }
+.button--muted .button__icon { width: 15px; height: 15px; filter: brightness(0) invert(1); opacity: 0.8; }
 
 .platform__hint { margin: 0.9rem 0 0; color: var(--subtext); font-size: 0.88rem; }
 .platform__hint strong { color: var(--text); font-weight: 600; }

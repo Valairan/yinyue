@@ -177,21 +177,25 @@
                  data-file-arm64="downloads/Yinyue-0.2.0-arm64.dmg"
                  data-file-x64="downloads/Yinyue-0.2.0-x64.dmg">
           <h3>macOS</h3>
-          <p class="platform__meta">Version 0.2.0 · Disk image · about 44 MB · macOS 13 and later</p>
+          <p class="platform__meta">Version 0.2.0 · Disk image · 44 MB · macOS 13 and later</p>
           <div class="download-row">
             <a class="button button--primary" href="downloads/Yinyue-0.2.0-arm64.dmg" download data-mac-download>
               <img src="assets/icons/apple.svg" alt="" class="button__icon">
               Download for macOS
             </a>
-            <!-- One build per processor. The toggle picks which file every macOS button hands out. -->
-            <div class="segmented" role="group" aria-label="Which Mac">
-              <button type="button" data-mac-arch="arm64" aria-pressed="true">Apple silicon</button>
-              <button type="button" data-mac-arch="x64" aria-pressed="false">Intel</button>
-            </div>
+            <!--
+                One build per processor. One button, styled as a quieter sibling of the
+                download: it names the build in hand and flips to the other on click.
+            -->
+            <button type="button" class="button button--muted" data-mac-arch-toggle
+                    title="Switch between the Apple silicon and Intel builds">
+              <img src="assets/icons/arrow-right-left.svg" alt="" class="button__icon">
+              <span data-mac-arch-name>Apple silicon</span>
+            </button>
           </div>
           <p class="platform__hint">
-            Downloading the <strong data-mac-arch-name>Apple silicon</strong> build. Not sure which you have?
-            Apple menu → About This Mac says “Chip” for Apple silicon and “Processor” for Intel.
+            Not sure which Mac you have? Apple menu → About This Mac says “Chip” for Apple silicon
+            and “Processor” for Intel. The button beside the download switches builds.
           </p>
           <noscript><p class="platform__hint">Intel Mac: <a href="downloads/Yinyue-0.2.0-x64.dmg" download>Yinyue-0.2.0-x64.dmg</a></p></noscript>
           <dl class="facts">
