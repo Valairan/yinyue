@@ -1128,6 +1128,14 @@ degraded mode to design for a refusal.
   same strings in `config.json`.
 - Distribution: a `.app`, signed and notarised (Apple Developer Program) or right-click-to-open.
 
+**Running it:** `./mac/run.sh` — build, run, self-test, stop. Use it rather than invoking
+`dotnet` directly, for two reasons it documents at the top. The SDK is **not** the one on
+PATH: `dotnet` on this machine is 7.0.309 and fails with `NETSDK1045`/`NETSDK1139` before
+reaching any code, while the .NET 8 SDK and the `macos` workload live in `~/.dotnet`. And the
+app has **no single-instance guard yet**, unlike the Windows mutex, so a stale copy gives two
+menu-bar icons and two overlays fighting over one anchor; the script kills one before
+launching. Building at all needs a full Xcode, not the Command Line Tools.
+
 **Toolchain reality:** `win/` and `tests/Yinyue.Tests` target `net8.0-windows` and will not
 build on a Mac. That is expected, not a defect — but `core/` and `tests/Yinyue.Core.Tests`
 build and pass on either, which is what makes Mac-side work possible at all.

@@ -58,6 +58,24 @@ For a standalone build:
 dotnet publish win/Yinyue.csproj -c Release -r win-x64 --no-self-contained -p:PublishSingleFile=true
 ```
 
+## Running the macOS app
+
+```bash
+./mac/run.sh show      # build and summon the overlay
+./mac/run.sh           # build and sit in the menu bar
+./mac/run.sh test      # seam self-test
+./mac/run.sh stop      # kill a running copy
+```
+
+It needs the **.NET 8 SDK and the `macos` workload**, which are not the same thing as a
+system `dotnet` — a .NET 7 SDK fails with `NETSDK1045` before it reaches any code. The script
+uses `~/.dotnet/dotnet` and says how to install it if it is missing. Building also needs a
+full **Xcode**, not just the Command Line Tools.
+
+Like the Windows build it is a menu-bar app with no main window, so a successful launch looks
+like nothing happening: the 音樂 mark appears in the menu bar. There is no global hotkey yet,
+so `show` is how you summon the overlay for now.
+
 ## Building the installer
 
 ```powershell
