@@ -43,6 +43,9 @@ namespace Yinyue.UI
         private readonly NSButton _settings;
 
         // Transport, left to right, matching MainWindow's row 3.
+        private readonly NSImageView _sleepIcon = new();
+        private readonly NSTextField _sleepRemaining;
+
         private readonly NSButton _previous;
         private readonly NSButton _playPause;
         private readonly NSButton _next;
@@ -71,6 +74,7 @@ namespace Yinyue.UI
             _status = Label(Metrics.StatusFontSize, Theme.Subtext);
             _title = Label(Metrics.TitleFontSize, Theme.Text, bold: true);
             _artist = Label(Metrics.ArtistFontSize, Theme.Subtext);
+            _sleepRemaining = Label(Metrics.StatusFontSize, Theme.Warning);
             _elapsed = Label(Metrics.TimeFontSize, Theme.Subtext);
             _total = Label(Metrics.TimeFontSize, Theme.Subtext);
 
@@ -151,6 +155,29 @@ namespace Yinyue.UI
 
             double buttonsW = buttons.Length * Metrics.ButtonMinWidth
                             + (buttons.Length - 1) * Metrics.HeaderButtonMargin * 2;
+
+            // The sleep readout lives here rather than on the status line, because that line
+            // carries transient messages and would keep overwriting it. Hidden until the
+            // timer runs, and it reserves no space — nothing else moves when it appears,
+            // because it sits between the status text and the buttons and the status text
+            // simply has less room.
+            const double sleepIconW = 12, sleepGap = 4, sleepTextW = 48;
+            double sleepW = sleepIconW + sleepGap + sleepTextW;
+
+            _sleepIcon.Frame = new CGRect(x + width - buttonsW - sleepW,
+                y + (height - sleepIconW) / 2, sleepIconW, sleepIconW);
+            _sleepIcon.Image = Icon.Make(Icons.Moon, sleepIconW, Theme.Warning);
+            _sleepIcon.ImageScaling = NSImageScale.ProportionallyDown;
+            _sleepIcon.Hidden = true;
+            AddSubview(_sleepIcon);
+
+            _sleepRemaining.Frame = new CGRect(x + width - buttonsW - sleepTextW - 4,
+                y + (height - LineHeight(Metrics.StatusFontSize)) / 2,
+                sleepTextW, LineHeight(Metrics.StatusFontSize));
+            _sleepRemaining.Hidden = true;
+            AddSubview(_sleepRemaining);
+
+            buttonsW += sleepW;
 
             // The status line takes what the buttons leave. The buttons are ALWAYS visible:
             // collapsing them on Windows once hid the settings cog, and since the overlay
@@ -402,6 +429,8 @@ namespace Yinyue.UI
         /// </summary>
         public void ShowFavorite(bool isFavorite)
         {
+            _favoriteOn = isFavorite;
+
             SetIcon(_favorite, isFavorite ? Icons.Heart : Icons.HeartPlus,
                 isFavorite ? Theme.Danger : Theme.Text);
 
@@ -411,6 +440,8 @@ namespace Yinyue.UI
         /// <summary>Cloud, or cloud-off while offline mode is on.</summary>
         public void ShowOffline(bool offline)
         {
+            _offlineOn = offline;
+
             SetIcon(_offline, offline ? Icons.CloudOff : Icons.Cloud,
                 offline ? Theme.Warning : Theme.Text);
 
@@ -419,6 +450,66 @@ namespace Yinyue.UI
 
         /// <summary>The status line, for transient messages.</summary>
         public void ShowStatus(string message) => _status.StringValue = message;
+
+        /// <summary>
+        /// How long the sleep timer has left, or nothing when it is not running.
+        ///
+        /// Before this its only surface was the toast raised when cycling, so checking it
+        /// meant pressing the shortcut — which also changed the setting.
+        /// </summary>
+        public void ShowSleepRemaining(TimeSpan remaining)
+        {
+            string text = MacSleepTimer.Describe(remaining);
+            bool running = text.Length > 0;
+
+            _sleepRemaining.StringValue = text;
+            _sleepRemaining.ToolTip = running ? $"Playback pauses in {text}" : null;
+            _sleepRemaining.Hidden = !running;
+            _sleepIcon.Hidden = !running;
+        }
+
+        /// <summary>
+        /// Restates every hint that names a shortcut.
+        ///
+        /// <b>A hint never contains a literal combination.</b> Every shortcut here is
+        /// rebindable, so a tooltip with "Ctrl+Alt+I" written into it is wrong the moment
+        /// someone rebinds — and wrong for everyone when a default moves. Re-run on config
+        /// change, so a rebind updates the overlay without a restart.
+        /// </summary>
+        public void ApplyShortcutHints(HotkeyConfig hotkeys)
+        {
+            string Hint(string action)
+            {
+                string keys = hotkeys.For(action).Keys;
+                return string.IsNullOrWhiteSpace(keys) ? string.Empty : $" ({keys})";
+            }
+
+            _queue.ToolTip = "Queue" + Hint(HotkeyActions.OpenQueue);
+            _offline.ToolTip = (_offlineOn ? "Offline mode on" : "Offline mode off")
+                             + Hint(HotkeyActions.OfflineMode);
+            _shuffleFavorites.ToolTip =
+                "Shuffle all favourites · hold the shortcut to add them to the queue instead"
+                + Hint(HotkeyActions.ShuffleFavorites);
+            _settings.ToolTip = "Settings" + Hint(HotkeyActions.OpenSettings);
+
+            _previous.ToolTip = "Restart · hold to step back" + Hint(HotkeyActions.RestartOrPrevious);
+            _playPause.ToolTip = "Play / pause · hold to skip" + Hint(HotkeyActions.PlayPause);
+            _next.ToolTip = "Next";
+            _shuffle.ToolTip = (_playback.Shuffle ? "Shuffle on" : "Shuffle off")
+                             + Hint(HotkeyActions.ToggleShuffle);
+            _loop.ToolTip = $"Loop {_playback.Loop}".ToLowerInvariant() + Hint(HotkeyActions.CycleLoop);
+            _favorite.ToolTip = _favoriteOn ? "Remove from favourites" : "Add to favourites";
+        }
+
+        private bool _offlineOn;
+        private bool _favoriteOn;
+
+        /// <summary>For the suite: hints must follow a rebind, and cannot be read from markup.</summary>
+        public string SettingsTooltipForTest => _settings.ToolTip ?? string.Empty;
+
+        public bool SleepShownForTest => !_sleepRemaining.Hidden;
+
+        public string SleepTextForTest => _sleepRemaining.StringValue;
 
         private void OnSeekChanged(object? s, EventArgs e)
         {

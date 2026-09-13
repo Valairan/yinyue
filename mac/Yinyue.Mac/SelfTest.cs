@@ -317,6 +317,34 @@ namespace Yinyue
             Check("focusing the search box leaves the overlay up", applet.IsVisible);
             Check("and the box has key status", stack.SearchBar.IsKeyWindow);
 
+            // Hints must name the LIVE binding, never a literal. Every shortcut is
+            // rebindable, so a tooltip with a combination written into it is wrong the moment
+            // someone rebinds -- and wrong for everyone when a default moves.
+            var hotkeys = new Yinyue.Models.HotkeyConfig();
+            var view = new Yinyue.UI.AppletView(playback);
+
+            view.ApplyShortcutHints(hotkeys);
+            string before = view.SettingsTooltipForTest;
+
+            Check("a hint names the current binding",
+                before.Contains(hotkeys.For(Yinyue.Models.HotkeyActions.OpenSettings).Keys), before);
+
+            hotkeys.For(Yinyue.Models.HotkeyActions.OpenSettings).Keys = "Ctrl+Alt+J";
+            view.ApplyShortcutHints(hotkeys);
+
+            Check("and follows a rebind without a restart",
+                view.SettingsTooltipForTest.Contains("Ctrl+Alt+J"), view.SettingsTooltipForTest);
+
+            Check("the old binding is gone", !view.SettingsTooltipForTest.Contains(before));
+
+            // The readout appears only while the timer runs.
+            view.ShowSleepRemaining(TimeSpan.Zero);
+            Check("no sleep readout when the timer is off", !view.SleepShownForTest);
+
+            view.ShowSleepRemaining(TimeSpan.FromMinutes(30));
+            Check("a running timer shows its remaining time", view.SleepShownForTest,
+                view.SleepTextForTest);
+
             // Nothing that has not been asked for is on screen. The toasts were child
             // windows once, which AddChildWindow orders in -- so two empty rounded boxes sat
             // under the applet from launch. Counting windows is the check that catches that;
@@ -619,6 +647,32 @@ namespace Yinyue
         }
 
         /// <summary>
+        /// A resume point set before the media is ready must still be applied.
+        ///
+        /// AVPlayer drops a seek issued against an item that has not loaded, without an
+        /// error — so the naive implementation looks correct, compiles, and silently starts
+        /// every resumed track from zero. Track.ResumePosition carries Jellyfin's stored
+        /// position, so this is the difference between resuming an album and restarting it.
+        /// </summary>
+        private static void ResumePointIsHonoured(string fixturePath)
+        {
+            using var audio = new MacAudioPlayer();
+
+            var target = TimeSpan.FromSeconds(0.6);
+            audio.SeekWhenReady(target);
+            audio.PlayFileAsync(fixturePath).GetAwaiter().GetResult();
+
+            // Pump rather than block: the seek is applied on the first tick that reports the
+            // item ready, and blocking the main thread would stop those ticks arriving.
+            var deadline = DateTime.UtcNow.AddSeconds(5);
+            while (audio.Position < target && DateTime.UtcNow < deadline)
+                NSRunLoop.Main.RunUntil(NSDate.FromTimeIntervalSinceNow(0.05));
+
+            Check("a resume point set before load is applied",
+                audio.Position >= target, $"landed at {audio.Position.TotalSeconds:0.00}s");
+        }
+
+        /// <summary>
         /// Every shared mark must actually draw.
         ///
         /// Parsing is not the interesting failure. A wrong scale, a bad flip or an arc
@@ -843,6 +897,8 @@ namespace Yinyue
             Check("it played to the end", reachedEnd, reachedEnd ? null : failure ?? "timed out");
             Check("duration was reported", audio.Duration > TimeSpan.Zero, audio.Duration.ToString());
             Check("progress fired while playing", progressTicks > 0, $"{progressTicks} ticks");
+
+            ResumePointIsHonoured(path);
 
             try { File.Delete(path); } catch { }
         }

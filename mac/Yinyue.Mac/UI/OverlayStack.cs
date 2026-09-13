@@ -189,8 +189,21 @@ namespace Yinyue.UI
         /// </summary>
         public void MoveSelection(int delta)
         {
-            if (_queue.IsVisible) _queue.MoveSelection(delta);
-            else _results.MoveSelection(delta);
+            if (_queue.IsVisible)
+            {
+                _queue.MoveSelection(delta);
+                return;
+            }
+
+            // Arrowing off the top returns to typing rather than sticking at the first row.
+            // The caret goes to the end, so the term is still there to be edited.
+            if (delta < 0 && _results.IsAtFirst)
+            {
+                FocusSearch();
+                return;
+            }
+
+            _results.MoveSelection(delta);
         }
 
         public bool QueueIsOpen => _queue.IsVisible;
@@ -323,6 +336,16 @@ namespace Yinyue.UI
             if (string.IsNullOrWhiteSpace(text))
             {
                 CloseResults();
+                return;
+            }
+
+            // A prefix with nothing after it is intent without a subject. Searching for the
+            // empty string would return an arbitrary slice of the whole library, so the
+            // overlay says what the prefix does instead and waits for a term.
+            var parsed = SearchQuery.Parse(text);
+            if (parsed.IsScoped && parsed.IsEmpty)
+            {
+                ShowResultsMessage($"Searching {parsed.Noun} — type something to look for.");
                 return;
             }
 

@@ -196,7 +196,20 @@ namespace Yinyue.UI
             // is the exception on both platforms: transparency cannot be changed once a
             // window has a surface.
             _config.ConfigChanged += (_, _) => NSApplication.SharedApplication
-                .BeginInvokeOnMainThread(() => _stack?.ApplyBackgroundOpacity());
+                .BeginInvokeOnMainThread(() =>
+                {
+                    _stack?.ApplyBackgroundOpacity();
+
+                    // Rebinding a shortcut must update the overlay's hints without a restart,
+                    // or every tooltip naming a key becomes a lie.
+                    _applet?.ApplyShortcutHints(_config.Current.Hotkeys);
+
+                    // And the shortcuts themselves have to follow the config.
+                    _hotkeys?.Apply(_config.Current.Hotkeys);
+
+                    _sleep?.SetSteps(_config.Current.SleepTimer.Steps);
+                    if (_sleep is not null) _sleep.Enabled = _config.Current.SleepTimer.Enabled;
+                });
 
             // A local monitor rather than the panel's KeyDown.
             //
@@ -221,6 +234,7 @@ namespace Yinyue.UI
             _reporter = new JellyfinPlaybackReporter(_playback, _jellyfin);
 
             applet.ShowOffline(_config.Current.OfflineMode);
+            applet.ApplyShortcutHints(_config.Current.Hotkeys);
 
             // After the overlay exists, so its handlers see the restored state.
             RestoreQueue();
@@ -356,7 +370,11 @@ namespace Yinyue.UI
                     () => _stack?.Toast("Sleep timer finished — paused", Icons.Moon));
             };
 
-            _sleep.Changed += _ => NSApplication.SharedApplication.BeginInvokeOnMainThread(UpdateTooltip);
+            _sleep.Changed += remaining => NSApplication.SharedApplication.BeginInvokeOnMainThread(() =>
+            {
+                UpdateTooltip();
+                _applet?.ShowSleepRemaining(remaining);
+            });
 
             _playback.VolumeChanged += (_, _) =>
                 NSApplication.SharedApplication.BeginInvokeOnMainThread(UpdateTooltip);

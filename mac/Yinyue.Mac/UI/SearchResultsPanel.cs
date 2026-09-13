@@ -105,6 +105,9 @@ namespace Yinyue.UI
             Highlight();
         }
 
+        /// <summary>True when the highlight is on the first row, or there is nothing to move.</summary>
+        public bool IsAtFirst => _selected <= 0;
+
         public void MoveSelection(int delta)
         {
             if (_items.Count == 0) return;
