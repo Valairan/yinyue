@@ -94,7 +94,6 @@ namespace Yinyue.UI
             };
 
             var layer = root.Layer!;
-            layer.BackgroundColor = Theme.Base.WithAlpha(_config.BackgroundOpacity).CGColor;
             layer.CornerRadius = (nfloat)OverlayMetrics.RootCornerRadius;
             layer.BorderWidth = (nfloat)OverlayMetrics.RootBorderThickness;
             layer.BorderColor = Theme.Surface0.CGColor;
@@ -102,6 +101,7 @@ namespace Yinyue.UI
             // Corners have to be clipped for children to respect the radius.
             layer.MasksToBounds = true;
 
+            ApplyBackgroundOpacity(root);
             return root;
         }
 
@@ -110,6 +110,20 @@ namespace Yinyue.UI
         /// so the app is not activated; the panel still accepts keys because it can become key
         /// without becoming main.
         /// </summary>
+        /// <summary>
+        /// Re-reads the tint. Applied on every config change rather than cached, so the
+        /// setting takes effect without a restart — the same rule the Windows overlay
+        /// follows, and the reason it is a panel tint rather than window opacity: fading the
+        /// window would take the text and the artwork with it.
+        /// </summary>
+        public void ApplyBackgroundOpacity(NSView? root = null)
+        {
+            var view = root ?? ContentView;
+            if (view?.Layer is not { } layer) return;
+
+            layer.BackgroundColor = Theme.Base.WithAlpha(_config.BackgroundOpacity).CGColor;
+        }
+
         /// <summary>Raised after the panel is placed and shown, so the stack can follow it.</summary>
         public event EventHandler? Shown;
 

@@ -192,6 +192,12 @@ namespace Yinyue.UI
 
             _overlay.WatchForFocusLoss();
 
+            // The tint takes effect without a restart, as on Windows. The animations switch
+            // is the exception on both platforms: transparency cannot be changed once a
+            // window has a surface.
+            _config.ConfigChanged += (_, _) => NSApplication.SharedApplication
+                .BeginInvokeOnMainThread(() => _stack?.ApplyBackgroundOpacity());
+
             // A local monitor rather than the panel's KeyDown.
             //
             // The search box is the only panel that can become key, so once the caret is in

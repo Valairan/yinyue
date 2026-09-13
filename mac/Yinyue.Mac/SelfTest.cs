@@ -33,6 +33,7 @@ namespace Yinyue
             if (which is "all" or "search") SearchStack();
             if (which is "all" or "sleep") SleepTimerRules();
             if (which is "all" or "windows") WindowsOpen();
+            if (which is "all" or "opacity") BackgroundOpacity();
 
             Console.WriteLine();
             Console.WriteLine(_failed == 0 ? "PASS" : $"FAIL — {_failed} check(s)");
@@ -44,6 +45,57 @@ namespace Yinyue
             if (!ok) _failed++;
             Console.WriteLine($"  [{(ok ? "ok" : "FAIL")}] {label}{(detail is null ? "" : $"  — {detail}")}");
             Console.Out.Flush();
+        }
+
+        /// <summary>
+        /// The background tint must reach the panel and nothing else.
+        ///
+        /// It is a PANEL tint, not window opacity: using the window's alpha would fade the
+        /// text and artwork with it, and a track title you cannot read is not a setting
+        /// anyone wants. So the check is that the layer carries the alpha while the window
+        /// stays fully opaque.
+        /// </summary>
+        private static void BackgroundOpacity()
+        {
+            Console.WriteLine("\nBackground opacity");
+
+            foreach (double wanted in new[] { 1.0, 0.6, 0.2 })
+            {
+                var config = new Yinyue.Models.OverlayConfig { BackgroundOpacity = wanted };
+                var panel = new Yinyue.UI.OverlayPanel(config, Yinyue.UI.OverlayMetrics.AppletHeight);
+
+                var layer = panel.ContentView!.Layer!;
+                double alpha = layer.BackgroundColor!.Alpha;
+
+                Check($"a tint of {wanted:0.0} reaches the panel",
+                    Math.Abs(alpha - wanted) < 0.01, alpha.ToString("0.00"));
+
+                Check($"and the window itself stays opaque at {wanted:0.0}",
+                    Math.Abs(panel.AlphaValue - 1.0) < 0.01, panel.AlphaValue.ToString("0.00"));
+
+                panel.Close();
+            }
+
+            // Changing the setting must take effect without a restart, as on Windows. Read
+            // once at construction, it did not.
+            var live = new Yinyue.Models.OverlayConfig { BackgroundOpacity = 1.0 };
+            var livePanel = new Yinyue.UI.OverlayPanel(live, Yinyue.UI.OverlayMetrics.AppletHeight);
+
+            live.BackgroundOpacity = 0.4;
+            livePanel.ApplyBackgroundOpacity();
+
+            Check("a changed tint applies without a restart",
+                Math.Abs(livePanel.ContentView!.Layer!.BackgroundColor!.Alpha - 0.4) < 0.01,
+                livePanel.ContentView.Layer.BackgroundColor.Alpha.ToString("0.00"));
+
+            livePanel.Close();
+
+            // The floor matters: a panel you cannot see is indistinguishable from a broken
+            // one, so the config clamps rather than honouring zero.
+            var floored = new Yinyue.Models.OverlayConfig { BackgroundOpacity = 0.0 };
+            Check("zero is clamped to the floor, not honoured",
+                floored.BackgroundOpacity >= Yinyue.Models.OverlayConfig.MinBackgroundOpacity,
+                floored.BackgroundOpacity.ToString("0.00"));
         }
 
         /// <summary>

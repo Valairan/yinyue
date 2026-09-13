@@ -129,6 +129,16 @@ namespace Yinyue.UI
             // themselves when shown — they have to work with no applet on screen at all.
         }
 
+        /// <summary>Re-applies the background tint across the whole stack.</summary>
+        public void ApplyBackgroundOpacity()
+        {
+            _applet.ApplyBackgroundOpacity();
+
+            foreach (var (_, panel) in PanelsForTest)
+                if (panel is StackedPanel stacked)
+                    stacked.ApplyBackgroundOpacity();
+        }
+
         public void Show()
         {
             _searchBar.OrderFrontRegardless();

@@ -96,14 +96,30 @@ namespace Yinyue.UI
             };
 
             var layer = root.Layer!;
-            layer.BackgroundColor = Theme.Base.ColorWithAlphaComponent(
-                (nfloat)_config.BackgroundOpacity).CGColor;
             layer.CornerRadius = (nfloat)OverlayMetrics.RootCornerRadius;
             layer.BorderWidth = (nfloat)OverlayMetrics.RootBorderThickness;
             layer.BorderColor = Theme.Surface0.CGColor;
             layer.MasksToBounds = true;
 
+            ApplyBackgroundOpacity(root);
             return root;
+        }
+
+        /// <summary>
+        /// Re-reads the tint and applies it.
+        ///
+        /// Called on every config change rather than cached at construction, so the setting
+        /// takes effect without a restart — the same rule the Windows overlay follows. The
+        /// animations switch is the exception on both platforms, because transparency cannot
+        /// be changed once a window is on screen.
+        /// </summary>
+        public void ApplyBackgroundOpacity(NSView? root = null)
+        {
+            var view = root ?? ContentView;
+            if (view?.Layer is not { } layer) return;
+
+            layer.BackgroundColor = Theme.Base
+                .ColorWithAlphaComponent((nfloat)_config.BackgroundOpacity).CGColor;
         }
 
         /// <summary>
