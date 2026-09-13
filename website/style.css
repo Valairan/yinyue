@@ -301,6 +301,34 @@ h2 {
 .platform__meta { margin: 0 0 1.2rem; color: var(--subtext); font-size: 0.92rem; }
 .platform .facts { margin-top: 1.6rem; }
 
+/* The macOS button and its processor toggle share a row; on a narrow card they stack. */
+.download-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.8rem; }
+
+.segmented {
+  display: inline-flex;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  padding: 3px;
+  background: rgba(255, 255, 255, 0.04);
+}
+.segmented button {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--subtext);
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  padding: 0.45rem 0.9rem;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.segmented button:hover { color: var(--white); }
+.segmented button[aria-pressed="true"] { background: var(--white); color: var(--crust); }
+
+.platform__hint { margin: 0.9rem 0 0; color: var(--subtext); font-size: 0.88rem; }
+.platform__hint strong { color: var(--text); font-weight: 600; }
+
 .facts {
   max-width: 44rem;
   margin: 2.4rem auto 0;

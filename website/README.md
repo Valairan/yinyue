@@ -4,7 +4,7 @@ A static one-page site with no build step. Copy this whole folder into the portf
 so that `valairan.tech/yinyue/` serves `index.html`. Every link inside is relative, so it
 works from any sub-path.
 
-## Placeholders to fill in
+## What is generated, and how
 
 - **Background loop** — `media/demo.gif`, a 15 s recording of the main flows made by the same
   harness as the screenshots (its `--gif` mode drives the real UI and writes frames;
@@ -14,28 +14,39 @@ works from any sub-path.
   tracks and rendered at 2x by a small harness (a console project referencing `win/Yinyue.csproj`
   that shows the overlay, plays a fake track, opens each panel and composites the windows onto
   a dark canvas). Regenerate them when the UI changes; the `<figcaption>`s say what each shows.
-
-## Placeholders
-
+- **Marks and favicon** — `assets/mark.svg`, `mark-short.svg` and `favicon.svg` come from
+  `Common/make-win-assets.py`, which also builds the Windows icons.
 - **Buy Me a Coffee** — the Support card links to buymeacoffee.com/valairan as a whole; the QR
   code inside it is `assets/buymeacoffee.png`, resized to 720px for the web.
-- **macOS facts** — both "Download for macOS" buttons now link to the DMG. The macOS card
-  still has no `Requires` / `Installer` / `SHA-256` / signing rows the way the Windows one
-  does, and three lines still describe macOS as unreleased: the hero meta ("macOS next"), the
-  card's `platform--soon` class, and its "In development" line.
+
+## Downloads
+
+`downloads/` holds three files per release:
+
+| File | For |
+|---|---|
+| `Yinyue-X.Y.Z.msi` | Windows 10 and 11 |
+| `Yinyue-X.Y.Z-arm64.dmg` | macOS on Apple silicon (M1 and later) |
+| `Yinyue-X.Y.Z-x64.dmg` | macOS on Intel |
+
+The macOS card has a processor toggle beside its download button. `script.js` reads the two
+file names from `data-file-arm64` and `data-file-x64` on the card, points every
+`[data-mac-download]` link at the chosen one, and remembers the choice. Apple silicon is the
+default. Without JavaScript the links point at the Apple silicon build and the toggle does
+nothing, so a `<noscript>` line under the card names the Intel file directly.
+
+The MSI is gitignored and copied in from the Windows machine at release time. The DMGs are
+committed, so a clone carries them; mind the size, since git keeps every version forever and
+GitHub refuses single files over 100 MB.
 
 ## Releasing a new version
-
-The installers are **not committed** — `downloads/` is gitignored for both. Build them at
-release time and copy this whole folder to the host; a 43 MB DMG in git history would outweigh
-the rest of the repository several times over and could only be removed by rewriting it.
 
 **Windows**, from the repo root:
 
 1. Build the MSI: `.\installer\build.ps1 -Version X.Y.Z`.
 2. Copy `installer\out\Yinyue-X.Y.Z.msi` into `downloads/` and remove the old one.
-3. In `index.html`, update the two download links, the version text in the hero, the size,
-   and the SHA-256 (`Get-FileHash downloads\Yinyue-X.Y.Z.msi -Algorithm SHA256`).
+3. In `index.html`, update the Windows links, the version text in the hero and the card, the
+   size, and the SHA-256 (`Get-FileHash downloads\Yinyue-X.Y.Z.msi -Algorithm SHA256`).
 
 **macOS**, on a Mac with Xcode and the .NET 8 SDK:
 
@@ -43,15 +54,14 @@ the rest of the repository several times over and could only be removed by rewri
    `Yinyue-X.Y.Z-x64.dmg` into `downloads/` and prints each size and SHA-256.
    `./installer/build-mac.sh X.Y.Z universal` builds one bundle carrying both instead, which
    is the sum of the two rather than a saving.
-2. The macOS card needs **two** links, one per architecture — the DMGs are separate, so a
-   single button cannot serve both, and an Intel visitor given the arm64 file gets an app
-   that will not open.
-2. Update the two macOS links and facts in `index.html` to match.
+2. In `index.html`, update `data-file-arm64` and `data-file-x64` on the macOS card, the version
+   text, and the two SHA-256 rows. The DMGs are separate, so a single link cannot serve both:
+   an Intel visitor given the arm64 file gets an app that will not open, which is what the
+   processor toggle is for.
 
-The DMG is **ad-hoc signed** unless `DEVELOPER_ID` is set, which means Gatekeeper refuses a
+The DMGs are **ad-hoc signed** unless `DEVELOPER_ID` is set, which means Gatekeeper refuses a
 downloaded copy until the user right-clicks and chooses Open. That only affects the first
-launch — start at sign-in and everything else work normally afterwards — but the macOS card
-should say so while it is true. With an Apple Developer Program membership:
+launch, and the macOS card says so while it is true. With an Apple Developer Program membership:
 
     DEVELOPER_ID="Developer ID Application: Your Name (TEAMID)" \
     NOTARY_PROFILE=yinyue ./installer/build-mac.sh X.Y.Z
