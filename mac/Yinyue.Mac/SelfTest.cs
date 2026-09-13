@@ -313,12 +313,16 @@ namespace Yinyue
         {
             Console.WriteLine("\nSearch stack");
 
-            var config = new Yinyue.Models.OverlayConfig { MarginX = 16, MarginY = 16 };
+            var settings = new Yinyue.Services.ConfigService();
+            var config = settings.Current.Overlay;
+            config.MarginX = 16;
+            config.MarginY = 16;
+
             var playback = BuildIdlePlayback();
-            var library = new Yinyue.Services.MusicLibrary(new Yinyue.Services.ConfigService());
+            var library = new Yinyue.Services.MusicLibrary(settings);
 
             var applet = new Yinyue.UI.OverlayPanel(config, Yinyue.UI.OverlayMetrics.AppletHeight);
-            using var stack = new Yinyue.UI.OverlayStack(config, library, playback, applet);
+            using var stack = new Yinyue.UI.OverlayStack(settings, library, playback, applet);
 
             applet.ShowOverlay();
 
@@ -360,6 +364,45 @@ namespace Yinyue
                 queued.Target == Yinyue.Models.SearchTarget.Queue, queued.Target.ToString());
 
             Check("and keeps its term", queued.Term == "hello", queued.Term);
+
+            // An empty state must point somewhere. "No results" on a fresh install is true
+            // and useless: there is no library to search and nothing on screen says so.
+            var term = Yinyue.Models.SearchQuery.Parse("anything");
+
+            var folders = settings.Current.Library.Folders.ToList();
+            string server = settings.Current.Jellyfin.ServerUrl;
+            bool offline = settings.Current.OfflineMode;
+
+            settings.Current.Library.Folders = new List<string>();
+            settings.Current.Jellyfin.ServerUrl = string.Empty;
+
+            Check("with no sources, the message names the way out",
+                !stack.HasConfiguredSource && stack.NoResults(term).Contains("open settings"),
+                stack.NoResults(term));
+
+            // Offline with a server configured is a different problem and gets a different
+            // message — and it names the live binding rather than a literal, since the
+            // shortcut is rebindable.
+            settings.Current.Jellyfin.ServerUrl = "http://example";
+            settings.Current.Library.Folders = new List<string> { "/tmp" };
+            settings.Current.OfflineMode = true;
+
+            string offlineMessage = stack.NoResults(term);
+            Check("offline mode explains itself", offlineMessage.Contains("Offline mode is on"),
+                offlineMessage);
+
+            Check("and names the live binding, not a literal",
+                offlineMessage.Contains(settings.Current.Hotkeys
+                    .For(Yinyue.Models.HotkeyActions.OfflineMode).Keys));
+
+            settings.Current.OfflineMode = false;
+            Check("a scoped search says which kind found nothing",
+                stack.NoResults(Yinyue.Models.SearchQuery.Parse("album:x")).Contains("albums"),
+                stack.NoResults(Yinyue.Models.SearchQuery.Parse("album:x")));
+
+            settings.Current.Library.Folders = folders;
+            settings.Current.Jellyfin.ServerUrl = server;
+            settings.Current.OfflineMode = offline;
 
             // queue: picks ONE entry rather than listing hits, so the ranking has to have a
             // single defensible answer: title over artist over album, exact over leading over

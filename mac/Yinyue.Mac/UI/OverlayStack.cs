@@ -27,8 +27,15 @@ namespace Yinyue.UI
         /// </summary>
         private static readonly TimeSpan Debounce = TimeSpan.FromMilliseconds(250);
 
-        private readonly OverlayConfig _config;
+        private readonly ConfigService _settings;
         private readonly MusicLibrary _library;
+
+        /// <summary>
+        /// The overlay's own slice, which is all the panels need — but the stack itself needs
+        /// the whole config, because an empty search has to explain offline mode and a missing
+        /// library, and both live outside OverlayConfig.
+        /// </summary>
+        private OverlayConfig _config => _settings.Current.Overlay;
         private readonly PlaybackService _playback;
 
         private readonly OverlayPanel _applet;
@@ -44,10 +51,12 @@ namespace Yinyue.UI
         private NSTimer? _debounce;
         private CancellationTokenSource? _search;
 
-        public OverlayStack(OverlayConfig config, MusicLibrary library, PlaybackService playback,
+        public OverlayStack(ConfigService settings, MusicLibrary library, PlaybackService playback,
                             OverlayPanel applet)
         {
-            _config = config;
+            _settings = settings;
+
+            var config = settings.Current.Overlay;
             _library = library;
             _playback = playback;
             _applet = applet;
@@ -332,22 +341,13 @@ namespace Yinyue.UI
         public void EndHold() => _hold.EndHold();
 
         /// <summary>Plays the highlighted row, or the top one when nothing is highlighted.</summary>
-        /// <summary>What produced the rows now showing, so Enter can act on them correctly.</summary>
+        /// <summary>What produced the rows now showing, so a message can name the kind.</summary>
         private SearchQuery _resultsQuery = SearchQuery.Parse(string.Empty);
 
         public void PlaySelected()
         {
-            // A hit from queue: is already queued, so Enter JUMPS to it. Rebuilding the queue
-            // from the results would throw away everything that did not match the search.
-            if (_resultsQuery.Target == SearchTarget.Queue && _results.Selected is Track queued)
-            {
-                int position = _playback.PlayOrder.ToList().IndexOf(queued);
-                CloseResults();
-
-                if (position >= 0) _ = _playback.JumpToAsync(position);
-                return;
-            }
-
+            // No queue case here: a queue search opens the queue rather than filling this
+            // panel, so Enter on a queue row goes through JumpToQueueSelection instead.
             switch (_results.Selected)
             {
                 case Track track:
@@ -505,11 +505,7 @@ namespace Yinyue.UI
 
             if (result.Tracks.Count == 0 && result.Collections.Count == 0)
             {
-                // A scoped search says WHICH kind found nothing, so the term need not be
-                // retyped to find out.
-                ShowResultsMessage(query.IsScoped
-                    ? $"No {query.Noun} match “{query.Term}”."
-                    : $"Nothing found for “{query.Term}”.");
+                ShowResultsMessage(NoResults(query));
                 return;
             }
 
@@ -517,6 +513,35 @@ namespace Yinyue.UI
             _results.OrderFrontRegardless();
             Layout();
         }
+
+        /// <summary>
+        /// Why nothing came back, not just that nothing did.
+        ///
+        /// An empty state has to point somewhere. "No results" on a fresh install is true and
+        /// useless — there is no library to search and nothing on screen says so.
+        /// </summary>
+        public string NoResults(SearchQuery query)
+        {
+            if (!HasConfiguredSource)
+                return "No music configured yet — open settings to add a library folder or a Jellyfin server.";
+
+            // Names the live binding rather than a literal, like every other hint: the
+            // shortcut is rebindable and a hard-coded combination is wrong the moment it moves.
+            if (_settings.Current.OfflineMode && _settings.Current.Jellyfin.IsConfigured)
+                return "No local matches. Offline mode is on, so Jellyfin is not being searched — "
+                     + "press the cloud button or "
+                     + _settings.Current.Hotkeys.For(HotkeyActions.OfflineMode).Keys
+                     + " to go back online.";
+
+            // A scoped search says WHICH kind found nothing, so the term need not be retyped
+            // to find out.
+            return query.IsScoped
+                ? $"No {query.Noun} match “{query.Term}”."
+                : $"Nothing found for “{query.Term}”.";
+        }
+
+        public bool HasConfiguredSource =>
+            _settings.Current.Library.Folders.Count > 0 || _settings.Current.Jellyfin.IsConfigured;
 
         private void ShowResultsMessage(string message)
         {

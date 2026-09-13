@@ -188,7 +188,7 @@ namespace Yinyue.UI
 
             // The stack subscribes to the applet's own Shown/Hidden, so there is nothing to
             // wire here beyond the keys.
-            _stack = new OverlayStack(_config.Current.Overlay, _library, _playback, _overlay);
+            _stack = new OverlayStack(_config, _library, _playback, _overlay);
             _stack.Status = message => applet.ShowStatus(message);
 
             _overlay.WatchForFocusLoss();
@@ -343,7 +343,29 @@ namespace Yinyue.UI
         }
 
         /// <summary>Summons the overlay — used by the tray menu and by a second launch.</summary>
-        public void ShowOverlay() => _overlay?.ShowOverlay();
+        public void ShowOverlay()
+        {
+            _overlay?.ShowOverlay();
+
+            // An empty state has to point somewhere. A fresh install has no library, so the
+            // overlay would otherwise open on an empty search box that just looks broken —
+            // and since the cog is the only way to fix that, the hint names it.
+            if (_playback.CurrentTrack is null && _stack?.HasConfiguredSource == false)
+            {
+                _applet?.ShowStatus("No music yet — press the cog to add a library folder or sign in"
+                    + KeyHint(HotkeyActions.OpenSettings));
+            }
+        }
+
+        /// <summary>
+        /// A hint never contains a literal combination: every shortcut is rebindable, so one
+        /// written into a string is wrong the moment it moves.
+        /// </summary>
+        private string KeyHint(string action)
+        {
+            string keys = _config.Current.Hotkeys.For(action).Keys;
+            return string.IsNullOrWhiteSpace(keys) ? string.Empty : $" ({keys})";
+        }
 
         /// <summary>
         /// The menu-bar tooltip is the one surface always available while the overlay is

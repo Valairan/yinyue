@@ -77,7 +77,7 @@ namespace Yinyue.UI
         public NSScrollView Build()
         {
             double height = _y + 12;
-            var document = new FlippedView(new CGRect(0, 0, Width, height));
+            var document = new DocumentView(new CGRect(0, 0, Width, height));
 
             foreach (var view in _views)
             {
@@ -95,12 +95,18 @@ namespace Yinyue.UI
             };
         }
 
-        /// <summary>A view whose origin is top-left, so rows read in the order they are added.</summary>
-        private sealed class FlippedView : NSView
+        /// <summary>
+        /// A plain document view.
+        ///
+        /// It was called FlippedView and returned <c>IsFlipped = false</c>, which is the
+        /// opposite of what the name claimed. The rows are placed by arithmetic in
+        /// <see cref="Build"/> — measured down from the top and converted — so AppKit's
+        /// ordinary bottom-left origin is what that arithmetic assumes, and flipping it would
+        /// break the layout rather than simplify it.
+        /// </summary>
+        private sealed class DocumentView : NSView
         {
-            public FlippedView(CGRect frame) : base(frame) { }
-
-            public override bool IsFlipped => false;
+            public DocumentView(CGRect frame) : base(frame) { }
         }
     }
 
