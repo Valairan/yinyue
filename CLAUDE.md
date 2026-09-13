@@ -694,7 +694,7 @@ and draw light chrome, so each is fully retemplated there — `ToggleSwitchStyle
 controls will look pasted in from another app.
 
 **Icons.** Every icon is a [Lucide](https://lucide.dev) icon (ISC licence, copy in
-`win/Assets/Icons/LICENSE`), kept as the original SVG in `win/Assets/Icons/`. WPF has no SVG
+`Common/Icons/LICENSE`), kept as the original SVG in `Common/Icons/`, shared with the Mac shell. WPF has no SVG
 renderer and adding one would cost startup time for twenty line drawings, so
 `generate.py` in that folder translates the SVGs into `win/Icons.xaml`, a committed
 `ResourceDictionary` of `Geometry` resources keyed `Icon.<PascalName>` (`skip-back.svg` →
@@ -717,7 +717,7 @@ inherited `Foreground`, inside Lucide's 24-unit box scaled to `Size` (18 by defa
   arrowheads. It is the one SVG in the folder that is not Lucide's.
 - The toast's `Show` takes a kind, not a glyph: `Volume2`/`VolumeX`, `Music`, `Repeat`,
   `Repeat1`, `RepeatOff`, `Shuffle`, `Moon` for the sleep timer.
-- To add an icon: drop the SVG in the folder, run `python win/Assets/Icons/generate.py`, use
+- To add an icon: drop the SVG in the folder, run `python Common/Icons/generate.py`, use
   its PascalCase name as `Kind`, and add it to the suite's list of kinds — that test is what
   ties the plain strings in markup and code to the generated dictionary. The generator
   refuses transforms and compacted arc flags rather than guessing.

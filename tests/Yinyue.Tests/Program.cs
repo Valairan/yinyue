@@ -875,7 +875,7 @@ public static class WindowTests
 
         Check.Group("every icon the app names has a geometry", () =>
         {
-            // Icons.xaml is generated from win/Assets/Icons; the Kind strings in markup and
+            // Icons.xaml is generated from Common/Icons; the Kind strings in markup and
             // code are plain text. This is what ties the two together.
             foreach (var kind in new[]
                      {

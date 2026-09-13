@@ -8,7 +8,7 @@
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
                 <!--
-                    Every icon in the app, generated from win/Assets/Icons/*.svg by
+                    Every icon in the app, generated from Common/Icons/*.svg by
                     generate.py there. Do not edit Icons.xaml by hand.
                 -->
                 <ResourceDictionary Source="pack://application:,,,/Yinyue;component/Icons.xaml"/>
