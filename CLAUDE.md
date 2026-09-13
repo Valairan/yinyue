@@ -34,7 +34,13 @@ win/                      .NET 8 WPF app — the working implementation, and the
   SettingsWindow.xaml(.cs) Jellyfin sign-in, library folders, overlay position
   Models/                 HotkeyBinding — parses onto WPF's Key enum, so it stays here
   Services/               Audio, Smtc, Hotkey, Overlay, WindowStyling, Startup, Setup, SleepTimer, Dpapi
-mac/                      A tap/hold spike only. Menu-bar shell over Yinyue.Core, not yet started.
+mac/Yinyue.Mac/           net8.0-macos AppKit menu-bar shell over Yinyue.Core
+  Main.cs                 Composition root: single instance, service graph
+  Services/               Audio (AVPlayer), Keychain, Carbon hotkeys, media keys, sleep timer
+  UI/                     Overlay, applet, stack, search, queue, toasts, settings, icons
+  SelfTest.cs             What needs this machine — 177 checks
+mac/Assets/               Generated from Common/ by make-mac-assets.swift
+mac/spikes/               Throwaway probes, kept for their findings
 tests/Yinyue.Core.Tests/  net8.0 — runs on macOS or Windows. Logic, no desktop needed
 tests/Yinyue.Tests/       net8.0-windows — XAML, panel placement, real hotkey registration
 tests/Shared/             Check (the harness) and Fakes, compiled into both suites
@@ -1035,7 +1041,21 @@ returns from 32 px up. Windows picks the exact frame for the size it asks for, s
 one `.ico`. The same rule applies on the website: the nav shows the short mark, the hero the
 full one.
 
-`python Common/make-win-assets.py` regenerates everything below from the two SVGs (needs
+`python Common/make-win-assets.py` regenerates the Windows assets, and
+`swift Common/make-mac-assets.swift` the macOS ones, both from the same two SVGs.
+
+**The Mac generator needs nothing installed.** `NSImage` reads SVG natively, so it rasterises
+with AppKit rather than requiring ImageMagick — the right dependency on Windows and an
+unnecessary one here. It applies the same size rule: the short mark at 24 px and under, the
+full mark above. That rule matters more on macOS than on Windows, because the menu bar is
+**18 pt** — comfortably under the threshold, so the menu-bar mark is always 音 alone.
+
+One trap it hit: `NSImage.lockFocus` draws at the screen's backing scale, so an 18-point
+canvas produced a 36-pixel file on a Retina Mac and every asset came out twice its intended
+size. Rendering into an explicit `NSBitmapImageRep` pins the pixel dimensions regardless of
+the display.
+
+The Windows generator needs ImageMagick (
 ImageMagick with librsvg, which the Windows build ships). Do not edit the outputs by hand.
 
 | File | Use |
@@ -1127,8 +1147,10 @@ What this means in practice:
   the AppKit equivalent of `ShowInTaskbar="False"` plus the tray icon.
 
 **The macOS app is feature-complete for the overlay itself**: playback, search, the queue,
-toasts, global hotkeys, media keys, the sleep timer and settings. Not yet ported: the installer
-and a Hotkeys tab in settings — rebinding still means editing `config.json`.
+toasts, global hotkeys, media keys, the sleep timer, and settings in the same four tabs
+Windows has — including rebinding. **Not yet ported: packaging.** There is no `.app` →
+signed → notarised → DMG pipeline, which is the last thing `installer/` has with no
+counterpart.
 
 **Start-at-login registers the bundle, not a path**, which removes the failure the Windows
 one documents: the Run key holds an absolute path, so moving or republishing the app strands
@@ -1152,7 +1174,7 @@ cycle, the sanitisation, `Describe` — is the part worth moving to Core, and bo
 assert the same behaviours against their own copy.
 
 `win/` is the reference implementation for anything above Core. Get a feature working and
-proven there before porting it; the shell under `mac/` is not yet started.
+proven there before porting it. The shell under `mac/` is built and running.
 
 ### Starting the macOS app
 

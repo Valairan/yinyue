@@ -181,12 +181,15 @@ Configuration lives in `%APPDATA%\Yinyue\`.
 
 The Windows app is complete and has been exercised against a live Jellyfin server.
 
-**macOS is not started**, but the groundwork is: a third of the app — playback, the Jellyfin
-client, the library, search and persistence — now lives in `core/Yinyue.Core`, targets plain
-`net8.0`, and builds and tests on a Mac today. The plan is an AppKit menu-bar app as a second
-shell over that core, not a cross-platform toolkit: both defining features (a borderless
-always-on-top overlay, and OS media-key integration) are platform-specific interop whichever
-toolkit you pick, so the UI is written twice on purpose.
+**macOS runs.** A third of the app — playback, the Jellyfin client, the library, search and
+persistence — lives in `core/Yinyue.Core` and is the same code on both platforms; the AppKit
+menu-bar shell in `mac/` supplies the rest. Overlay, search, queue, toasts, global hotkeys,
+media keys, the sleep timer and settings all work. Packaging is the one thing still missing:
+there is no signed, notarised `.dmg` yet.
+
+It is a second shell over that core rather than a cross-platform toolkit, because both
+defining features — a borderless always-on-top overlay and OS media-key integration — are
+platform-specific interop whichever toolkit you pick. The UI is written twice on purpose.
 
 Avalonia was measured as the alternative and rejected. It matched WPF on startup and memory,
 but kept about 1% of a core busy even with the overlay hidden, where WPF idles at zero; for an
