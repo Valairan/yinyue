@@ -35,7 +35,8 @@ mac/**/obj/
 # The MSI is built on Windows and copied in when the site is assembled; it is not committed.
 website/downloads/*.msi
 
-# The DMG is committed, so the macOS download works from a clone. It is 85 MB against a 7 MB
-# repository, and git keeps blobs forever — a later change of mind means rewriting history.
+# The DMGs are committed, so the macOS downloads work from a clone. One per architecture:
+# 43 MB and 45 MB, against a repository that was 7 MB. Git keeps blobs forever, so every
+# future version adds its own pair and a change of mind means rewriting history.
 !website/downloads/*.dmg
 installer/obj/

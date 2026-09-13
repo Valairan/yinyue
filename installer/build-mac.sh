@@ -2,8 +2,14 @@
 #
 # Publishes Yinyue for macOS and packages it into a DMG — the counterpart to build.ps1.
 #
-#     ./installer/build-mac.sh                 # builds website/downloads/Yinyue-0.2.0.dmg
+#     ./installer/build-mac.sh                 # both: -arm64.dmg and -x64.dmg
 #     ./installer/build-mac.sh 0.3.0
+#     ./installer/build-mac.sh 0.2.0 universal  # one bundle carrying both architectures
+#
+# Per architecture by default. A universal bundle is one download that runs everywhere, and
+# it is the sum of both: 85 MB against 43 each. Since almost nobody needs both slices on one
+# machine, shipping them apart halves what anyone actually downloads — it does not reduce
+# what the repository or the host carries, which is both files either way.
 #
 # A DMG rather than a .pkg, and that is the macOS convention rather than a shortcut: a
 # menu-bar app is one bundle with no system-wide state, so there is nothing for an installer
@@ -24,6 +30,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 VERSION="${1:-0.2.0}"
+FLAVOUR="${2:-separate}"          # separate | universal
 CONFIG="${CONFIGURATION:-Release}"
 DOTNET="${DOTNET:-$HOME/.dotnet/dotnet}"
 
@@ -45,9 +52,10 @@ fi
 rm -rf "$STAGE"
 mkdir -p "$STAGE" "$OUT"
 
-# No -r: the project declares both RuntimeIdentifiers, so publish builds each architecture
-# and lipos them into one universal bundle beside them. Passing -r here would pin it to a
-# single architecture and quietly undo that.
+# One publish either way: the project declares both RuntimeIdentifiers, so this builds each
+# architecture into its own folder and lipos them into a universal bundle beside them. The
+# per-architecture bundles are what `separate` ships; the universal one is what `universal`
+# ships. Passing -r here would build only one and quietly undo that.
 #
 # CreatePackage=false because the macOS SDK otherwise wraps the bundle in a .pkg and that is
 # what lands in the output directory — a .pkg installer for an app whose entire installation
@@ -59,80 +67,85 @@ echo "publishing ${CONFIG} (arm64 + x64)…"
     -p:CreatePackage=false \
     -p:ApplicationDisplayVersion="$VERSION" >/dev/null
 
-# The universal bundle sits at the framework root; the per-architecture ones are beside it in
-# osx-arm64/ and osx-x64/ and are inputs, not outputs.
-APP="mac/Yinyue.Mac/bin/$CONFIG/net8.0-macos/Yinyue.app"
-if [ ! -d "$APP" ]; then
-    echo "publish produced no universal Yinyue.app at $APP" >&2
-    exit 1
-fi
+BASE="mac/Yinyue.Mac/bin/$CONFIG/net8.0-macos"
 
-ARCHS=$(lipo -archs "$APP/Contents/MacOS/Yinyue")
-case "$ARCHS" in
-    *arm64*x86_64*|*x86_64*arm64*) ;;
-    *)
-        # Worth failing on: a single-architecture bundle looks identical from the outside and
-        # only shows up as "damaged" on the machines that cannot run it.
-        echo "not universal — the bundle carries only: $ARCHS" >&2
-        exit 1
-        ;;
+case "$FLAVOUR" in
+    universal) TARGETS="Yinyue.app:" ;;
+    separate)  TARGETS="osx-arm64/Yinyue.app:-arm64 osx-x64/Yinyue.app:-x64" ;;
+    *) echo "unknown flavour '$FLAVOUR' — use separate or universal" >&2; exit 1 ;;
 esac
-echo "universal: $ARCHS"
 
-# --- Version ------------------------------------------------------------------------
-#
-# Stamped into the built bundle rather than passed to the build. Info.plist is hand-written
-# here -- it has to be, because LSUIElement is not something the SDK properties can express --
-# and a hand-written plist wins over ApplicationDisplayVersion, so the bundle reported 1.0.0
-# while the DMG beside it said 0.2.0.
-/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" \
-    "$APP/Contents/Info.plist"
+for target in $TARGETS; do
+    APP="$BASE/${target%%:*}"
+    SUFFIX="${target##*:}"
+    DMG="$OUT/Yinyue-$VERSION$SUFFIX.dmg"
 
-# --- Signing ------------------------------------------------------------------------
-#
-# Deep, and the entitlements-free default: the app sandboxes nothing and needs no special
-# entitlements — the Keychain item is its own, and the global hotkeys deliberately avoid
-# anything requiring Accessibility.
-if [ -n "${DEVELOPER_ID:-}" ]; then
-    echo "signing with ${DEVELOPER_ID}…"
-    codesign --force --deep --options runtime --timestamp \
-        --sign "$DEVELOPER_ID" "$APP"
-else
-    echo "signing ad-hoc (no DEVELOPER_ID set — Gatekeeper will need right-click → Open)"
-    codesign --force --deep --sign - "$APP"
-fi
-
-codesign --verify --deep --strict "$APP"
-
-# --- DMG ----------------------------------------------------------------------------
-#
-# With an Applications symlink beside the app, which is the whole of the install gesture.
-STAGE_DMG="$STAGE/dmg"
-rm -rf "$STAGE_DMG"
-mkdir -p "$STAGE_DMG"
-
-cp -R "$APP" "$STAGE_DMG/"
-ln -s /Applications "$STAGE_DMG/Applications"
-
-rm -f "$DMG"
-hdiutil create -quiet -volname "Yinyue $VERSION" -srcfolder "$STAGE_DMG" \
-    -ov -format UDZO "$DMG"
-
-if [ -n "${DEVELOPER_ID:-}" ]; then
-    codesign --force --sign "$DEVELOPER_ID" "$DMG"
-
-    # Notarisation needs credentials stored once with:
-    #   xcrun notarytool store-credentials yinyue --apple-id … --team-id … --password …
-    if [ -n "${NOTARY_PROFILE:-}" ]; then
-        echo "notarising…"
-        xcrun notarytool submit "$DMG" --keychain-profile "$NOTARY_PROFILE" --wait
-        xcrun stapler staple "$DMG"
-    else
-        echo "not notarised: set NOTARY_PROFILE to submit it."
+    if [ ! -d "$APP" ]; then
+        echo "publish produced no bundle at $APP" >&2
+        exit 1
     fi
-fi
 
-SIZE=$(du -h "$DMG" | cut -f1 | tr -d ' ')
-echo
-echo "wrote $DMG ($SIZE)"
-echo "SHA-256: $(shasum -a 256 "$DMG" | cut -d' ' -f1)"
+    ARCHS=$(lipo -archs "$APP/Contents/MacOS/Yinyue")
+
+    # Worth failing on: a bundle with the wrong slices looks identical from the outside and
+    # only shows up as "damaged" on the machines that cannot run it — which are, by
+    # definition, not the machine that built it.
+    case "$FLAVOUR:$SUFFIX:$ARCHS" in
+        universal:*:*arm64*x86_64*|universal:*:*x86_64*arm64*) ;;
+        separate:-arm64:arm64) ;;
+        separate:-x64:x86_64) ;;
+        *) echo "wrong architectures for $SUFFIX: $ARCHS" >&2; exit 1 ;;
+    esac
+
+    # --- Version ----------------------------------------------------------------------
+    #
+    # Stamped into the built bundle rather than passed to the build. Info.plist is
+    # hand-written here -- it has to be, because LSUIElement is not something the SDK
+    # properties can express -- and a hand-written plist wins over
+    # ApplicationDisplayVersion, so the bundle reported 1.0.0 while the DMG said 0.2.0.
+    /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" \
+        "$APP/Contents/Info.plist"
+
+    # --- Signing ----------------------------------------------------------------------
+    #
+    # No entitlements: nothing is sandboxed, the Keychain item is the app's own, and the
+    # global hotkeys deliberately avoid anything requiring Accessibility.
+    if [ -n "${DEVELOPER_ID:-}" ]; then
+        codesign --force --deep --options runtime --timestamp --sign "$DEVELOPER_ID" "$APP"
+    else
+        codesign --force --deep --sign - "$APP"
+    fi
+    codesign --verify --deep --strict "$APP"
+
+    # --- DMG --------------------------------------------------------------------------
+    #
+    # With an Applications symlink beside the app, which is the whole of the install gesture.
+    STAGE_DMG="$STAGE/dmg$SUFFIX"
+    rm -rf "$STAGE_DMG"
+    mkdir -p "$STAGE_DMG"
+
+    cp -R "$APP" "$STAGE_DMG/"
+    ln -s /Applications "$STAGE_DMG/Applications"
+
+    rm -f "$DMG"
+    hdiutil create -quiet -volname "Yinyue $VERSION" -srcfolder "$STAGE_DMG" \
+        -ov -format UDZO "$DMG"
+
+    if [ -n "${DEVELOPER_ID:-}" ]; then
+        codesign --force --sign "$DEVELOPER_ID" "$DMG"
+
+        # Notarisation needs credentials stored once with:
+        #   xcrun notarytool store-credentials yinyue --apple-id … --team-id … --password …
+        if [ -n "${NOTARY_PROFILE:-}" ]; then
+            xcrun notarytool submit "$DMG" --keychain-profile "$NOTARY_PROFILE" --wait
+            xcrun stapler staple "$DMG"
+        fi
+    fi
+
+    echo "  $(basename "$DMG")  $ARCHS  $(du -h "$DMG" | cut -f1 | tr -d ' ')  $(shasum -a 256 "$DMG" | cut -d' ' -f1)"
+done
+
+if [ -z "${DEVELOPER_ID:-}" ]; then
+    echo
+    echo "ad-hoc signed: Gatekeeper will need right-click → Open on a downloaded copy."
+fi
