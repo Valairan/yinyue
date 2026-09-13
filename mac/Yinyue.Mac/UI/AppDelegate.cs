@@ -40,7 +40,12 @@ namespace Yinyue.UI
 
             // Height is provisional until the applet's contents exist; the stack and its
             // reserved toast rows are the next piece of work.
-            _overlay = new OverlayPanel(_config.Current.Overlay, height: 170);
+            const double height = 170;
+            _overlay = new OverlayPanel(_config.Current.Overlay, height);
+
+            var applet = new AppletView(new CoreGraphics.CGRect(0, 0, Theme.PanelWidth, height), _playback);
+            applet.SettingsRequested += (_, _) => { /* settings window is not built yet */ };
+            _overlay.SetContent(applet);
 
             // --show summons it straight away, so the panel can be looked at without a
             // hotkey manager existing yet.

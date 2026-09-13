@@ -28,6 +28,9 @@ namespace Yinyue.UI
     {
         private readonly OverlayConfig _config;
 
+        /// <summary>The applet fills the panel; the stack above it comes later.</summary>
+        public NSView? Content { get; private set; }
+
         public OverlayPanel(OverlayConfig config, double height)
             : base(new CGRect(0, 0, Theme.PanelWidth, height),
                    // Borderless for the frameless look; Nonactivating so it never steals
@@ -58,6 +61,17 @@ namespace Yinyue.UI
             MovableByWindowBackground = false;
 
             ContentView = BuildRoot(height);
+        }
+
+        /// <summary>
+        /// Places the applet inside the rounded root. Added rather than replacing the root,
+        /// so the corner radius and border survive.
+        /// </summary>
+        public void SetContent(NSView view)
+        {
+            Content?.RemoveFromSuperview();
+            Content = view;
+            ContentView!.AddSubview(view);
         }
 
         /// <summary>
