@@ -31,6 +31,7 @@ namespace Yinyue
             if (which is "all" or "hotkeys") HotkeysRegister();
             if (which is "all" or "media") MediaControls();
             if (which is "all" or "search") SearchStack();
+            if (which is "all" or "sleep") SleepTimerRules();
 
             Console.WriteLine();
             Console.WriteLine(_failed == 0 ? "PASS" : $"FAIL — {_failed} check(s)");
@@ -42,6 +43,58 @@ namespace Yinyue
             if (!ok) _failed++;
             Console.WriteLine($"  [{(ok ? "ok" : "FAIL")}] {label}{(detail is null ? "" : $"  — {detail}")}");
             Console.Out.Flush();
+        }
+
+        /// <summary>
+        /// The sleep timer's rules, which are the part that is easy to get subtly wrong and
+        /// the part a user notices. Mirrors what the Windows suite asserts.
+        /// </summary>
+        private static void SleepTimerRules()
+        {
+            Console.WriteLine("\nSleep timer");
+
+            using var timer = new Yinyue.Services.MacSleepTimer();
+
+            // "Off" is never stored in the list; it is prepended, so it is always the entry
+            // point and always reachable. Otherwise the shortcut could arm but never disarm.
+            timer.SetSteps(new[] { 15, 30, 60 });
+            Check("off leads the cycle", timer.Steps[0] == 0, string.Join(",", timer.Steps));
+
+            Check("starts off", !timer.IsRunning);
+            Check("first press arms the shortest step", timer.Cycle() == 15);
+            Check("then the next", timer.Cycle() == 30);
+            Check("then the last", timer.Cycle() == 60);
+            Check("and comes back round to off", timer.Cycle() == 0);
+
+            // A running timer whose duration leaves the list is stopped rather than stranded
+            // outside the cycle with no way to reach it.
+            timer.Set(30);
+            Check("a set step runs", timer.IsRunning);
+            timer.SetSteps(new[] { 15, 45 });
+            Check("dropping its step stops it", !timer.IsRunning);
+
+            // Turning the feature off cancels anything running: a countdown alive under a
+            // disabled feature would stop playback with no visible cause.
+            timer.SetSteps(new[] { 15 });
+            timer.Set(15);
+            timer.Enabled = false;
+            Check("disabling cancels a running timer", !timer.IsRunning);
+            Check("and the shortcut does nothing while disabled", timer.Cycle() == 0);
+
+            // Coarse far out, precise near the end, and rounded up so it never reads 0m with
+            // music still to come.
+            Check("under a minute reads in seconds",
+                Yinyue.Services.MacSleepTimer.Describe(TimeSpan.FromSeconds(42)) == "42s");
+            Check("rounds up rather than to zero",
+                Yinyue.Services.MacSleepTimer.Describe(TimeSpan.FromSeconds(61)) == "2m",
+                Yinyue.Services.MacSleepTimer.Describe(TimeSpan.FromSeconds(61)));
+            Check("whole hours have no minutes",
+                Yinyue.Services.MacSleepTimer.Describe(TimeSpan.FromMinutes(120)) == "2h");
+            Check("otherwise hours and minutes",
+                Yinyue.Services.MacSleepTimer.Describe(TimeSpan.FromMinutes(95)) == "1h 35m",
+                Yinyue.Services.MacSleepTimer.Describe(TimeSpan.FromMinutes(95)));
+            Check("nothing left reads empty",
+                Yinyue.Services.MacSleepTimer.Describe(TimeSpan.Zero) == string.Empty);
         }
 
         /// <summary>
@@ -90,6 +143,29 @@ namespace Yinyue
                 $"bar x={stack.SearchBar.Frame.X}, applet x={moved.X}");
 
             Check("an empty box means Escape falls through to dismiss", !stack.HandleEscape());
+
+            // Every surface in the stack is the same width and left-aligned with the applet,
+            // measured in AppKit points -- CGWindowList reports Quartz display coordinates,
+            // which differ from points on a scaled Retina mode and would look like a bug.
+            stack.ToggleQueue();
+            stack.Toast("measuring");
+            stack.Layout();
+
+            foreach (var (name, panel) in stack.PanelsForTest)
+            {
+                Check($"{name} is PanelWidth wide",
+                    Math.Abs(panel.Frame.Width - 420) < 0.5, panel.Frame.Width.ToString());
+
+                Check($"{name} is left-aligned with the applet",
+                    Math.Abs(panel.Frame.X - applet.Frame.X) < 0.5,
+                    $"{panel.Frame.X} vs {applet.Frame.X}");
+            }
+
+            // The two toast rows sit below the applet, reserved whether or not one is showing.
+            var (_, message) = stack.PanelsForTest.First(p => p.Name == "toast");
+            Check("the toast row is below the applet",
+                message.Frame.Y + message.Frame.Height < applet.Frame.Y + 0.5,
+                $"toast top={message.Frame.Y + message.Frame.Height}, applet y={applet.Frame.Y}");
 
             applet.Close();
         }

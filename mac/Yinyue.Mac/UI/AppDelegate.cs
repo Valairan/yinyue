@@ -25,14 +25,41 @@ namespace Yinyue.UI
         private MacHotkeyManager? _hotkeys;
         private MacMediaControls? _media;
         private OverlayStack? _stack;
+        private MacSleepTimer? _sleep;
+        private SettingsWindow? _settings;
 
         private readonly MusicLibrary _library;
+        private readonly JellyfinApiClient _jellyfin;
+        private readonly LibraryIndexerService _indexer;
 
-        public AppDelegate(ConfigService config, PlaybackService playback, MusicLibrary library)
+        public AppDelegate(ConfigService config, PlaybackService playback, MusicLibrary library,
+                           JellyfinApiClient jellyfin, LibraryIndexerService indexer)
         {
             _config = config;
             _playback = playback;
             _library = library;
+            _jellyfin = jellyfin;
+            _indexer = indexer;
+        }
+
+        /// <summary>
+        /// Created lazily and kept, so reopening is instant and any typing survives a close.
+        /// Activates the app, unlike everything else here: settings is a window you work in,
+        /// not a surface you glance at, and it needs the keyboard.
+        /// </summary>
+        public void ShowSettings()
+        {
+            _settings ??= new SettingsWindow(_config, _jellyfin, _indexer);
+
+            // Activate() is the macOS 14 spelling and ActivateIgnoringOtherApps is obsolete
+            // from 14 — but the deployment target is 13, so both are needed.
+            if (OperatingSystem.IsMacOSVersionAtLeast(14))
+                NSApplication.SharedApplication.Activate();
+            else
+#pragma warning disable CA1422   // obsolete from 14, which the branch above handles
+                NSApplication.SharedApplication.ActivateIgnoringOtherApps(true);
+#pragma warning restore CA1422
+            _settings.MakeKeyAndOrderFront(null);
         }
 
         /// <summary>
@@ -46,12 +73,16 @@ namespace Yinyue.UI
         {
             switch (e.KeyCode)
             {
-                case 53:   // Escape: clear a search in progress, or dismiss the overlay
+                case 53:   // Escape
+                    // A held queue entry goes back where it was picked up; otherwise a search
+                    // in progress is cleared; an already-empty box dismisses the overlay.
+                    if (_stack?.CancelQueueGrab() == true) break;
                     if (_stack?.HandleEscape() != true) _overlay?.HideOverlay();
                     break;
 
-                case 36:   // Return: play the highlighted result
-                    _stack?.PlaySelected();
+                case 36:   // Return
+                    if (_stack?.QueueIsOpen == true) _stack.JumpToQueueSelection();
+                    else _stack?.PlaySelected();
                     break;
 
                 case 126:  // Up
@@ -95,8 +126,8 @@ namespace Yinyue.UI
             _overlay = new OverlayPanel(_config.Current.Overlay, OverlayMetrics.AppletHeight);
 
             var applet = new AppletView(_playback);
-            applet.SettingsRequested += (_, _) => { /* settings window is not built yet */ };
-            applet.QueueRequested += (_, _) => { /* the queue panel is not built yet */ };
+            applet.SettingsRequested += (_, _) => ShowSettings();
+            applet.QueueRequested += (_, _) => _stack?.ToggleQueue();
             _overlay.SetContent(applet);
 
             // The stack subscribes to the applet's own Shown/Hidden, so there is nothing to
@@ -104,17 +135,39 @@ namespace Yinyue.UI
             _stack = new OverlayStack(_config.Current.Overlay, _library, _playback, _overlay);
             _overlay.KeyReceived += OnOverlayKey;
 
+            BuildSleepTimer();
             BuildHotkeys();
 
             // Media keys and the Now Playing panel. Owned here rather than by the overlay,
             // because the overlay is hidden almost all the time and these must work anyway.
             _media = new MacMediaControls(_playback);
 
+            // Only deliberate changes are announced. An automatic advance at the end of a
+            // track would fire all day for something the user never asked for.
+            _playback.TrackChanged += (_, args) =>
+            {
+                if (args.Automatic || args.Track is null) return;
+
+                NSApplication.SharedApplication.BeginInvokeOnMainThread(() =>
+                    _stack?.Toast($"{args.Track.Title} — {args.Track.DisplayArtist}"));
+            };
+
             if (Environment.GetCommandLineArgs().Contains("--show")) _overlay.ShowOverlay();
         }
 
         /// <summary>Summons the overlay — used by the tray menu and by a second launch.</summary>
         public void ShowOverlay() => _overlay?.ShowOverlay();
+
+        private void BuildSleepTimer()
+        {
+            _sleep = new MacSleepTimer
+            {
+                Enabled = _config.Current.SleepTimer.Enabled,
+            };
+
+            _sleep.SetSteps(_config.Current.SleepTimer.Steps);
+            _sleep.Elapsed += () => Fire(_playback.PauseAsync());
+        }
 
         private void BuildHotkeys()
         {
@@ -158,23 +211,46 @@ namespace Yinyue.UI
                     break;
 
                 case HotkeyActions.ToggleShuffle:
-                    _playback.ToggleShuffle();
+                    _stack?.Toast(_playback.ToggleShuffle() ? "Shuffle on" : "Shuffle off");
                     break;
 
                 case HotkeyActions.CycleLoop:
-                    _playback.CycleLoop();
+                    _stack?.Toast($"Loop {_playback.CycleLoop()}".ToLowerInvariant());
                     break;
 
                 case HotkeyActions.VolumeUp:
-                    _playback.AdjustVolume(VolumeStep);
+                    AnnounceVolume(_playback.AdjustVolume(VolumeStep));
                     break;
 
                 case HotkeyActions.VolumeDown:
-                    _playback.AdjustVolume(-VolumeStep);
+                    AnnounceVolume(_playback.AdjustVolume(-VolumeStep));
                     break;
 
                 case HotkeyActions.Mute:
                     _playback.ToggleMute();
+                    _stack?.Toast(_playback.IsMuted ? "Muted" : "Unmuted",
+                        _playback.IsMuted ? 0 : _playback.Volume);
+                    break;
+
+                case HotkeyActions.OpenQueue:
+                    _overlay?.ShowOverlay();
+                    _stack?.ToggleQueue();
+                    break;
+
+                case HotkeyActions.GrabQueueEntry:
+                    _stack?.GrabQueueEntry();
+                    break;
+
+                case HotkeyActions.AddToQueue:
+                    // Tap queues at the end, hold plays it next.
+                    _stack?.AddSelectedToQueue(next: e.Held);
+                    break;
+
+                case HotkeyActions.RemoveFromQueue:
+                    // Tap removes the selected entry; the hold clears the queue, and that
+                    // hold is the only guard on an action that cannot be undone.
+                    if (e.Held) _ = _stack?.ClearQueueAsync();
+                    else _stack?.RemoveQueueEntry();
                     break;
 
                 case HotkeyActions.QuickSearch:
@@ -184,14 +260,32 @@ namespace Yinyue.UI
                     _stack?.FocusSearch();
                     break;
 
-                case HotkeyActions.OpenSettings:
-                case HotkeyActions.OpenQueue:
-                case HotkeyActions.GrabQueueEntry:
-                case HotkeyActions.AddToQueue:
-                case HotkeyActions.RemoveFromQueue:
-                case HotkeyActions.ShuffleFavorites:
                 case HotkeyActions.OfflineMode:
+                    _config.Current.OfflineMode = !_config.Current.OfflineMode;
+                    _config.Save();
+                    _stack?.Toast(_config.Current.OfflineMode ? "Offline mode on" : "Offline mode off");
+                    break;
+
+                case HotkeyActions.ShuffleFavorites:
+                    _ = ShuffleFavoritesAsync();
+                    break;
+
                 case HotkeyActions.SleepTimer:
+                    // Pressing it while disabled says so. Silence would read as a broken
+                    // shortcut.
+                    if (_sleep is null || !_sleep.Enabled)
+                    {
+                        _stack?.Toast("The sleep timer is switched off in settings.");
+                        break;
+                    }
+
+                    int minutes = _sleep.Cycle();
+                    _stack?.Toast(minutes == 0
+                        ? "Sleep timer off"
+                        : $"Sleep timer {MacSleepTimer.Describe(TimeSpan.FromMinutes(minutes))}");
+                    break;
+
+                case HotkeyActions.OpenSettings:
                     // These need surfaces that do not exist yet: search, the queue panel,
                     // settings and the sleep timer. Registered now so the combinations are
                     // claimed and conflicts surface early, rather than appearing to work and
@@ -202,6 +296,38 @@ namespace Yinyue.UI
 
         /// <summary>How much one press of the volume shortcuts moves the level.</summary>
         private const double VolumeStep = 0.05;
+
+        /// <summary>
+        /// Shuffle-favourites caps at 1000 and holds them in memory, as on Windows. Only
+        /// Jellyfin implements favourites, so this says so while offline rather than showing
+        /// an empty queue.
+        /// </summary>
+        private const int FavoritesCap = 1000;
+
+        private void AnnounceVolume(double level) =>
+            _stack?.Toast($"Volume {Math.Round(level * 100)}%", level);
+
+        private async Task ShuffleFavoritesAsync()
+        {
+            var source = _library.Sources.OfType<ISupportsFavorites>().FirstOrDefault();
+            if (source is null)
+            {
+                _stack?.Toast("No source provides favourites.");
+                return;
+            }
+
+            var result = await source.GetFavoritesAsync(FavoritesCap, CancellationToken.None)
+                                     .ConfigureAwait(false);
+
+            if (result.Tracks.Count == 0)
+            {
+                _stack?.Toast(result.Error ?? "No favourites found.");
+                return;
+            }
+
+            if (!_playback.Shuffle) _playback.ToggleShuffle();
+            await _playback.PlayQueueAsync(result.Tracks, 0).ConfigureAwait(false);
+        }
 
         private static void Fire(Task work) =>
             _ = work.ContinueWith(t => Console.Error.WriteLine($"[Hotkey] {t.Exception}"),
@@ -237,7 +363,7 @@ namespace Yinyue.UI
             var menu = new NSMenu();
             menu.AddItem(Item("Show Yinyue", (_, _) => _overlay?.ToggleOverlay()));
             menu.AddItem(NSMenuItem.SeparatorItem);
-            menu.AddItem(Item("Settings…", (_, _) => { /* settings window is not built yet */ }));
+            menu.AddItem(Item("Settings…", (_, _) => ShowSettings()));
             menu.AddItem(NSMenuItem.SeparatorItem);
             menu.AddItem(Item("Quit Yinyue", (_, _) => NSApplication.SharedApplication.Terminate(this)));
 
@@ -258,6 +384,7 @@ namespace Yinyue.UI
             _media?.Dispose();
             _hotkeys?.Dispose();
             _stack?.Dispose();
+            _sleep?.Dispose();
             _playback.Dispose();
             _statusItem?.Dispose();
         }

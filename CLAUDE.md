@@ -1069,6 +1069,16 @@ What this means in practice:
 - The macOS app needs `LSUIElement = true` in `Info.plist` (menu-bar-only, no Dock icon),
   the AppKit equivalent of `ShowInTaskbar="False"` plus the tray icon.
 
+**The macOS app is feature-complete for the overlay itself**: playback, search, the queue,
+toasts, global hotkeys, media keys, the sleep timer and settings. Not yet ported: the
+installer, startup-at-login (`SMAppService`), the tray tooltip, and the hold dial's arc —
+the hold row exists and shows a bar rather than a filling arc.
+
+The sleep timer is **duplicated**, not shared: `MacSleepTimer` mirrors the rules of
+`SleepTimerService` because that one ticks on a `DispatcherTimer`. The arithmetic — the
+cycle, the sanitisation, `Describe` — is the part worth moving to Core, and both suites now
+assert the same behaviours against their own copy.
+
 `win/` is the reference implementation for anything above Core. Get a feature working and
 proven there before porting it; the shell under `mac/` is not yet started.
 

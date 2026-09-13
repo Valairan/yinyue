@@ -34,6 +34,12 @@ namespace Yinyue.UI
         private readonly OverlayPanel _applet;
         private readonly SearchBarPanel _searchBar;
         private readonly SearchResultsPanel _results;
+        private readonly QueuePanel _queue;
+
+        // Two toasts, not one: a track change can land while a hold is in progress and one
+        // window cannot occupy two rows at once.
+        private readonly ToastPanel _message;
+        private readonly ToastPanel _hold;
 
         private NSTimer? _debounce;
         private CancellationTokenSource? _search;
@@ -48,12 +54,21 @@ namespace Yinyue.UI
 
             _searchBar = new SearchBarPanel(config);
             _results = new SearchResultsPanel(config);
+            _queue = new QueuePanel(config, playback);
+
+            _message = new ToastPanel(config, ToastRole.Message);
+            _hold = new ToastPanel(config, ToastRole.Hold);
 
             _searchBar.QueryChanged += (_, text) => OnQueryChanged(text);
 
             // Child windows follow the parent, which is what makes the stack hold together.
             _applet.AddChildWindow(_searchBar, NSWindowOrderingMode.Above);
             _applet.AddChildWindow(_results, NSWindowOrderingMode.Above);
+            _applet.AddChildWindow(_queue, NSWindowOrderingMode.Above);
+
+            // The toasts go BELOW the applet, in the two rows reserved for them.
+            _applet.AddChildWindow(_message, NSWindowOrderingMode.Below);
+            _applet.AddChildWindow(_hold, NSWindowOrderingMode.Below);
 
             // The stack owns its relationship to the applet rather than having the delegate
             // wire it: a stack that has not been laid out sits at the window origin, and
@@ -63,25 +78,55 @@ namespace Yinyue.UI
             _applet.Hidden += (_, _) => Hide();
 
             _results.OrderOut(null);
+            _queue.OrderOut(null);
             Layout();
         }
 
         public SearchBarPanel SearchBar => _searchBar;
 
+        /// <summary>Every surface in the stack, for the alignment checks in the suite.</summary>
+        public IReadOnlyList<(string Name, NSWindow Panel)> PanelsForTest => new (string, NSWindow)[]
+        {
+            ("search bar", _searchBar),
+            ("results", _results),
+            ("queue", _queue),
+            ("toast", _message),
+            ("hold", _hold),
+        };
+
         /// <summary>
-        /// Places every panel above the applet, outward, so each clears everything between it
-        /// and the applet and a closed panel leaves no hole.
+        /// Accumulates outward from the applet over an ordered list, so each panel clears
+        /// everything between it and the applet and a closed panel leaves no hole. Offsets
+        /// come from each panel's own height, because they grow and shrink with their
+        /// contents — a results panel showing one row and one showing seven push the queue up
+        /// by different amounts.
         /// </summary>
         public void Layout()
         {
             var anchor = _applet.Frame;
+
+            // Upward: search bar, then results, then the queue beyond them.
             double y = anchor.Y + anchor.Height + OverlayMetrics.SideGap;
 
-            _searchBar.SetFrameOrigin(new CGPoint(anchor.X, y));
-            y += _searchBar.Frame.Height + OverlayMetrics.SideGap;
+            foreach (var panel in new NSWindow[] { _searchBar, _results, _queue })
+            {
+                // Every panel is placed, including hidden ones: a panel that has never been
+                // positioned sits at the screen origin and flashes there for a frame when it
+                // opens. Only a visible panel advances the offset, so a closed one leaves no
+                // hole in the stack.
+                panel.SetFrameOrigin(new CGPoint(anchor.X, y));
 
-            if (_results.IsVisible)
-                _results.SetFrameOrigin(new CGPoint(anchor.X, y));
+                if (panel.IsVisible) y += panel.Frame.Height + OverlayMetrics.SideGap;
+            }
+
+            // Downward: the two toast rows, reserved permanently whether or not a toast is
+            // showing. Making room on demand would be worse — toasts arrive unbidden, and a
+            // panel that jumped mid-interaction would move the thing being read.
+            double below = anchor.Y - OverlayMetrics.SideGap - OverlayMetrics.ToastRowHeight;
+            _message.SetFrameOrigin(new CGPoint(anchor.X, below));
+
+            below -= OverlayMetrics.SideGap + OverlayMetrics.ToastRowHeight;
+            _hold.SetFrameOrigin(new CGPoint(anchor.X, below));
         }
 
         public void Show()
@@ -119,7 +164,116 @@ namespace Yinyue.UI
             return true;
         }
 
-        public void MoveSelection(int delta) => _results.MoveSelection(delta);
+        /// <summary>
+        /// The arrows belong to whichever list is in front: the queue if it is open, the
+        /// results otherwise. Reserved for navigation and nothing else — they used to seek
+        /// and change volume on Windows, which fought with the lists and made the panel
+        /// unpredictable to move around.
+        /// </summary>
+        public void MoveSelection(int delta)
+        {
+            if (_queue.IsVisible) _queue.MoveSelection(delta);
+            else _results.MoveSelection(delta);
+        }
+
+        public bool QueueIsOpen => _queue.IsVisible;
+
+        public void ToggleQueue()
+        {
+            if (_queue.IsVisible)
+            {
+                // Closing commits rather than reverts: the moves are already applied, and
+                // undoing them behind a closed panel would be a surprise.
+                _queue.OrderOut(null);
+            }
+            else
+            {
+                _queue.Open();
+            }
+
+            Layout();
+        }
+
+        public void GrabQueueEntry() => _queue.ToggleGrab();
+
+        public void JumpToQueueSelection() => _queue.JumpToSelected();
+
+        /// <summary>Returns true if a held entry was put back, so Escape stops there.</summary>
+        public bool CancelQueueGrab()
+        {
+            if (!_queue.IsHolding) return false;
+
+            _queue.CancelGrab();
+            return true;
+        }
+
+        public void RemoveQueueEntry() => _queue.RemoveSelected();
+
+        public Task ClearQueueAsync() => _playback.ClearQueueAsync();
+
+        /// <summary>
+        /// Queues the highlighted result at the end, or plays it next when held. A collection
+        /// row queues all of it.
+        /// </summary>
+        public void AddSelectedToQueue(bool next)
+        {
+            switch (_results.Selected)
+            {
+                case Track track:
+                    if (next) _playback.InsertNext(track);
+                    else _playback.Enqueue(track);
+                    break;
+
+                case TrackCollection collection:
+                    _ = QueueCollectionAsync(collection, next);
+                    break;
+            }
+        }
+
+        private async Task QueueCollectionAsync(TrackCollection collection, bool next)
+        {
+            var result = await _library.GetCollectionTracksAsync(collection, 1000, CancellationToken.None)
+                                       .ConfigureAwait(false);
+
+            if (result.Tracks.Count == 0) return;
+
+            NSApplication.SharedApplication.BeginInvokeOnMainThread(() =>
+            {
+                if (!next)
+                {
+                    _playback.EnqueueRange(result.Tracks);
+                    return;
+                }
+
+                // Walked backwards, because each insert lands directly after the current
+                // track — forwards would reverse the playlist.
+                foreach (var track in result.Tracks.Reverse()) _playback.InsertNext(track);
+            });
+        }
+
+        // ---------------------------------------------------------------- toasts
+
+        /// <summary>
+        /// The single entry point for transient feedback, and it shows <b>only while the
+        /// overlay is hidden</b>: with the overlay open the applet already says the same
+        /// thing, and two readouts of one change is noise.
+        /// </summary>
+        public void Toast(string message, double? level = null)
+        {
+            if (_applet.IsVisible) return;
+
+            _message.Show(message, level);
+            _message.Dismiss(TimeSpan.FromSeconds(2));
+            Layout();
+        }
+
+        public void ShowHold(string message, double progress)
+        {
+            _hold.Show(message, progress);
+            Layout();
+        }
+
+        public void EndHold() => _hold.Dismiss(TimeSpan.Zero);
 
         /// <summary>Plays the highlighted row, or the top one when nothing is highlighted.</summary>
         public void PlaySelected()
@@ -222,6 +376,7 @@ namespace Yinyue.UI
             _debounce = null;
 
             _results.OrderOut(null);
+            _queue.OrderOut(null);
             Layout();
         }
 

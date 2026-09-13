@@ -63,7 +63,7 @@ namespace Yinyue
 
             var playback = new PlaybackService(audio, library);
 
-            if (!check) return RunApp(config, playback, library, instance);
+            if (!check) return RunApp(config, playback, library, jellyfin, indexer, instance);
 
             Console.WriteLine("Yinyue — macOS seam check");
             Console.WriteLine(new string('-', 52));
@@ -95,10 +95,11 @@ namespace Yinyue
             token is null ? "none stored (expected before sign-in)" : $"{token.Length} chars";
 
         private static int RunApp(ConfigService config, PlaybackService playback,
-            MusicLibrary library, SingleInstance instance)
+            MusicLibrary library, JellyfinApiClient jellyfin, LibraryIndexerService indexer,
+            SingleInstance instance)
         {
             var app = NSApplication.SharedApplication;
-            var del = new AppDelegate(config, playback, library);
+            var del = new AppDelegate(config, playback, library, jellyfin, indexer);
 
             instance.ListenForSummon(del.ShowOverlay);
 
