@@ -28,3 +28,6 @@ installer/out/
 # .NET build output for the macOS shell
 mac/**/bin/
 mac/**/obj/
+
+# MSBuild SDK-resolver backups left behind when an IDE without the macos workload loads the Mac project
+*.SdkResolver.*.proj.Backup.tmp
