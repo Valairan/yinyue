@@ -28,7 +28,8 @@ public static class HotkeyConfigTests
 
             foreach (var action in new[]
                      {
-                         HotkeyActions.AddToQueue, HotkeyActions.RemoveFromQueue, HotkeyActions.PlayPause
+                         HotkeyActions.AddToQueue, HotkeyActions.RemoveFromQueue, HotkeyActions.PlayPause,
+                         HotkeyActions.RestartOrPrevious, HotkeyActions.ShuffleFavorites,
                      })
             {
                 Check.That($"{action} withholds the generic hold toggle",

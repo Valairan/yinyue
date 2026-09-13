@@ -111,7 +111,7 @@ public static class HotkeyTests
 
             var manager = new HotkeyManager();
             var cfg = new HotkeyConfig();
-            cfg.For(HotkeyActions.ShuffleFavorites).Hold = true;
+            cfg.For(HotkeyActions.ToggleShuffle).Hold = true;
             cfg.For(HotkeyActions.RemoveFromQueue).Hold = true;   // must be ignored
 
             var refused = manager.Apply(hwnd, cfg);
@@ -121,7 +121,7 @@ public static class HotkeyTests
             Check.Equal("all registered", HotkeyActions.All.Length, manager.Active.Count);
 
             var byAction = manager.Active.Values.ToDictionary(r => r.Action);
-            Check.That("an enabled hold is honoured", byAction[HotkeyActions.ShuffleFavorites].RequiresHold);
+            Check.That("an enabled hold is honoured", byAction[HotkeyActions.ToggleShuffle].RequiresHold);
             Check.That("a withheld hold stays off", !byAction[HotkeyActions.RemoveFromQueue].RequiresHold);
 
             Check.That("arrows remain bindable",

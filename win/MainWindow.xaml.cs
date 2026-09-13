@@ -1293,7 +1293,8 @@ namespace Yinyue
         /// </summary>
         private void ApplyShortcutHints()
         {
-            BtnShuffleFavorites.ToolTip = "Shuffle all favourites" + KeyHint(HotkeyActions.ShuffleFavorites);
+            BtnShuffleFavorites.ToolTip = "Shuffle all favourites · hold the shortcut to add them to the queue instead"
+                                          + KeyHint(HotkeyActions.ShuffleFavorites);
             BtnSettingsGear.ToolTip = "Settings" + KeyHint(HotkeyActions.OpenSettings);
 
             UpdateOfflineButton();
@@ -1700,13 +1701,60 @@ namespace Yinyue
             _ = ShuffleFavoritesAsync();
 
         /// <summary>
+        /// Entry point for the favourites hotkey: a tap replaces the queue with every
+        /// favourite in random order; a hold adds them, shuffled, to the end of the queue
+        /// instead, so the song playing now is not cut off. The header button does the tap.
+        /// </summary>
+        public void BeginShuffleFavoritesHold(HotkeyBinding binding)
+        {
+            BeginTapOrHold(binding,
+                onTap: () => _ = ShuffleFavoritesAsync(),
+                onHold: () => _ = EnqueueFavoritesAsync(),
+                holdLabel: "add favourites to the queue");
+        }
+
+        /// <summary>
         /// Loads every favourited track from the server and plays them in random order.
         ///
         /// Shuffle is forced on rather than assumed: the point of the action is a random
         /// walk through favourites, and silently playing them alphabetically because a
         /// toggle happened to be off would be the wrong answer.
         /// </summary>
-        public async Task ShuffleFavoritesAsync()
+        public Task ShuffleFavoritesAsync() => WithFavoritesAsync(async tracks =>
+        {
+            if (!_playback.Shuffle) _playback.ToggleShuffle();
+            UpdateShuffleButton();
+
+            // Start somewhere random. PlayQueueAsync keeps the chosen track first and
+            // shuffles the rest, so without this the first song would always be the
+            // alphabetically first favourite.
+            int start = Random.Shared.Next(tracks.Count);
+
+            await _playback.PlayQueueAsync(tracks, start);
+            TxtStatus.Text = $"Shuffling {tracks.Count} favourite(s)";
+        });
+
+        /// <summary>
+        /// Adds every favourite to the end of the queue in random order, leaving whatever is
+        /// playing alone. The list is shuffled here rather than by switching shuffle mode on:
+        /// that would reshuffle what is already queued as well, and the ask is only that the
+        /// favourites arrive in random order behind it.
+        /// </summary>
+        public Task EnqueueFavoritesAsync() => WithFavoritesAsync(tracks =>
+        {
+            var shuffled = tracks.ToArray();
+            Random.Shared.Shuffle(shuffled);
+
+            int added = _playback.EnqueueRange(shuffled);
+            TxtStatus.Text = $"Added {added} favourite(s) to the queue";
+            return Task.CompletedTask;
+        });
+
+        /// <summary>
+        /// The shared half of both favourites actions: fetch, report an empty or failed
+        /// result, and keep the button and the guard flag honest around <paramref name="act"/>.
+        /// </summary>
+        private async Task WithFavoritesAsync(Func<List<Track>, Task> act)
         {
             if (_favoritesLoading) return;
             _favoritesLoading = true;
@@ -1730,18 +1778,7 @@ namespace Yinyue
                     return;
                 }
 
-                if (!_playback.Shuffle) _playback.ToggleShuffle();
-                UpdateShuffleButton();
-
-                // Start somewhere random. PlayQueueAsync keeps the chosen track first and
-                // shuffles the rest, so without this the first song would always be the
-                // alphabetically first favourite.
-                int start = Random.Shared.Next(result.Tracks.Count);
-
-                var tracks = result.Tracks.ToList();
-                await _playback.PlayQueueAsync(tracks, start);
-
-                TxtStatus.Text = $"Shuffling {tracks.Count} favourite(s)";
+                await act(result.Tracks.ToList());
             }
             catch (Exception ex)
             {

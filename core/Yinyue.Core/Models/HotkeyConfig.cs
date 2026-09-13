@@ -65,13 +65,14 @@ namespace Yinyue.Models
         /// Actions whose hold gesture is already spoken for, so the generic
         /// hold-to-activate toggle would contradict them.
         ///
-        /// Both queue actions are such cases: a tap does the ordinary thing and a hold does
+        /// Every tap/hold pair is such a case: a tap does the ordinary thing and a hold does
         /// the bigger version. Letting the user also demand a hold before the tap fires
         /// would leave no gesture meaning "just do the ordinary thing".
         /// </summary>
         public static bool SupportsHoldToggle(string action) =>
             action != RemoveFromQueue && action != AddToQueue &&
-            action != PlayPause && action != RestartOrPrevious;
+            action != PlayPause && action != RestartOrPrevious &&
+            action != ShuffleFavorites;
 
         public static string? HoldNote(string action) => action switch
         {
@@ -79,6 +80,7 @@ namespace Yinyue.Models
             AddToQueue => "Tap queues at the end · hold plays it next",
             PlayPause => "Tap plays or pauses · hold skips forward, repeatedly",
             RestartOrPrevious => "Tap restarts the track · hold steps back, repeatedly",
+            ShuffleFavorites => "Tap plays the favourites shuffled · hold adds them to the queue instead",
             SleepTimer => "Cycles off · 15 · 30 · 45 · 60 minutes",
             _ => null,
         };

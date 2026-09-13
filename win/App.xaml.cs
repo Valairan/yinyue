@@ -581,10 +581,12 @@ namespace Yinyue
                 }
 
                 case HotkeyActions.ShuffleFavorites:
-                    // Bring the overlay up: this starts a whole queue, and doing that with
-                    // no visible confirmation would feel like the app ignored the key.
+                    // Bring the overlay up: this starts or extends a whole queue, and doing
+                    // that with no visible confirmation would feel like the app ignored the
+                    // key. Tap plays them; hold adds them behind the current track.
                     _overlay!.ShowOverlay();
-                    _ = _overlay.ShuffleFavoritesAsync();
+                    _overlay.BeginShuffleFavoritesHold(
+                        _hotkeys!.BindingFor(HotkeyActions.ShuffleFavorites) ?? default);
                     break;
 
                 case HotkeyActions.AddToQueue:

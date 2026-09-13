@@ -73,6 +73,27 @@ public static class QueueTests
             await Task.CompletedTask;
         });
 
+        await Check.GroupAsync("queue — enqueuing many at once", async () =>
+        {
+            var (playback, _) = NewPlayback();
+            int changes = 0;
+            playback.QueueChanged += (_, _) => changes++;
+
+            Check.Equal("all added", 3, playback.EnqueueRange(Make.Tracks("a", "b", "c")));
+            Check.Equal("one change event, not three", 1, changes);
+            Check.Equal("the first becomes current on an empty queue", "a", playback.CurrentTrack?.Id);
+            Check.That("armed but silent", !playback.IsPlaying);
+
+            Check.Equal("appended after what is there", 2, playback.EnqueueRange(Make.Tracks("d", "e")));
+            Check.That("in order, at the end",
+                playback.PlayOrder.Select(t => t.Id).SequenceEqual(new[] { "a", "b", "c", "d", "e" }));
+            Check.Equal("current untouched", "a", playback.CurrentTrack?.Id);
+            Check.Equal("nothing to add is a no-op", 0, playback.EnqueueRange(Array.Empty<Track>()));
+
+            playback.Dispose();
+            await Task.CompletedTask;
+        });
+
         await Check.GroupAsync("queue — shuffle", async () =>
         {
             var (playback, _) = NewPlayback("t0", "t1", "t2", "t3");

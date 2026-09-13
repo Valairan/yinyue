@@ -747,7 +747,7 @@ stored in `config.json`; see `HotkeyConfig` for the defaults.
 | `Ctrl+Alt+Plus` / `Ctrl+Alt+Minus` | Volume, one step per press (5% by default, configurable). Hold to keep stepping |
 | `Ctrl+Alt+M` | Mute / unmute |
 | `Ctrl+Alt+T` | Sleep timer: cycles off and then each configured step |
-| `Ctrl+Alt+F` | Shuffle all favourites |
+| `Ctrl+Alt+F` | Tap: shuffle all favourites into a fresh queue. Hold: add them, shuffled, to the end of the queue |
 | `Ctrl+Alt+Pipe` | Tap: queue the highlighted result at the end. Hold: play it next |
 | `Ctrl+Alt+Backspace` | Tap: remove the selected queue entry. Hold 800 ms: clear the queue |
 | `Ctrl+Alt+Q` | Open the queue |
@@ -758,7 +758,7 @@ stored in `config.json`; see `HotkeyConfig` for the defaults.
 action and hold to walk the queue backwards or forwards. Offline mode moved to `Ctrl+Alt+L`
 to make room.
 
-Four shortcuts carry a built-in tap/hold escalation — tap does the ordinary thing, hold
+Five shortcuts carry a built-in tap/hold escalation — tap does the ordinary thing, hold
 does the bigger version. `MainWindow.BeginTapOrHold` implements all of them; the specific
 entry points supply the two actions and their preconditions.
 
@@ -769,8 +769,8 @@ in another window; the toast reports where a skip landed.
 
 Any shortcut can be set to **hold to activate** — it then fires only after being held for
 `HoldDelaySeconds` (0.2–5 s, three decimals, one setting shared by every hold gesture). Off
-by default. The exception is `RemoveFromQueue`, whose hold already means "clear the queue",
-so neither queue action has a toggle — their hold already means something.
+by default. The exceptions are the five tap/hold shortcuts, whose hold already means
+something.
 `HotkeyActions.SupportsHoldToggle` is the single place that decides, and it is enforced
 again at registration so a hand-edited config cannot get past it.
 
@@ -1106,7 +1106,7 @@ Verified against the current tree — these are real, not speculative.
 - `StartupService` writes an absolute path to the Run key, so moving or republishing the app
   leaves a stale entry. Settings detects this and prompts, but does not repair it silently.
 - Shuffle-favourites caps at 1000 tracks (`MainWindow.FavoritesCap`) and holds them in
-  memory. Fine for a normal favourites list; a pathological one would be truncated silently.
+  memory, on both the tap (play) and the hold (add to queue) paths. Fine for a normal favourites list; a pathological one would be truncated silently.
 - Only Jellyfin implements `ISupportsFavorites`. The local index has no favourites concept,
   so the action does nothing while offline — it says so rather than showing an empty queue.
 - Volume has no on-screen control — only the global hotkeys and the toast they raise. The

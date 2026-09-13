@@ -278,6 +278,47 @@ namespace Yinyue.Services
         }
 
         /// <summary>
+        /// Appends many tracks at once, raising one <see cref="QueueChanged"/> rather than
+        /// one per track: <see cref="Enqueue"/> in a loop over a thousand favourites would
+        /// have the overlay rebuild its queue list a thousand times. The order given is the
+        /// order kept — callers shuffle first if they want random. Same rule as Enqueue for
+        /// an empty queue: the first track becomes current, armed but silent. Returns how
+        /// many were added.
+        /// </summary>
+        public int EnqueueRange(IEnumerable<Track> tracks)
+        {
+            var list = tracks.ToList();
+            if (list.Count == 0) return 0;
+
+            Track? nowCurrent = null;
+
+            lock (_gate)
+            {
+                foreach (var track in list)
+                {
+                    _queue.Add(track);
+                    _order.Add(_queue.Count - 1);
+                }
+
+                if (_orderPosition < 0)
+                {
+                    _orderPosition = _order.Count - list.Count;
+                    nowCurrent = list[0];
+                }
+            }
+
+            if (nowCurrent != null)
+            {
+                CurrentTrack = nowCurrent;
+                TrackChanged?.Invoke(this, new TrackChangedEventArgs { Track = nowCurrent });
+            }
+
+            QueueChanged?.Invoke(this, EventArgs.Empty);
+            StartPrebuffer();
+            return list.Count;
+        }
+
+        /// <summary>
         /// Reinstates a saved queue without starting playback. The overlay shows the track
         /// as current and the transport is armed, but nothing makes noise until the user
         /// asks — an app that starts playing on its own at login is hostile.

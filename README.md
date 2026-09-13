@@ -101,7 +101,7 @@ These work anywhere, whether or not the overlay is visible. All are configurable
 | `Ctrl+Alt+M` | Mute / unmute |
 | `Ctrl+Alt+R` | Cycle loop: off → queue → track |
 | `Ctrl+Alt+X` | Toggle shuffle |
-| `Ctrl+Alt+F` | Shuffle all favourites |
+| `Ctrl+Alt+F` | Shuffle all favourites. Hold to add them to the queue instead of replacing it |
 | `Ctrl+Alt+Q` | Open the queue |
 | `Ctrl+Alt+G` | Pick up the highlighted queue entry to move it |
 | <code>Ctrl+Alt+&#124;</code> | Tap: queue the highlighted result. Hold: play it next |
