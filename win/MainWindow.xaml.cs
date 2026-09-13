@@ -177,14 +177,10 @@ namespace Yinyue
             _playback.ProgressUpdated += OnProgressUpdated;
             _playback.PlaybackFailed += OnPlaybackFailed;
 
-            // Volume can move from the global hotkeys while the overlay is hidden, so read
-            // it from the event rather than from whatever changed it.
-            _playback.VolumeChanged += (_, volume) => Dispatcher.BeginInvoke(() =>
-            {
-                TxtStatus.Text = _playback.IsMuted || volume <= 0.0001
-                    ? "Muted"
-                    : $"Volume {volume * 100:F0}%";
-            });
+            // Volume is deliberately not reported here. It used to be written into the status
+            // line while the overlay was showing and toasted otherwise, which meant two
+            // different readouts for one gesture depending on state. The toast now shows for
+            // volume whether or not the overlay is up — see App.OnVolumeChanged.
 
             // Shuffle and loop can both change from global hotkeys while the overlay is
             // hidden, so the buttons follow the service rather than the click that caused it.

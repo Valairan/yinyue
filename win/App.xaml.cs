@@ -253,9 +253,15 @@ namespace Yinyue
                 _volumeSaveTimer?.Stop();
                 _volumeSaveTimer?.Start();
 
+                // Volume is the one change that toasts even while the overlay is showing.
+                // It used to switch surfaces with the overlay's state — a line of text in
+                // the applet when up, the toast when hidden — and the same gesture reading
+                // two different ways was less polished than one consistent readout with a
+                // level bar. The toast has its own reserved row, so it never covers anything.
                 ShowToast(muted ? "🔇" : "🔊",
                     muted ? "Muted" : $"Volume {volume * 100:F0}%",
-                    volume);
+                    volume,
+                    evenWhileOverlayShown: true);
             });
         }
 
@@ -305,13 +311,16 @@ namespace Yinyue
         }
 
         /// <summary>
-        /// Shows the toast only while the overlay is hidden. With it open the status line
-        /// says the same thing, and two readouts of one change is noise.
+        /// Shows the toast only while the overlay is hidden, unless told otherwise. With the
+        /// overlay open its status line already reports track, loop and shuffle changes, and
+        /// two readouts of one change is noise. Volume is the exception: the status line no
+        /// longer shows it at all, so the toast is its only surface in either state.
         /// </summary>
-        private void ShowToast(string glyph, string message, double? level = null)
+        private void ShowToast(string glyph, string message, double? level = null,
+            bool evenWhileOverlayShown = false)
         {
             if (!_ready || _toast == null) return;
-            if (_overlay?.IsOverlayShown == true) return;
+            if (!evenWhileOverlayShown && _overlay?.IsOverlayShown == true) return;
 
             _toast.Show(glyph, message, level);
         }

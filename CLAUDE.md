@@ -810,6 +810,13 @@ landed on. `App.ShowToast` is the single entry point and it shows the toast **on
 while the overlay is hidden**; with the overlay open its status line already says the same
 thing, and two readouts of one change is noise.
 
+**Volume is the one exception: it always toasts.** It used to be written into the applet's
+status line while the overlay was up and toasted only when hidden, so the same keypress read
+two different ways depending on state — a line of text in one case, a level bar in the other.
+The status line no longer reports volume at all, and `OnVolumeChanged` passes
+`evenWhileOverlayShown` so the toast is its single surface. The toast has a reserved row of its
+own, so it covers nothing when it appears over an open overlay.
+
 Requirements on it, all load-bearing:
 
 - **Carries the hold dial**, in its own row. A filling arc rather than a countdown: it reads
