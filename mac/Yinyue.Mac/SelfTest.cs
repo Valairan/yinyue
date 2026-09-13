@@ -115,7 +115,23 @@ namespace Yinyue
         {
             Console.WriteLine("\nToast layout");
 
+            // The timings are asserted against literals measured from win/ToastWindow.xaml.cs,
+            // not against the constants themselves — a test that checks a constant equals
+            // itself proves nothing, and these are the numbers the two apps must share.
+            Check("a toast stays up for 1400ms, as on Windows",
+                Math.Abs(Yinyue.UI.ToastPanel.VisibleFor.TotalMilliseconds - 1400) < 0.5,
+                Yinyue.UI.ToastPanel.VisibleFor.TotalMilliseconds.ToString());
+
+            Check("a stale hold dial gives up after 600ms",
+                Math.Abs(Yinyue.UI.ToastPanel.HoldStaleForTest.TotalMilliseconds - 600) < 0.5,
+                Yinyue.UI.ToastPanel.HoldStaleForTest.TotalMilliseconds.ToString());
+
             var config = new Yinyue.Models.OverlayConfig();
+
+            Check("a toast caught mid-fade returns in 70ms or less",
+                Yinyue.UI.ToastPanel.FadeBackFor(config) <= 0.0701,
+                (Yinyue.UI.ToastPanel.FadeBackFor(config) * 1000).ToString("0"));
+
             var toast = new Yinyue.UI.ToastPanel(config, Yinyue.UI.ToastRole.Message);
 
             toast.Show("plain");

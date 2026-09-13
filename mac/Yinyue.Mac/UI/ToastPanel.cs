@@ -140,14 +140,17 @@ namespace Yinyue.UI
             _level.Hidden = level is null;
             if (level is { } value) _level.DoubleValue = Math.Clamp(value, 0, 1);
 
+            // A hold may have been in progress; this is an ordinary toast now.
+            _holding = false;
+
             // A fade may be running from a previous toast; claim the window back from it.
             _generation++;
-            AlphaValue = 1;
 
             // Positioned and faded in only on the way in. A repeat call must not reposition
-            // or re-run the entrance -- doing that on every call is what made rapid volume
+            // or re-run the entrance — doing that on every call is what made rapid volume
             // steps strobe on Windows.
             if (!IsVisible) Enter();
+            else ComeBack();
         }
 
         /// <summary>
@@ -178,6 +181,46 @@ namespace Yinyue.UI
             // interval and every update restarts it.
             Dismiss(HoldStale);
         }
+
+        /// <summary>
+        /// Brings a toast back that was already on screen, and back up if it was fading out.
+        ///
+        /// Over <see cref="FadeBack"/> rather than instantly, matching Windows: a toast caught
+        /// mid-exit should feel like it never left, and a hard cut to full opacity reads as a
+        /// second toast arriving rather than the same one staying.
+        /// </summary>
+        private void ComeBack()
+        {
+            if (AlphaValue >= 0.999)
+            {
+                AlphaValue = 1;
+                return;
+            }
+
+            double seconds = _config.Animations ? FadeBack : 0;
+
+            if (seconds <= 0)
+            {
+                AlphaValue = 1;
+                return;
+            }
+
+            Fade(to: 1, seconds, onDone: null);
+        }
+
+        /// <summary>
+        /// Bringing a fading toast back up should feel instant, not like a re-entry — so it
+        /// is capped well below the ordinary fade. Read at use, like the fade itself, so the
+        /// setting takes effect without a restart.
+        /// </summary>
+        private double FadeBack => FadeBackFor(_config);
+
+        /// <summary>For the suite, and so the cap lives in exactly one place.</summary>
+        public static double FadeBackFor(OverlayConfig config) =>
+            Math.Min(70, config.AnimationMilliseconds) / 1000.0;
+
+        /// <summary>For the suite.</summary>
+        public static TimeSpan HoldStaleForTest => HoldStale;
 
         /// <summary>How long a dial may go without an update before it is assumed stale.</summary>
         private static readonly TimeSpan HoldStale = TimeSpan.FromMilliseconds(600);
