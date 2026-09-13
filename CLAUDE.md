@@ -296,9 +296,16 @@ The settings window keeps its chrome, so it cannot be transparent and therefore 
 fade.
 
 **Auto-hide.** The overlay dismisses itself after `OverlayConfig.AutoHideSeconds` of no
-interaction, on by default at 10 s and switchable off. Any key, click or pointer movement
-restarts the countdown, and an open search or queue — or the settings window in front —
-suspends it entirely, because reading is not idling.
+interaction, on by default at 10 s and switchable off. Any key, click, pointer movement or
+shortcut restarts the countdown, and **nothing suspends it**: with no activity the overlay
+goes, whatever is open. An open search or queue used to suspend it "because reading is not
+idling" — but the panels are popups whose input never reached the window's handlers, so the
+suspension was really standing in for activity the timer could not see. Each panel now reports
+its own mouse and key activity, the two lists report selection changes (which is what the
+arrow keys and the queue hotkeys move), and the queue actions count as activity when they
+arrive by global hotkey. Hiding takes the panels down with it and commits a queue entry
+mid-move where it is. The suite opens both panels and watches the overlay go, and keeps it
+alive by moving the selection.
 
 **macOS diverges here, deliberately: nothing suspends auto-hide.** An open panel with no
 input for ten seconds is still an overlay nobody is using, and leaving it up was judged the

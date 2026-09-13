@@ -136,10 +136,24 @@ namespace Yinyue
 
             MouseDown += MainWindow_MouseDown;
 
-            // Any sign of life restarts the idle countdown.
+            // Any sign of life restarts the idle countdown. The panels are popups with their
+            // own windows, so input inside them never reaches this window's handlers — each
+            // panel is hooked in its own right, and the two lists report keyboard movement
+            // through their selection, which is what the arrow keys and the queue hotkeys
+            // change. Without these, reading a result list would count as idling and the
+            // overlay would vanish mid-arrow.
             PreviewMouseMove += (_, _) => RestartAutoHide();
             PreviewMouseDown += (_, _) => RestartAutoHide();
             PreviewKeyUp += (_, _) => RestartAutoHide();
+            foreach (var panel in new FrameworkElement[] { SearchBarPanel, SearchPanel, QueuePanel })
+            {
+                panel.PreviewMouseMove += (_, _) => RestartAutoHide();
+                panel.PreviewMouseDown += (_, _) => RestartAutoHide();
+                panel.PreviewKeyUp += (_, _) => RestartAutoHide();
+            }
+            SearchTextBox.TextChanged += (_, _) => RestartAutoHide();
+            LstSearchResults.SelectionChanged += (_, _) => RestartAutoHide();
+            LstQueue.SelectionChanged += (_, _) => RestartAutoHide();
 
             _autoHideTimer.Tick += (_, _) =>
             {
@@ -351,6 +365,13 @@ namespace Yinyue
         /// <summary>
         /// Restarts the idle countdown. Called from every interaction, so the overlay only
         /// disappears when genuinely left alone.
+        ///
+        /// Nothing suspends it. An open result list or queue used to, on the theory that
+        /// reading is not idling — but the panels are popups whose input never reached this
+        /// window, so the suspension was really a stand-in for activity the timer could not
+        /// see. The panels report their own activity now (see the constructor), and the
+        /// owner's rule is simpler: no activity, no overlay, whatever is on screen. Hiding
+        /// closes the panels with it, and a queue entry mid-move is committed where it is.
         /// </summary>
         private void RestartAutoHide()
         {
@@ -358,10 +379,6 @@ namespace Yinyue
 
             var overlay = _config.Current.Overlay;
             if (!_isShown || !overlay.AutoHide) return;
-
-            // Reading is not idling: an open list, or settings in front, suspends it.
-            if (SearchPopup.IsOpen || QueuePopup.IsOpen) return;
-            if (_settingsWindow is { IsVisible: true }) return;
 
             _autoHideTimer.Interval = TimeSpan.FromSeconds(overlay.AutoHideSeconds);
             _autoHideTimer.Start();
@@ -976,6 +993,7 @@ namespace Yinyue
         /// </summary>
         public void ToggleQueueGrab()
         {
+            RestartAutoHide();   // a hotkey action is activity too
             if (IsGrabbing)
             {
                 CommitQueueGrab();
@@ -1027,6 +1045,7 @@ namespace Yinyue
         /// </summary>
         private void MoveGrabbed(int delta)
         {
+            RestartAutoHide();   // a hotkey action is activity too
             if (!IsGrabbing) return;
 
             int target = _grabbedIndex + delta;
@@ -1367,6 +1386,7 @@ namespace Yinyue
         /// </summary>
         public void AddHighlightedToQueue()
         {
+            RestartAutoHide();   // a hotkey action is activity too
             switch (HighlightedResult())
             {
                 case Track track:
@@ -1398,6 +1418,7 @@ namespace Yinyue
         /// <summary>Inserts the highlighted result right after the current track.</summary>
         public void InsertHighlightedNext()
         {
+            RestartAutoHide();   // a hotkey action is activity too
             switch (HighlightedResult())
             {
                 case Track track:
@@ -1704,6 +1725,7 @@ namespace Yinyue
         /// </summary>
         public void RemoveSelectedFromQueue()
         {
+            RestartAutoHide();   // a hotkey action is activity too
             if (_playback.PlayOrder.Count == 0)
             {
                 TxtStatus.Text = "The queue is empty";

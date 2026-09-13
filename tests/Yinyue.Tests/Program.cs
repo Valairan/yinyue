@@ -982,6 +982,51 @@ public static class WindowTests
             playback.Dispose();
         });
 
+        Check.Group("auto-hide fires with panels open, and activity inside them holds it off", () =>
+        {
+            var (library, _) = Make.Library(new FakeSource("Fake", Yinyue.Models.TrackSource.Local, Make.Tracks("a", "b", "c")));
+            var config = new ConfigService();
+            config.Current.Overlay.AutoHide = true;
+            config.Current.Overlay.AutoHideSeconds = OverlayConfig.MinAutoHideSeconds;   // 2 s
+            var playback = new PlaybackService(new SilentAudioPlayer(), library);
+            var overlay = new MainWindow(config, library, playback, () => null!);
+            ShowAndActivate(overlay);
+            overlay.ShowOverlay();
+            Pump();
+
+            var box = (System.Windows.Controls.TextBox)overlay.FindName("SearchTextBox");
+            var results = (System.Windows.Controls.Primitives.Popup)overlay.FindName("SearchPopup");
+            var list = (ListBox)overlay.FindName("LstSearchResults");
+            box.Text = "a";
+            WaitUntil(() => results.IsOpen && list.Items.Count > 0, 3000);
+            playback.PlayQueueAsync(Make.Tracks("a", "b", "c"), 0).GetAwaiter().GetResult();
+            Pump();
+            overlay.ShowQueue();
+            Pump();
+            var queue = (System.Windows.Controls.Primitives.Popup)overlay.FindName("QueuePopup");
+            Check.That("both panels are open", results.IsOpen && queue.IsOpen);
+
+            // Moving through the results every half second for three seconds is activity,
+            // and three seconds is past the two-second idle limit.
+            var started = DateTime.UtcNow;
+            int step = 0;
+            while ((DateTime.UtcNow - started).TotalMilliseconds < 3000)
+            {
+                list.SelectedIndex = step++ % list.Items.Count;
+                var until = DateTime.UtcNow.AddMilliseconds(500);
+                while (DateTime.UtcNow < until) { Pump(); System.Threading.Thread.Sleep(15); }
+            }
+            Check.That("still up while the selection keeps moving", overlay.IsOverlayShown);
+
+            // Now nothing. The panels being open is no longer a reason to stay.
+            WaitUntil(() => !overlay.IsOverlayShown, 5000);
+            Check.That("gone after the idle period despite open panels", !overlay.IsOverlayShown);
+            Pump();
+
+            overlay.Close();
+            playback.Dispose();
+        });
+
         Check.Group("album art is a centred square", () =>
         {
             var config = new ConfigService();

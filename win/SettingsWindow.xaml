@@ -305,7 +305,7 @@
                                 </Grid>
 
                                 <TextBlock Style="{StaticResource HintStyle}"
-                                           Text="Typing, clicking or moving the pointer restarts the countdown, and an open search or queue suspends it."/>
+                                           Text="Typing, clicking, moving the pointer or using a shortcut restarts the countdown. Nothing suspends it: with no activity the overlay goes, whatever is open."/>
                             </StackPanel>
                         </Border>
 
