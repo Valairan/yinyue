@@ -55,7 +55,7 @@ GitHub refuses single files over 100 MB.
    `./installer/build-mac.sh X.Y.Z universal` builds one bundle carrying both instead, which
    is the sum of the two rather than a saving.
 2. In `index.html`, update `data-file-arm64` and `data-file-x64` on the macOS card, the version
-   text, and the two SHA-256 rows. The DMGs are separate, so a single link cannot serve both:
+   text, and the two hashes in the SHA-256 row. The DMGs are separate, so a single link cannot serve both:
    an Intel visitor given the arm64 file gets an app that will not open, which is what the
    processor toggle is for.
 
