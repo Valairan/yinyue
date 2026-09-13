@@ -235,10 +235,13 @@ h2 {
 
 /* ----------------------------------------------------------- screenshots */
 
+/* Every capture shares one canvas with the applet's bottom edge at the same line, so a row
+   of them reads as one desktop corner: the bar above the applet, then the results, then the
+   queue. Four across on a wide screen, two on a tablet, one on a phone. */
 .shots {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: 1.4rem;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1.2rem;
 }
 
 .shot { margin: 0; }
