@@ -68,7 +68,12 @@ namespace Yinyue
             library.Register(new LocalMusicSource(indexer, artwork));
             library.Register(new JellyfinMusicSource(jellyfin, artwork));
 
-            var playback = new PlaybackService(audio, library);
+            var playback = new PlaybackService(audio, library)
+            {
+                // Read here, not defaulted: the setting exists in settings and wrote a value
+                // nothing looked at, so prebuffering was always on however it was set.
+                PrebufferNext = config.Current.Jellyfin.PrebufferNext,
+            };
 
             if (!check) return RunApp(config, playback, library, jellyfin, indexer, artwork, instance);
 

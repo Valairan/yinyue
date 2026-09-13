@@ -208,6 +208,11 @@ namespace Yinyue.UI
                     // And the shortcuts themselves have to follow the config.
                     _hotkeys?.Apply(_config.Current.Hotkeys);
 
+                    // Settings that are read once at construction have to be re-applied, or
+                    // changing them does nothing until a restart.
+                    _playback.PrebufferNext = _config.Current.Jellyfin.PrebufferNext;
+                    _jellyfin.MaxStreamingBitrate = _config.Current.Jellyfin.MaxStreamingBitrate;
+
                     _sleep?.SetSteps(_config.Current.SleepTimer.Steps);
                     if (_sleep is not null) _sleep.Enabled = _config.Current.SleepTimer.Enabled;
                 });
@@ -569,8 +574,14 @@ namespace Yinyue.UI
             _ => HotkeyActions.Describe(action),
         };
 
-        /// <summary>How much one press of the volume shortcuts moves the level.</summary>
-        private const double VolumeStep = 0.05;
+        /// <summary>
+        /// How far one press of a volume shortcut moves the level.
+        ///
+        /// Read from the config at use, not cached: this was a hard-coded 0.05, so the
+        /// "Volume step (%)" field in settings wrote a value nothing ever read — the setting
+        /// existed, saved, and did nothing.
+        /// </summary>
+        private double VolumeStep => _config.Current.Playback.VolumeStep;
 
         /// <summary>
         /// Shuffle-favourites caps at 1000 and holds them in memory, as on Windows. Only

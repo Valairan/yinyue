@@ -37,6 +37,7 @@ namespace Yinyue
             if (which is "all" or "toast") ToastLayout();
             if (which is "all" or "playpause") PlayPauseFeedback();
             if (which is "startup") StartAtLogin();
+            if (which is "all" or "volume") VolumeStepping();
 
             Console.WriteLine();
             Console.WriteLine(_failed == 0 ? "PASS" : $"FAIL — {_failed} check(s)");
@@ -48,6 +49,52 @@ namespace Yinyue
             if (!ok) _failed++;
             Console.WriteLine($"  [{(ok ? "ok" : "FAIL")}] {label}{(detail is null ? "" : $"  — {detail}")}");
             Console.Out.Flush();
+        }
+
+        /// <summary>
+        /// The volume shortcuts must move the level by the configured step.
+        ///
+        /// The step was hard-coded at 5% while settings offered a field for it, so the
+        /// setting saved a number nothing read. A setting that does nothing is worse than no
+        /// setting: it says the app can do something it cannot.
+        /// </summary>
+        private static void VolumeStepping()
+        {
+            Console.WriteLine("\nVolume step");
+
+            var config = new Yinyue.Models.PlaybackConfig();
+            Check("defaults to 5%", Math.Abs(config.VolumeStepPercent - 5) < 0.01,
+                config.VolumeStepPercent.ToString());
+
+            Check("and the engine gets it as a fraction",
+                Math.Abs(config.VolumeStep - 0.05) < 0.001, config.VolumeStep.ToString());
+
+            config.VolumeStepPercent = 12;
+            Check("a changed step is carried through",
+                Math.Abs(config.VolumeStep - 0.12) < 0.001, config.VolumeStep.ToString());
+
+            // Clamped on the way in: below 1% a hold takes forever to get anywhere, above 25%
+            // a single press is a jump rather than a step.
+            config.VolumeStepPercent = 0.1;
+            Check("too small is clamped up", config.VolumeStepPercent >= 1, config.VolumeStepPercent.ToString());
+
+            config.VolumeStepPercent = 90;
+            Check("too large is clamped down", config.VolumeStepPercent <= 25, config.VolumeStepPercent.ToString());
+
+            // And the level actually moves by it.
+            var audio = new Yinyue.Services.MacAudioPlayer();
+            var settings = new Yinyue.Services.ConfigService();
+            using var playback = new Yinyue.Services.PlaybackService(
+                audio, new Yinyue.Services.MusicLibrary(settings));
+
+            playback.Volume = 0.5;
+            double after = playback.AdjustVolume(0.12);
+
+            Check("AdjustVolume moves by exactly the step",
+                Math.Abs(after - 0.62) < 0.001, after.ToString("0.000"));
+
+            audio.Dispose();
+
         }
 
         /// <summary>
