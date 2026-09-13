@@ -31,3 +31,6 @@ mac/**/obj/
 
 # MSBuild SDK-resolver backups left behind when an IDE without the macos workload loads the Mac project
 *.SdkResolver.*.proj.Backup.tmp
+
+# The landing page carries the current MSI when it is copied to the website; the repo does not
+website/downloads/*.msi

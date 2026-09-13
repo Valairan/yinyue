@@ -1,0 +1,312 @@
+/*
+  Yinyue landing page. One file, no build step, no framework.
+  Palette is Catppuccin Mocha, the same one the app draws in.
+*/
+
+:root {
+  --crust: #11111b;
+  --mantle: #181825;
+  --base: #1e1e2e;
+  --surface0: #313244;
+  --surface1: #45475a;
+  --surface2: #585b70;
+  --text: #cdd6f4;
+  --subtext: #a6adc8;
+  --accent: #89b4fa;
+  --white: #ffffff;
+
+  --radius: 12px;
+  --max: 1080px;
+  --font: -apple-system, BlinkMacSystemFont, "Segoe UI Variable", "Segoe UI", Roboto, Inter,
+          "Helvetica Neue", Arial, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  margin: 0;
+  font-family: var(--font);
+  color: var(--text);
+  background: var(--crust);
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+code {
+  font-family: ui-monospace, "Cascadia Code", Consolas, "SF Mono", Menlo, monospace;
+  font-size: 0.92em;
+  background: rgba(255, 255, 255, 0.08);
+  padding: 0.1em 0.4em;
+  border-radius: 6px;
+}
+
+/* ------------------------------------------------------------- backdrop video */
+
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  background: var(--crust);
+}
+
+.backdrop__video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  /* Poster and video alike sit behind a shade, so text stays legible whatever the frame. */
+  filter: saturate(0.9);
+}
+
+.backdrop__shade {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse at 50% 20%, rgba(17, 17, 27, 0.35), rgba(17, 17, 27, 0.75) 60%, rgba(17, 17, 27, 0.92)),
+    linear-gradient(180deg, rgba(17, 17, 27, 0.55), rgba(17, 17, 27, 0.9));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .backdrop__video { display: none; }
+  .backdrop { background: var(--crust) url("media/poster-applet.png") center / cover no-repeat; }
+}
+
+/* ------------------------------------------------------------------ nav */
+
+.nav {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.9rem clamp(1rem, 4vw, 2.5rem);
+  background: rgba(17, 17, 27, 0.55);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.nav__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  color: var(--white);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+.nav__brand:hover { text-decoration: none; }
+.nav__mark { height: 22px; width: auto; }
+
+.nav__links { display: flex; gap: 1.4rem; font-size: 0.95rem; }
+.nav__links a { color: var(--subtext); }
+.nav__links a:hover { color: var(--white); text-decoration: none; }
+
+/* ----------------------------------------------------------------- hero */
+
+main { max-width: var(--max); margin: 0 auto; padding: 0 clamp(1rem, 4vw, 2.5rem); }
+
+.hero {
+  min-height: calc(100vh - 60px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 5rem 0 4rem;
+}
+
+.hero__mark {
+  height: 96px;
+  width: auto;
+  margin-bottom: 1.6rem;
+  filter: drop-shadow(0 10px 30px rgba(0, 0, 0, 0.5));
+}
+
+h1 {
+  font-size: clamp(2.4rem, 6vw, 4.2rem);
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  margin: 0 0 1rem;
+  color: var(--white);
+}
+
+.hero__lead {
+  font-size: clamp(1.05rem, 2vw, 1.3rem);
+  color: var(--subtext);
+  max-width: 40rem;
+  margin: 0 auto 2rem;
+}
+
+.hero__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.8rem;
+  justify-content: center;
+}
+
+.hero__meta { margin-top: 1.4rem; color: var(--subtext); font-size: 0.92rem; }
+.muted { color: var(--surface2); }
+
+/* --------------------------------------------------------------- buttons */
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.85rem 1.4rem;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 1rem;
+  border: 1px solid transparent;
+  transition: transform 120ms ease, background 120ms ease, border-color 120ms ease;
+}
+.button:hover { text-decoration: none; transform: translateY(-1px); }
+
+.button--primary { background: var(--white); color: var(--crust); }
+.button--primary:hover { background: #e6e9f5; }
+
+.button--ghost {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--white);
+  border-color: rgba(255, 255, 255, 0.14);
+}
+.button--ghost:hover { background: rgba(255, 255, 255, 0.11); }
+
+.button__icon { width: 18px; height: 18px; }
+.button--primary .button__icon { filter: brightness(0); }
+.button--ghost .button__icon { filter: brightness(0) invert(1); }
+
+/* -------------------------------------------------------------- sections */
+
+.section { padding: 5rem 0; }
+
+h2 {
+  font-size: clamp(1.7rem, 3.5vw, 2.4rem);
+  letter-spacing: -0.015em;
+  margin: 0 0 0.6rem;
+  color: var(--white);
+  text-align: center;
+}
+
+.section__lead {
+  text-align: center;
+  color: var(--subtext);
+  max-width: 44rem;
+  margin: 0 auto 2.8rem;
+  font-size: 1.05rem;
+}
+
+/* ---------------------------------------------------------------- cards */
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 1rem;
+}
+
+.card {
+  background: rgba(30, 30, 46, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: var(--radius);
+  padding: 1.4rem 1.3rem;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.card__icon {
+  width: 26px;
+  height: 26px;
+  filter: brightness(0) invert(1);
+  margin-bottom: 0.8rem;
+}
+
+.card h3 { margin: 0 0 0.35rem; font-size: 1.05rem; color: var(--white); }
+.card p { margin: 0; color: var(--subtext); font-size: 0.95rem; }
+
+/* ----------------------------------------------------------- screenshots */
+
+.shots {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1.4rem;
+}
+
+.shot { margin: 0; }
+
+.shot__placeholder,
+.shot img {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  aspect-ratio: 16 / 10;
+  width: 100%;
+  border-radius: var(--radius);
+  border: 1px dashed rgba(255, 255, 255, 0.18);
+  background: rgba(30, 30, 46, 0.6);
+  color: var(--subtext);
+  font-weight: 600;
+  line-height: 1.4;
+}
+.shot img { border-style: solid; object-fit: cover; display: block; }
+.shot__placeholder span { display: block; font-weight: 400; font-size: 0.9rem; color: var(--surface2); }
+
+.shot figcaption { margin-top: 0.6rem; color: var(--subtext); font-size: 0.92rem; text-align: center; }
+
+/* ---------------------------------------------------------------- facts */
+
+.section--download {
+  background: rgba(30, 30, 46, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: calc(var(--radius) * 1.5);
+  padding: 4rem clamp(1rem, 4vw, 3rem);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  margin-bottom: 4rem;
+}
+
+.facts {
+  max-width: 44rem;
+  margin: 2.4rem auto 0;
+  display: grid;
+  gap: 0.9rem;
+}
+.facts div { display: grid; grid-template-columns: 7rem 1fr; gap: 1rem; align-items: baseline; }
+.facts dt { color: var(--white); font-weight: 600; }
+.facts dd { margin: 0; color: var(--subtext); }
+
+.hash { word-break: break-all; font-size: 0.8em; }
+
+/* --------------------------------------------------------------- footer */
+
+.footer {
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 2rem clamp(1rem, 4vw, 2.5rem) 3rem;
+  text-align: center;
+  color: var(--subtext);
+  font-size: 0.92rem;
+  background: rgba(17, 17, 27, 0.7);
+}
+.footer__links { display: flex; flex-wrap: wrap; justify-content: center; gap: 1.4rem; margin-bottom: 0.8rem; }
+.footer__links a { color: var(--subtext); }
+.footer__links a:hover { color: var(--white); }
+.footer__credits { margin: 0; }
+
+/* ------------------------------------------------------------ responsive */
+
+@media (max-width: 640px) {
+  .nav__links { gap: 1rem; font-size: 0.9rem; }
+  .facts div { grid-template-columns: 1fr; gap: 0.15rem; }
+  .hero { padding-top: 3.5rem; }
+}

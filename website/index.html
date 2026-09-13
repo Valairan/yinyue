@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Yinyue — a keyboard-driven music player for Jellyfin and local files</title>
+  <meta name="description" content="Yinyue is a lightweight Windows music player that lives in the tray. Summon it with a hotkey, search your Jellyfin server or local files, and get back to work.">
+  <meta property="og:title" content="Yinyue">
+  <meta property="og:description" content="A lightweight, keyboard-driven music player for Jellyfin and local files. Summon it, act, and it gets out of the way.">
+  <meta property="og:image" content="media/poster-applet.png">
+  <meta name="theme-color" content="#1e1e2e">
+  <link rel="icon" href="assets/icon.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!--
+    Full-page background video. Drop the recording in as media/demo.mp4 (and optionally
+    media/demo.webm for smaller files). Until it exists, the poster shows instead, so the page
+    never looks broken. Muted + playsinline are what let browsers autoplay it.
+  -->
+  <div class="backdrop" aria-hidden="true">
+    <video class="backdrop__video" autoplay muted loop playsinline preload="metadata"
+           poster="media/poster-applet.png">
+      <source src="media/demo.webm" type="video/webm">
+      <source src="media/demo.mp4" type="video/mp4">
+    </video>
+    <div class="backdrop__shade"></div>
+  </div>
+
+  <header class="nav">
+    <a class="nav__brand" href="#top">
+      <img src="assets/logo-white.png" alt="" class="nav__mark">
+      <span>Yinyue</span>
+    </a>
+    <nav class="nav__links">
+      <a href="#features">Features</a>
+      <a href="#screens">Screens</a>
+      <a href="#download">Download</a>
+      <a href="https://github.com/Valairan/yinyue" rel="noopener">GitHub</a>
+    </nav>
+  </header>
+
+  <main id="top">
+
+    <!-- ================================ Hero ================================ -->
+    <section class="hero">
+      <img src="assets/logo-white.png" alt="Yinyue" class="hero__mark">
+      <h1>Say hello to Yinyue.</h1>
+      <p class="hero__lead">
+        A music player that lives in your tray, not on your taskbar. Press a hotkey, search
+        your Jellyfin server or your local files, play, and it gets out of the way again.
+      </p>
+      <div class="hero__actions">
+        <a class="button button--primary" href="downloads/Yinyue-0.2.0.msi" download>
+          <img src="assets/icons/app-window.svg" alt="" class="button__icon">
+          Download for Windows
+        </a>
+        <a class="button button--ghost" href="https://github.com/Valairan/yinyue" rel="noopener">
+          <img src="assets/icons/github.svg" alt="" class="button__icon">
+          Source on GitHub
+        </a>
+      </div>
+      <p class="hero__meta">
+        v0.2.0 · 6.6 MB installer · Windows 10 and 11 · free and open source<br>
+        <span class="muted">macOS version in development</span>
+      </p>
+    </section>
+
+    <!-- ============================== Features ============================== -->
+    <section class="section" id="features">
+      <h2>Made to be summoned, not stared at.</h2>
+      <p class="section__lead">
+        Yinyue starts with Windows and waits in the tray. Everything is reachable from the
+        keyboard, and most of it works without ever showing the window.
+      </p>
+
+      <div class="grid">
+        <article class="card">
+          <img src="assets/icons/app-window.svg" alt="" class="card__icon">
+          <h3>Summon overlay</h3>
+          <p>One global hotkey brings up a small panel anchored to a corner of your screen. It appears, you act, it dismisses.</p>
+        </article>
+        <article class="card">
+          <img src="assets/icons/server.svg" alt="" class="card__icon">
+          <h3>Jellyfin, direct</h3>
+          <p>Streams straight from your server with no transcoding when the format allows. Favourites, playlists and albums included.</p>
+        </article>
+        <article class="card">
+          <img src="assets/icons/hard-drive.svg" alt="" class="card__icon">
+          <h3>Local files too</h3>
+          <p>Point it at a folder and it indexes what is there. Local and remote results appear together, duplicates folded.</p>
+        </article>
+        <article class="card">
+          <img src="assets/icons/keyboard.svg" alt="" class="card__icon">
+          <h3>Keyboard first</h3>
+          <p>Every action has a shortcut, and every shortcut can be rebound. Tap for the small thing, hold for the bigger one.</p>
+        </article>
+        <article class="card">
+          <img src="assets/icons/search.svg" alt="" class="card__icon">
+          <h3>Search that narrows</h3>
+          <p>Type <code>album:</code>, <code>playlist:</code>, <code>fav:</code> or <code>queue:</code> in front of a search to look in exactly one place.</p>
+        </article>
+        <article class="card">
+          <img src="assets/icons/list-music.svg" alt="" class="card__icon">
+          <h3>A queue you can shape</h3>
+          <p>Add, remove, reorder and jump, all from the keyboard. Shuffle and loop modes follow you across sessions.</p>
+        </article>
+        <article class="card">
+          <img src="assets/icons/headphones.svg" alt="" class="card__icon">
+          <h3>Media keys and the OS</h3>
+          <p>Play, pause and skip from your keyboard's media keys. Windows shows what is playing, with artwork.</p>
+        </article>
+        <article class="card">
+          <img src="assets/icons/zap.svg" alt="" class="card__icon">
+          <h3>Lightweight by design</h3>
+          <p>Idle at zero CPU with a small footprint, all day. A resident app should never be the reason your laptop fan spins.</p>
+        </article>
+      </div>
+    </section>
+
+    <!-- ============================= Screenshots ============================ -->
+    <section class="section" id="screens">
+      <h2>What it looks like.</h2>
+      <p class="section__lead">The whole app is a few small panels that stack above one another.</p>
+
+      <!--
+        Placeholders. Replace each <div class="shot"> with an <img> of the same class, or set
+        a background-image on it. Suggested captures, in this order: the applet playing a
+        track; search results above it; the queue with an entry picked up to move; the
+        settings window's Remote tab.
+      -->
+      <div class="shots">
+        <figure class="shot">
+          <div class="shot__placeholder">Screenshot<br><span>the applet, playing</span></div>
+          <figcaption>The applet: artwork, transport and seek in 420 by 170 pixels.</figcaption>
+        </figure>
+        <figure class="shot">
+          <div class="shot__placeholder">Screenshot<br><span>search results</span></div>
+          <figcaption>Results stack above the applet; the queue stacks above those.</figcaption>
+        </figure>
+        <figure class="shot">
+          <div class="shot__placeholder">Screenshot<br><span>queue, reordering</span></div>
+          <figcaption>Pick up an entry, move it with the arrows, put it down.</figcaption>
+        </figure>
+        <figure class="shot">
+          <div class="shot__placeholder">Screenshot<br><span>settings</span></div>
+          <figcaption>Sign in to Jellyfin, add folders, choose a corner, rebind anything.</figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <!-- =============================== Download ============================= -->
+    <section class="section section--download" id="download">
+      <h2>Get Yinyue.</h2>
+      <p class="section__lead">
+        Free and open source. Installs for the current user only, so it never asks for
+        administrator rights.
+      </p>
+      <div class="hero__actions">
+        <a class="button button--primary" href="downloads/Yinyue-0.2.0.msi" download>
+          <img src="assets/icons/app-window.svg" alt="" class="button__icon">
+          Download Yinyue 0.2.0 for Windows
+        </a>
+      </div>
+      <dl class="facts">
+        <div><dt>Requires</dt><dd>Windows 10 or 11 and the <a href="https://dotnet.microsoft.com/download/dotnet/8.0" rel="noopener">.NET 8 Desktop Runtime</a>. Windows offers to install it on first launch if it is missing.</dd></div>
+        <div><dt>Installer</dt><dd>MSI, 6.6 MB, per-user. Asks for your overlay corner, whether to start with Windows, and a music folder.</dd></div>
+        <div><dt>SHA-256</dt><dd><code class="hash">14bfa1633f98915c7d3dbaefbb7d3d034d0c647d26f22cd814f95a003dc5e2d8</code></dd></div>
+        <div><dt>Unsigned</dt><dd>Windows may warn about an unknown publisher. Choose “More info”, then “Run anyway”, or verify the hash above.</dd></div>
+      </dl>
+    </section>
+
+  </main>
+
+  <footer class="footer">
+    <div class="footer__links">
+      <a href="https://github.com/Valairan/yinyue" rel="noopener">GitHub</a>
+      <a href="https://github.com/Valairan/yinyue/issues" rel="noopener">Report a problem</a>
+      <a href="https://github.com/Valairan/yinyue/releases" rel="noopener">Releases</a>
+      <a href="https://valairan.tech" rel="noopener">valairan.tech</a>
+    </div>
+    <p class="footer__credits">
+      Made by Daryl Valairan. Icons by <a href="https://lucide.dev" rel="noopener">Lucide</a>,
+      colours by <a href="https://catppuccin.com" rel="noopener">Catppuccin</a>.
+      Not affiliated with Jellyfin.
+    </p>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>
