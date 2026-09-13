@@ -318,8 +318,10 @@ h2 {
 .mac-only-x64 { display: none; }
 #mac-x64:checked ~ main .mac-only-arm64 { display: none; }
 #mac-x64:checked ~ main .mac-only-x64 { display: inline-flex; }
-/* Keyboard users who focus the hidden radio see the toggle light up instead. */
-.mac-arch:focus-visible ~ main .button--muted { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* No focus ring on the toggle. Chromium treats a radio focused by a label click as
+   :focus-visible, so a ring meant for keyboard users appeared after every mouse click in Edge
+   and Chrome and stayed until the next click elsewhere; Safari, correctly, did not draw it.
+   The label's own text flipping is the feedback, for mouse and keyboard alike. */
 
 /* The macOS button and its processor toggle share a row; on a narrow card they stack. */
 .download-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem; }
