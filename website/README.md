@@ -40,7 +40,8 @@ the rest of the repository several times over and could only be removed by rewri
 **macOS**, on a Mac with Xcode and the .NET 8 SDK:
 
 1. `./installer/build-mac.sh X.Y.Z` — it writes straight into `downloads/` and prints the
-   size and SHA-256.
+   size and SHA-256. The bundle is universal, so it runs on Apple silicon and Intel alike;
+   the card should not say arm64 only.
 2. Update the two macOS links and facts in `index.html` to match.
 
 The DMG is **ad-hoc signed** unless `DEVELOPER_ID` is set, which means Gatekeeper refuses a

@@ -45,21 +45,39 @@ fi
 rm -rf "$STAGE"
 mkdir -p "$STAGE" "$OUT"
 
+# No -r: the project declares both RuntimeIdentifiers, so publish builds each architecture
+# and lipos them into one universal bundle beside them. Passing -r here would pin it to a
+# single architecture and quietly undo that.
+#
 # CreatePackage=false because the macOS SDK otherwise wraps the bundle in a .pkg and that is
 # what lands in the output directory — a .pkg installer for an app whose entire installation
 # is dragging it to Applications. The DMG is the convention for a menu-bar app; the Windows
 # MSI exists because Windows has no drag gesture and because its wizard seeds a first-run
 # configuration.
-echo "publishing ${CONFIG}…"
-"$DOTNET" publish "$PROJECT" -c "$CONFIG" -r osx-arm64 --nologo -v q \
+echo "publishing ${CONFIG} (arm64 + x64)…"
+"$DOTNET" publish "$PROJECT" -c "$CONFIG" --nologo -v q \
     -p:CreatePackage=false \
     -p:ApplicationDisplayVersion="$VERSION" >/dev/null
 
-APP="mac/Yinyue.Mac/bin/$CONFIG/net8.0-macos/osx-arm64/Yinyue.app"
+# The universal bundle sits at the framework root; the per-architecture ones are beside it in
+# osx-arm64/ and osx-x64/ and are inputs, not outputs.
+APP="mac/Yinyue.Mac/bin/$CONFIG/net8.0-macos/Yinyue.app"
 if [ ! -d "$APP" ]; then
-    echo "publish produced no Yinyue.app at $APP" >&2
+    echo "publish produced no universal Yinyue.app at $APP" >&2
     exit 1
 fi
+
+ARCHS=$(lipo -archs "$APP/Contents/MacOS/Yinyue")
+case "$ARCHS" in
+    *arm64*x86_64*|*x86_64*arm64*) ;;
+    *)
+        # Worth failing on: a single-architecture bundle looks identical from the outside and
+        # only shows up as "damaged" on the machines that cannot run it.
+        echo "not universal — the bundle carries only: $ARCHS" >&2
+        exit 1
+        ;;
+esac
+echo "universal: $ARCHS"
 
 # --- Version ------------------------------------------------------------------------
 #

@@ -1156,6 +1156,13 @@ toasts, global hotkeys, media keys, the sleep timer, and settings in the same fo
 Windows has — including rebinding. **Packaging:** `installer/build-mac.sh`, the counterpart to `build.ps1`. It publishes,
 stamps the version, signs, and writes `website/downloads/Yinyue-<version>.dmg`.
 
+- **Universal, both architectures in one bundle**, so a single download runs on Apple silicon
+  and on Intel. `RuntimeIdentifiers` has to be declared in the csproj — MSBuild reads a list
+  passed on the command line as one malformed RID — and `publish` must then be run **without**
+  `-r`, which would pin it to one architecture and quietly undo it. The script fails if the
+  result is not universal, because a single-architecture bundle looks identical from the
+  outside and only shows up as "damaged" on the machines that cannot run it. The cost is size:
+  43 MB arm64-only against 85 MB universal.
 - **A DMG, not a `.pkg`**, even though the macOS SDK produces one for free — and it does, so
   `CreatePackage=false` is needed or a `.pkg` is what lands in the output directory. A
   menu-bar app is one bundle with no system-wide state: there is nothing for an installer to

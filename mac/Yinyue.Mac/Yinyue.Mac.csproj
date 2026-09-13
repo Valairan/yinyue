@@ -20,6 +20,15 @@
       ("summon overlay, not a window") holds here too. Set in Info.plist as LSUIElement.
     -->
     <SupportedOSPlatformVersion>13.0</SupportedOSPlatformVersion>
+
+    <!--
+      Both architectures in one bundle, so a single download runs on Apple silicon and on
+      Intel. It has to be declared here: RuntimeIdentifiers cannot be passed on the command
+      line, where MSBuild reads the whole list as one malformed RID.
+
+      The Windows build ships win-x64 alone, and there is no equivalent expectation there.
+    -->
+    <RuntimeIdentifiers>osx-arm64;osx-x64</RuntimeIdentifiers>
   </PropertyGroup>
 
   <ItemGroup>
