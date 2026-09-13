@@ -28,20 +28,34 @@ namespace Yinyue.UI
         private MacSleepTimer? _sleep;
         private SettingsWindow? _settings;
         private NSStatusBarButton? _statusButton;
+        private AppletView? _applet;
+        private JellyfinPlaybackReporter? _reporter;
         private NSObject? _keyMonitor;
+        private QueueStore? _queueStore;
+        private NSTimer? _queueSave;
+        private NSTimer? _volumeSave;
+
+        /// <summary>
+        /// Suppresses toasts until startup finishes. Restoring a queue and applying the saved
+        /// volume both raise change events, and neither is something the user did.
+        /// </summary>
+        private bool _ready;
 
         private readonly MusicLibrary _library;
         private readonly JellyfinApiClient _jellyfin;
         private readonly LibraryIndexerService _indexer;
+        private readonly ArtworkCache _artwork;
 
         public AppDelegate(ConfigService config, PlaybackService playback, MusicLibrary library,
-                           JellyfinApiClient jellyfin, LibraryIndexerService indexer)
+                           JellyfinApiClient jellyfin, LibraryIndexerService indexer,
+                           ArtworkCache artwork)
         {
             _config = config;
             _playback = playback;
             _library = library;
             _jellyfin = jellyfin;
             _indexer = indexer;
+            _artwork = artwork;
         }
 
         /// <summary>
@@ -160,13 +174,25 @@ namespace Yinyue.UI
             _overlay = new OverlayPanel(_config.Current.Overlay, OverlayMetrics.AppletHeight);
 
             var applet = new AppletView(_playback);
+            applet.ShowArtwork(_playback.CurrentArtworkPath);
             applet.SettingsRequested += (_, _) => ShowSettings();
             applet.QueueRequested += (_, _) => _stack?.ToggleQueue();
+            applet.OfflineRequested += (_, _) => ToggleOffline();
+            applet.ShuffleFavoritesRequested += (_, _) => _ = ShuffleFavoritesAsync();
+            applet.FavoriteRequested += (_, _) => _ = ToggleFavoriteAsync();
+            _applet = applet;
             _overlay.SetContent(applet);
 
             // The stack subscribes to the applet's own Shown/Hidden, so there is nothing to
             // wire here beyond the keys.
             _stack = new OverlayStack(_config.Current.Overlay, _library, _playback, _overlay);
+
+            // An open search or queue, or settings in front, means the user is reading rather
+            // than idling — so the countdown is suspended rather than reset.
+            _overlay.SuspendAutoHide = () =>
+                _stack?.QueueIsOpen == true
+                || _stack?.SearchBar.HasText == true
+                || _settings is { IsVisible: true };
 
             // A local monitor rather than the panel's KeyDown.
             //
@@ -186,17 +212,102 @@ namespace Yinyue.UI
             _media = new MacMediaControls(_playback);
             UpdateTooltip();
 
+            // Start and progress reporting, so the server knows what is playing: resume
+            // points, play counts, and "now playing" in other clients all come from this.
+            _reporter = new JellyfinPlaybackReporter(_playback, _jellyfin);
+
+            applet.ShowOffline(_config.Current.OfflineMode);
+
+            // After the overlay exists, so its handlers see the restored state.
+            RestoreQueue();
+            SetUpPersistence();
+
+            // Deferred so none of it is on the startup path.
+            if (_config.Current.Library.ScanOnStartup) _ = Task.Run(ScanLibraryAsync);
+            _ = _artwork.PruneAsync();
+
+            // Everything from here is the user's doing, so it may announce itself.
+            _ready = true;
+
             // Only deliberate changes are announced. An automatic advance at the end of a
             // track would fire all day for something the user never asked for.
+            _playback.TrackChanged += (_, args) => NSApplication.SharedApplication
+                .BeginInvokeOnMainThread(() => _applet?.ShowFavorite(args.Track?.IsFavorite == true));
+
             _playback.TrackChanged += (_, args) =>
             {
-                if (args.Automatic || args.Track is null) return;
+                if (!_ready || args.Automatic || args.Track is null) return;
 
                 NSApplication.SharedApplication.BeginInvokeOnMainThread(() =>
                     _stack?.Toast($"{args.Track.Title} — {args.Track.DisplayArtist}", Icons.Music));
             };
 
             if (Environment.GetCommandLineArgs().Contains("--show")) _overlay.ShowOverlay();
+        }
+
+        /// <summary>
+        /// Brings back what was playing, armed but silent: the queue and the position are
+        /// restored, and nothing starts until the user asks.
+        /// </summary>
+        private void RestoreQueue()
+        {
+            _queueStore = new QueueStore();
+
+            if (_queueStore.Load() is not { } state) return;
+
+            _playback.RestoreQueue(state.Tracks, state.Position,
+                TimeSpan.FromSeconds(state.TrackPositionSeconds), state.Shuffle, state.Loop);
+
+            _playback.Volume = _config.Current.Playback.Volume;
+        }
+
+        /// <summary>
+        /// Both saves are debounced. The queue churns on every skip and the volume walks a
+        /// step at a time while a key is held; writing on each change would rewrite the files
+        /// dozens of times for one gesture.
+        /// </summary>
+        private void SetUpPersistence()
+        {
+            _playback.QueueChanged += (_, _) => Debounce(ref _queueSave, 2.0, SaveQueue);
+            _playback.ModesChanged += (_, _) => Debounce(ref _queueSave, 2.0, SaveQueue);
+            _playback.TrackChanged += (_, _) => Debounce(ref _queueSave, 2.0, SaveQueue);
+
+            _playback.VolumeChanged += (_, _) => Debounce(ref _volumeSave, 1.0, SaveVolume);
+        }
+
+        private static void Debounce(ref NSTimer? timer, double seconds, Action work)
+        {
+            timer?.Invalidate();
+            timer = NSTimer.CreateScheduledTimer(seconds, _ => work());
+        }
+
+        private void SaveQueue()
+        {
+            if (_queueStore is null) return;
+            _ = _queueStore.SaveAsync(_playback.Snapshot());
+        }
+
+        private void SaveVolume()
+        {
+            // EffectiveVolume, not Volume: saving the raw level while muted would write 0 and
+            // the app would come back silent with nothing explaining why.
+            _config.Current.Playback.Volume = _playback.EffectiveVolume;
+            _config.Save();
+        }
+
+        private async Task ScanLibraryAsync()
+        {
+            try
+            {
+                foreach (var folder in _config.Current.Library.Folders)
+                    await _indexer.IndexDirectoryAsync(folder).ConfigureAwait(false);
+
+                await _indexer.PruneAsync(_config.Current.Library.Folders).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[Scan] {ex.Message}");
+            }
         }
 
         /// <summary>Summons the overlay — used by the tray menu and by a second launch.</summary>
@@ -351,10 +462,7 @@ namespace Yinyue.UI
                     break;
 
                 case HotkeyActions.OfflineMode:
-                    _config.Current.OfflineMode = !_config.Current.OfflineMode;
-                    _config.Save();
-                    _stack?.Toast(_config.Current.OfflineMode ? "Offline mode on" : "Offline mode off",
-                        _config.Current.OfflineMode ? Icons.CloudOff : Icons.Cloud);
+                    ToggleOffline();
                     break;
 
                 case HotkeyActions.ShuffleFavorites:
@@ -444,6 +552,58 @@ namespace Yinyue.UI
             _stack?.Toast(_playback.Shuffle ? $"{loop} · shuffle on" : loop, icon);
         }
 
+        private void ToggleOffline()
+        {
+            _config.Current.OfflineMode = !_config.Current.OfflineMode;
+            _config.Save();
+
+            _applet?.ShowOffline(_config.Current.OfflineMode);
+
+            _stack?.Toast(_config.Current.OfflineMode ? "Offline mode on" : "Offline mode off",
+                _config.Current.OfflineMode ? Icons.CloudOff : Icons.Cloud);
+        }
+
+        /// <summary>
+        /// Only Jellyfin implements favourites — the local index has no such concept — so
+        /// this says so rather than appearing to do nothing.
+        /// </summary>
+        private async Task ToggleFavoriteAsync()
+        {
+            if (_playback.CurrentTrack is not { } track)
+            {
+                _stack?.Toast("Nothing playing.", Icons.Music, evenWhileOverlayShown: true);
+                return;
+            }
+
+            var source = _library.Sources.OfType<ISupportsFavorites>().FirstOrDefault();
+            if (source is null)
+            {
+                _stack?.Toast("No source provides favourites.", Icons.Heart,
+                    evenWhileOverlayShown: true);
+                return;
+            }
+
+            bool wanted = !track.IsFavorite;
+            bool ok = await source.SetFavoriteAsync(track, wanted, CancellationToken.None)
+                                  .ConfigureAwait(false);
+
+            NSApplication.SharedApplication.BeginInvokeOnMainThread(() =>
+            {
+                if (!ok)
+                {
+                    _stack?.Toast("Could not update favourites.", Icons.Heart,
+                        evenWhileOverlayShown: true);
+                    return;
+                }
+
+                track.IsFavorite = wanted;
+                _applet?.ShowFavorite(wanted);
+
+                _stack?.Toast(wanted ? "Added to favourites" : "Removed from favourites",
+                    wanted ? Icons.Heart : Icons.HeartPlus);
+            });
+        }
+
         private async Task ShuffleFavoritesAsync()
         {
             var source = _library.Sources.OfType<ISupportsFavorites>().FirstOrDefault();
@@ -519,8 +679,15 @@ namespace Yinyue.UI
         {
             // Before playback, so the Now Playing panel is cleared while there is still a
             // service to read state from.
+            _reporter?.Dispose();
             _media?.Dispose();
             _hotkeys?.Dispose();
+            // Flush rather than lose whatever the debounce was still holding.
+            _queueSave?.Invalidate();
+            _volumeSave?.Invalidate();
+            SaveQueue();
+            SaveVolume();
+
             if (_keyMonitor is not null) NSEvent.RemoveMonitor(_keyMonitor);
             _stack?.Dispose();
             _sleep?.Dispose();

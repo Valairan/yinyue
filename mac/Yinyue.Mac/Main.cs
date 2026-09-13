@@ -59,6 +59,8 @@ namespace Yinyue
                 MaxStreamingBitrate = config.Current.Jellyfin.MaxStreamingBitrate,
             };
 
+            RestoreJellyfinSession(config, jellyfin);
+
             var library = new MusicLibrary(config);
 
             // Registration order is result order, exactly as on Windows: local tracks play
@@ -68,7 +70,7 @@ namespace Yinyue
 
             var playback = new PlaybackService(audio, library);
 
-            if (!check) return RunApp(config, playback, library, jellyfin, indexer, instance);
+            if (!check) return RunApp(config, playback, library, jellyfin, indexer, artwork, instance);
 
             Console.WriteLine("Yinyue — macOS seam check");
             Console.WriteLine(new string('-', 52));
@@ -82,10 +84,28 @@ namespace Yinyue
             Console.WriteLine($"playback ready   : queue={snapshot.Tracks.Count} position={snapshot.Position} playing={playback.IsPlaying}");
             Console.WriteLine($"volume round-trip: {RoundTripVolume(audio)}");
             Console.WriteLine($"token read       : {Describe(config.GetAccessToken())}");
+            Console.WriteLine($"jellyfin session : {(jellyfin.IsAuthenticated ? "restored" : "none")}");
 
             Console.WriteLine();
             Console.WriteLine("Core is running on macOS against the two macOS seams.");
             return 0;
+        }
+
+        /// <summary>
+        /// Hands the stored token back to the client.
+        ///
+        /// Without this the token sits in the Keychain and the server URL sits in
+        /// config.json, and nothing connects them — so Jellyfin works in the session where
+        /// you signed in and silently stops working after a restart. Nothing reports it,
+        /// because an unauthenticated client simply returns no results.
+        /// </summary>
+        private static void RestoreJellyfinSession(ConfigService config, JellyfinApiClient jellyfin)
+        {
+            string? token = config.GetAccessToken();
+            var jelly = config.Current.Jellyfin;
+
+            if (!string.IsNullOrEmpty(token) && !string.IsNullOrWhiteSpace(jelly.ServerUrl))
+                jellyfin.RestoreSession(jelly.ServerUrl, token, jelly.UserId);
         }
 
         private static string RoundTripVolume(IAudioPlayer audio)
@@ -101,10 +121,10 @@ namespace Yinyue
 
         private static int RunApp(ConfigService config, PlaybackService playback,
             MusicLibrary library, JellyfinApiClient jellyfin, LibraryIndexerService indexer,
-            SingleInstance instance)
+            ArtworkCache artwork, SingleInstance instance)
         {
             var app = NSApplication.SharedApplication;
-            var del = new AppDelegate(config, playback, library, jellyfin, indexer);
+            var del = new AppDelegate(config, playback, library, jellyfin, indexer, artwork);
 
             instance.ListenForSummon(del.ShowOverlay);
 

@@ -124,10 +124,96 @@ namespace Yinyue.UI
             OrderFrontRegardless();
             MakeKeyWindow();
             Shown?.Invoke(this, EventArgs.Empty);
+            RestartAutoHide();
+        }
+
+        // ------------------------------------------------------------------ auto-hide
+
+        private NSTimer? _autoHide;
+
+        /// <summary>
+        /// Suspends auto-hide while something is genuinely being read — an open search or
+        /// queue, or the settings window in front. Reading is not idling.
+        /// </summary>
+        public Func<bool>? SuspendAutoHide { get; set; }
+
+        /// <summary>
+        /// Restarts the idle countdown. Called from every interaction, so the overlay only
+        /// disappears when it is genuinely left alone.
+        ///
+        /// This is <b>not</b> the sleep timer. They are the only two timers here and are
+        /// easily confused: this hides a window after a few seconds and any input restarts
+        /// it; the sleep timer pauses playback after a long absolute interval and nothing
+        /// resets it.
+        /// </summary>
+        public void RestartAutoHide()
+        {
+            _autoHide?.Invalidate();
+            _autoHide = null;
+
+            if (!_config.AutoHide || !IsVisible) return;
+
+            _autoHide = NSTimer.CreateScheduledTimer(_config.AutoHideSeconds, _ =>
+            {
+                if (SuspendAutoHide?.Invoke() == true)
+                {
+                    RestartAutoHide();
+                    return;
+                }
+
+                HideOverlay();
+            });
+        }
+
+        /// <summary>
+        /// Any key, click or pointer movement counts as interaction. Routed through here
+        /// rather than scattered through the handlers so nothing can forget to restart it.
+        /// </summary>
+        public override void SendEvent(NSEvent theEvent)
+        {
+            switch (theEvent.Type)
+            {
+                case NSEventType.KeyDown:
+                case NSEventType.LeftMouseDown:
+                case NSEventType.RightMouseDown:
+                case NSEventType.MouseMoved:
+                case NSEventType.ScrollWheel:
+                    RestartAutoHide();
+                    break;
+            }
+
+            base.SendEvent(theEvent);
+        }
+
+        /// <summary>
+        /// Dismisses when the overlay stops being the key window, if the user asked for that.
+        /// Deferred a turn of the run loop: focus moves through an intermediate state when a
+        /// child panel is ordered in, and acting on that would hide the overlay the moment
+        /// the search results opened.
+        /// </summary>
+        public override void ResignKeyWindow()
+        {
+            base.ResignKeyWindow();
+
+            if (!_config.HideOnFocusLoss || !IsVisible) return;
+
+            BeginInvokeOnMainThread(() =>
+            {
+                if (!IsVisible) return;
+                if (SuspendAutoHide?.Invoke() == true) return;
+
+                // Still ours? A child panel taking key status is not focus loss.
+                if (IsKeyWindow || ChildWindows.Any(w => w.IsKeyWindow)) return;
+
+                HideOverlay();
+            });
         }
 
         public void HideOverlay()
         {
+            _autoHide?.Invalidate();
+            _autoHide = null;
+
             Hidden?.Invoke(this, EventArgs.Empty);
             OrderOut(this);
         }

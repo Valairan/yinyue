@@ -58,6 +58,9 @@ namespace Yinyue.UI
 
         public event EventHandler? SettingsRequested;
         public event EventHandler? QueueRequested;
+        public event EventHandler? OfflineRequested;
+        public event EventHandler? ShuffleFavoritesRequested;
+        public event EventHandler? FavoriteRequested;
 
         public AppletView(PlaybackService playback)
             : base(new CGRect(0, 0, Metrics.PanelWidth, Metrics.AppletHeight))
@@ -296,11 +299,33 @@ namespace Yinyue.UI
         /// </summary>
         private void Subscribe()
         {
-            _playback.TrackChanged += (_, _) => BeginInvokeOnMainThread(Refresh);
+            _playback.TrackChanged += (_, e) => BeginInvokeOnMainThread(() =>
+            {
+                Refresh();
+                ShowArtwork(e.ArtworkPath);
+            });
             _playback.PlayingStateChanged += (_, _) => BeginInvokeOnMainThread(RefreshPlayGlyph);
             _playback.ModesChanged += (_, _) => BeginInvokeOnMainThread(RefreshModes);
             _playback.ProgressUpdated += (_, e) => BeginInvokeOnMainThread(() => RefreshProgress(e));
             _playback.PlaybackFailed += (_, m) => BeginInvokeOnMainThread(() => _status.StringValue = m);
+        }
+
+        /// <summary>
+        /// Album art, or the placeholder when there is none.
+        ///
+        /// The path is resolved by the source and handed over on TrackChanged, so nothing
+        /// here touches the network or the cache — a missing file is simply a missing file
+        /// and falls back rather than throwing.
+        /// </summary>
+        public void ShowArtwork(string? path)
+        {
+            NSImage? image = null;
+
+            if (!string.IsNullOrWhiteSpace(path) && File.Exists(path))
+                image = new NSImage(path);
+
+            // A grey square reads as broken. The placeholder says "no art" deliberately.
+            _art.Image = image ?? NSImage.ImageNamed("placeholder");
         }
 
         public void Refresh()
@@ -362,11 +387,38 @@ namespace Yinyue.UI
         private void OnShuffle(object? s, EventArgs e) { _playback.ToggleShuffle(); RefreshModes(); }
         private void OnLoop(object? s, EventArgs e) { _playback.CycleLoop(); RefreshModes(); }
 
-        // Not wired yet: favourites, offline and shuffle-favourites need the library surface
-        // the overlay does not have until search exists.
-        private void OnFavorite(object? s, EventArgs e) { }
-        private void OnOffline(object? s, EventArgs e) { }
-        private void OnShuffleFavorites(object? s, EventArgs e) { }
+        // Raised rather than handled: these need the library and the config, which belong to
+        // the composition root. The applet stays a view of playback.
+        private void OnFavorite(object? s, EventArgs e) => FavoriteRequested?.Invoke(this, EventArgs.Empty);
+        private void OnOffline(object? s, EventArgs e) => OfflineRequested?.Invoke(this, EventArgs.Empty);
+
+        private void OnShuffleFavorites(object? s, EventArgs e) =>
+            ShuffleFavoritesRequested?.Invoke(this, EventArgs.Empty);
+
+        /// <summary>
+        /// heart-plus until the track is a favourite, then a filled heart. The header's
+        /// shuffle-favourites button carries heart-shuffle, so the two hearts do two visibly
+        /// different jobs.
+        /// </summary>
+        public void ShowFavorite(bool isFavorite)
+        {
+            SetIcon(_favorite, isFavorite ? Icons.Heart : Icons.HeartPlus,
+                isFavorite ? Theme.Danger : Theme.Text);
+
+            _favorite.ToolTip = isFavorite ? "Remove from favourites" : "Add to favourites";
+        }
+
+        /// <summary>Cloud, or cloud-off while offline mode is on.</summary>
+        public void ShowOffline(bool offline)
+        {
+            SetIcon(_offline, offline ? Icons.CloudOff : Icons.Cloud,
+                offline ? Theme.Warning : Theme.Text);
+
+            _offline.ToolTip = offline ? "Offline mode on" : "Offline mode off";
+        }
+
+        /// <summary>The status line, for transient messages.</summary>
+        public void ShowStatus(string message) => _status.StringValue = message;
 
         private void OnSeekChanged(object? s, EventArgs e)
         {

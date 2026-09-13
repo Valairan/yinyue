@@ -52,4 +52,10 @@ rm -f "$ICONSET/icon_64x64.png"   # not part of the iconset spec; only 16/32/128
 iconutil -c icns "$ICONSET" -o "$OUT/Yinyue.icns"
 rm -rf "$(dirname "$ICONSET")"
 
-echo "wrote $OUT/menubar.png, menubar@2x.png, Yinyue.icns"
+# --- Album-art fallback -------------------------------------------------------------
+#
+# Copied rather than regenerated: it is a finished asset shared with the Windows app, not
+# a derivative of the logo masters.
+cp win/Resources/placeholder.png "$OUT/placeholder.png"
+
+echo "wrote $OUT/menubar.png, menubar@2x.png, Yinyue.icns, placeholder.png"

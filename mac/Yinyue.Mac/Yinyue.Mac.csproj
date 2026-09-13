@@ -36,6 +36,9 @@
     <BundleResource Include="..\Assets\menubar.png" Link="Resources\menubar.png" />
     <BundleResource Include="..\Assets\menubar@2x.png" Link="Resources\menubar@2x.png" />
     <BundleResource Include="..\Assets\Yinyue.icns" Link="Resources\Yinyue.icns" />
+
+    <!-- Album-art fallback, the same asset the Windows app uses. -->
+    <BundleResource Include="..\Assets\placeholder.png" Link="Resources\placeholder.png" />
   </ItemGroup>
 
   <ItemGroup>
