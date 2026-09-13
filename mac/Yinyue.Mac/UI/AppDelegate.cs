@@ -22,6 +22,7 @@ namespace Yinyue.UI
 
         private NSStatusItem? _statusItem;
         private OverlayPanel? _overlay;
+        private MacHotkeyManager? _hotkeys;
 
         public AppDelegate(ConfigService config, PlaybackService playback)
         {
@@ -47,10 +48,98 @@ namespace Yinyue.UI
             applet.QueueRequested += (_, _) => { /* the queue panel is not built yet */ };
             _overlay.SetContent(applet);
 
-            // --show summons it straight away, so the panel can be looked at without a
-            // hotkey manager existing yet.
+            BuildHotkeys();
+
             if (Environment.GetCommandLineArgs().Contains("--show")) _overlay.ShowOverlay();
         }
+
+        /// <summary>Summons the overlay — used by the tray menu and by a second launch.</summary>
+        public void ShowOverlay() => _overlay?.ShowOverlay();
+
+        private void BuildHotkeys()
+        {
+            _hotkeys = new MacHotkeyManager();
+            _hotkeys.Triggered += OnHotkey;
+
+            var refused = _hotkeys.Apply(_config.Current.Hotkeys);
+            if (refused.Count == 0) return;
+
+            // A combination another application already owns cannot be detected until
+            // registration is attempted -- the same limitation Windows has. Say so rather
+            // than leaving a shortcut silently dead.
+            Console.Error.WriteLine("Some shortcuts could not be registered:");
+            foreach (var line in refused) Console.Error.WriteLine($"  {line}");
+        }
+
+        /// <summary>
+        /// Global shortcuts act on <see cref="PlaybackService"/>, never on the overlay's
+        /// state, because the overlay is usually hidden when they are pressed. Only the ones
+        /// that are about the window itself touch the window.
+        /// </summary>
+        private void OnHotkey(object? sender, HotkeyTriggeredEventArgs e)
+        {
+            switch (e.Action)
+            {
+                case HotkeyActions.ToggleOverlay:
+                    _overlay?.ToggleOverlay();
+                    break;
+
+                case HotkeyActions.PlayPause:
+                    // Tap plays or pauses; hold walks the queue forward, once per interval.
+                    // The one escalation that deliberately does NOT summon the overlay, since
+                    // play/pause is used while working in another window.
+                    if (e.Held) Fire(_playback.NextAsync());
+                    else Fire(_playback.TogglePlayPauseAsync());
+                    break;
+
+                case HotkeyActions.RestartOrPrevious:
+                    if (e.Held) Fire(_playback.PreviousAsync(alwaysChangeTrack: true));
+                    else _playback.RestartTrack();
+                    break;
+
+                case HotkeyActions.ToggleShuffle:
+                    _playback.ToggleShuffle();
+                    break;
+
+                case HotkeyActions.CycleLoop:
+                    _playback.CycleLoop();
+                    break;
+
+                case HotkeyActions.VolumeUp:
+                    _playback.AdjustVolume(VolumeStep);
+                    break;
+
+                case HotkeyActions.VolumeDown:
+                    _playback.AdjustVolume(-VolumeStep);
+                    break;
+
+                case HotkeyActions.Mute:
+                    _playback.ToggleMute();
+                    break;
+
+                case HotkeyActions.OpenSettings:
+                case HotkeyActions.QuickSearch:
+                case HotkeyActions.OpenQueue:
+                case HotkeyActions.GrabQueueEntry:
+                case HotkeyActions.AddToQueue:
+                case HotkeyActions.RemoveFromQueue:
+                case HotkeyActions.ShuffleFavorites:
+                case HotkeyActions.OfflineMode:
+                case HotkeyActions.SleepTimer:
+                    // These need surfaces that do not exist yet: search, the queue panel,
+                    // settings and the sleep timer. Registered now so the combinations are
+                    // claimed and conflicts surface early, rather than appearing to work and
+                    // then being taken by another app later.
+                    break;
+            }
+        }
+
+        /// <summary>How much one press of the volume shortcuts moves the level.</summary>
+        private const double VolumeStep = 0.05;
+
+        private static void Fire(Task work) =>
+            _ = work.ContinueWith(t => Console.Error.WriteLine($"[Hotkey] {t.Exception}"),
+                TaskContinuationOptions.OnlyOnFaulted);
 
         private void BuildStatusItem()
         {
@@ -98,6 +187,7 @@ namespace Yinyue.UI
 
         public override void WillTerminate(NSNotification notification)
         {
+            _hotkeys?.Dispose();
             _playback.Dispose();
             _statusItem?.Dispose();
         }

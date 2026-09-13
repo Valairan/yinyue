@@ -13,9 +13,10 @@
 # which cannot target net8.0 at all, let alone net8.0-macos -- it fails with NETSDK1045 and
 # NETSDK1139. The .NET 8 SDK and the macos workload are installed user-locally in ~/.dotnet.
 #
-# And the app has no single-instance guard yet, unlike the Windows build's mutex. A second
-# copy gives you two menu-bar icons and two overlays fighting over the same anchor, so a
-# stale process is killed before launching.
+# And a running copy must be stopped before a new build can replace it. The app does have a
+# single-instance guard now, but its job is to summon the running copy rather than to start
+# a second one -- which during development means your rebuild silently does not run. So a
+# stale process is killed first.
 
 set -euo pipefail
 cd "$(dirname "$0")/.."

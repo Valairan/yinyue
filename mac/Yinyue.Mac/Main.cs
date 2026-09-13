@@ -25,6 +25,16 @@ namespace Yinyue
             bool check = args.Contains("--check");
             if (args.Contains("--selftest")) { NSApplication.Init(); return SelfTest.Run(args.Length > 1 ? args[1] : "all"); }
 
+            // Before anything else builds: a second copy would register the same seventeen
+            // shortcuts, fail every one of them, and leave the first copy's hotkeys looking
+            // broken. The self-test is exempt -- it registers and releases deliberately.
+            var instance = SingleInstance.Acquire();
+            if (!instance.IsFirst)
+            {
+                Console.WriteLine("Yinyue is already running; asked it to show itself.");
+                return 0;
+            }
+
             NSApplication.Init();
 
             var secrets = new KeychainSecretStore();
@@ -53,7 +63,7 @@ namespace Yinyue
 
             var playback = new PlaybackService(audio, library);
 
-            if (!check) return RunApp(config, playback);
+            if (!check) return RunApp(config, playback, instance);
 
             Console.WriteLine("Yinyue — macOS seam check");
             Console.WriteLine(new string('-', 52));
@@ -84,10 +94,14 @@ namespace Yinyue
         private static string Describe(string? token) =>
             token is null ? "none stored (expected before sign-in)" : $"{token.Length} chars";
 
-        private static int RunApp(ConfigService config, PlaybackService playback)
+        private static int RunApp(ConfigService config, PlaybackService playback, SingleInstance instance)
         {
             var app = NSApplication.SharedApplication;
-            app.Delegate = new AppDelegate(config, playback);
+            var del = new AppDelegate(config, playback);
+
+            instance.ListenForSummon(del.ShowOverlay);
+
+            app.Delegate = del;
             app.Run();
             return 0;
         }

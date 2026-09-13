@@ -28,6 +28,7 @@ namespace Yinyue
             if (which is "all" or "overlay") OverlayAnchors();
             if (which is "all" or "icons") IconsRender();
             if (which is "all" or "layout") LayoutMatchesWindows();
+            if (which is "all" or "hotkeys") HotkeysRegister();
 
             Console.WriteLine();
             Console.WriteLine(_failed == 0 ? "PASS" : $"FAIL — {_failed} check(s)");
@@ -39,6 +40,60 @@ namespace Yinyue
             if (!ok) _failed++;
             Console.WriteLine($"  [{(ok ? "ok" : "FAIL")}] {label}{(detail is null ? "" : $"  — {detail}")}");
             Console.Out.Flush();
+        }
+
+        /// <summary>
+        /// Every default shortcut must parse into a macOS key code, and the OS must accept
+        /// all seventeen at once. The Windows suite asserts the same thing against
+        /// RegisterHotKey; this is its counterpart and cannot be answered anywhere but here.
+        /// </summary>
+        private static void HotkeysRegister()
+        {
+            Console.WriteLine("\nGlobal hotkeys");
+
+            var config = new Yinyue.Models.HotkeyConfig();
+
+            // Parsing first, so a bad key name is reported as itself rather than as a
+            // registration failure.
+            var unparsed = Yinyue.Models.HotkeyActions.All
+                .Where(a => !Yinyue.Services.MacHotkeyBinding.TryParse(config.For(a).Keys, out _))
+                .Select(a => $"{a}={config.For(a).Keys}")
+                .ToList();
+
+            Check("every default parses", unparsed.Count == 0, string.Join(", ", unparsed));
+
+            // The vocabulary is shared with Windows through config.json, so these specific
+            // spellings must keep working.
+            foreach (var text in new[] { "Ctrl+Alt+Space", "Ctrl+Alt+Plus", "Ctrl+Alt+Minus",
+                                         "Ctrl+Alt+Pipe", "Ctrl+Alt+Backspace", "Alt+Win+M" })
+            {
+                Check($"{text} parses", Yinyue.Services.MacHotkeyBinding.TryParse(text, out _));
+            }
+
+            Check("a bare key is rejected",
+                !Yinyue.Services.MacHotkeyBinding.TryParse("Space", out _));
+            Check("modifiers alone are rejected",
+                !Yinyue.Services.MacHotkeyBinding.TryParse("Ctrl+Alt", out _));
+            Check("nonsense is rejected",
+                !Yinyue.Services.MacHotkeyBinding.TryParse("Ctrl+Alt+Bananas", out _));
+
+            using var manager = new Yinyue.Services.MacHotkeyManager();
+            var refused = manager.Apply(config);
+
+            foreach (var line in refused) Console.WriteLine($"       refused: {line}");
+
+            Check("the OS accepts every default", refused.Count == 0);
+            Check("all registered", manager.Active.Count == Yinyue.Models.HotkeyActions.All.Length,
+                $"{manager.Active.Count} of {Yinyue.Models.HotkeyActions.All.Length}");
+
+            // Ctrl+Alt+Delete is reserved on Windows and refused with error 1409. macOS has
+            // no such reservation, which is a real divergence worth knowing rather than
+            // assuming the platforms agree.
+            Check("Ctrl+Alt+Delete parses here, unlike on Windows",
+                Yinyue.Services.MacHotkeyBinding.TryParse("Ctrl+Alt+Delete", out _));
+
+            manager.UnregisterAll();
+            Check("unregistering releases them all", manager.Active.Count == 0);
         }
 
         /// <summary>

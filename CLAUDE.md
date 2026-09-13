@@ -1112,9 +1112,19 @@ degraded mode to design for a refusal.
 - Overlay: `NSPanel` with `.nonactivatingPanel`, floating level, no title bar, carrying the
   same reserved vertical stack as Windows — hold row, toast row, applet, search bar, results,
   queue — so the two look the same by design even though they share no UI code.
-- Global hotkeys: Carbon `RegisterEventHotKey` for the press, `kEventHotKeyReleased` for the
-  release, neither needing Accessibility. Tap/hold is the interval between the two — do not
-  port the Windows polling, which cannot work here. See above.
+- Global hotkeys: **done.** `MacHotkeyManager` over Carbon — `RegisterEventHotKey` for the
+  press, `kEventHotKeyReleased` for the release, neither needing Accessibility. A hold is a
+  timer armed on press and cancelled on release; do not port the Windows polling, which
+  cannot work here. All seventeen defaults register at once, verified in the suite.
+  `MacHotkeyBinding` parses the same strings `config.json` already holds — the vocabulary is
+  the contract, only the key codes differ. `Win` maps to Command: same position, same role.
+  One real divergence: **`Ctrl+Alt+Delete` is bindable here**, where Windows refuses it with
+  error 1409 for the Secure Attention Sequence.
+- Single instance: `SingleInstance`, an exclusive lock file plus a distributed notification,
+  standing in for the Windows mutex and named event. A lock rather than a process scan
+  because the app runs both as a bundle and straight from the binary in development. Not
+  housekeeping: a second copy fails to register all seventeen shortcuts and the symptom is
+  "my hotkeys stopped working", which points nowhere near the cause.
 - Media keys: `MPRemoteCommandCenter` and `MPNowPlayingInfoCenter`. See `media-integration`.
 - Audio: an `IAudioPlayer` over `AVPlayer`, which handles both HTTP and local files, FLAC
   included since 10.13. The interface is the specification — implement it and
@@ -1131,10 +1141,10 @@ degraded mode to design for a refusal.
 **Running it:** `./mac/run.sh` — build, run, self-test, stop. Use it rather than invoking
 `dotnet` directly, for two reasons it documents at the top. The SDK is **not** the one on
 PATH: `dotnet` on this machine is 7.0.309 and fails with `NETSDK1045`/`NETSDK1139` before
-reaching any code, while the .NET 8 SDK and the `macos` workload live in `~/.dotnet`. And the
-app has **no single-instance guard yet**, unlike the Windows mutex, so a stale copy gives two
-menu-bar icons and two overlays fighting over one anchor; the script kills one before
-launching. Building at all needs a full Xcode, not the Command Line Tools.
+reaching any code, while the .NET 8 SDK and the `macos` workload live in `~/.dotnet`. And a
+running copy has to be stopped before a rebuild can replace it: the single-instance guard
+summons the running copy rather than starting a second one, so without the kill your rebuild
+silently does not run. Building at all needs a full Xcode, not the Command Line Tools.
 
 **Toolchain reality:** `win/` and `tests/Yinyue.Tests` target `net8.0-windows` and will not
 build on a Mac. That is expected, not a defect — but `core/` and `tests/Yinyue.Core.Tests`
