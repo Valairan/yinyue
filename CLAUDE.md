@@ -1170,11 +1170,18 @@ stamps the version, signs, and writes `website/downloads/Yinyue-<version>.dmg`.
 **Start-at-login registers the bundle, not a path**, which removes the failure the Windows
 one documents: the Run key holds an absolute path, so moving or republishing the app strands
 it and settings has to detect the stale entry and offer to repair it. `SMAppService.MainApp`
-tracks bundle identity, so moving the `.app` cannot leave a dangling registration. The cost
-is that it only works from a real bundle — running the bare binary in development fails, and
-that is correct, since there would be nothing stable to register. macOS can also refuse
-outright when the user has switched it off in System Settings, which an app cannot override;
-settings reports that and puts the switch back rather than showing a lie.
+tracks bundle identity, so moving the `.app` cannot leave a dangling registration. It registers whatever
+bundle is calling, so it works from the dev build as readily as from an installed copy, and
+**ad-hoc signing does not gate it** — verified from the packaged DMG bundle. What ad-hoc
+signing gates is the *first launch* of a downloaded copy, which Gatekeeper refuses until the
+user right-clicks and chooses Open; after that the quarantine flag is gone and a login item
+behaves normally. macOS can still refuse outright when the user has switched it off in System
+Settings, which an app cannot override; settings reports that and puts the switch back rather
+than showing a lie.
+
+`--selftest startup` checks it against whichever bundle runs it. It is deliberately outside
+the `all` run, because it registers a real login item — a change to the machine rather than a
+measurement of it — and puts it back afterwards.
 
 **The hold dial fills from one timer, not two.** The hotkey manager ticks at 1/30 s while a
 key is down and fires the hold on whichever tick crosses the threshold — two timers would

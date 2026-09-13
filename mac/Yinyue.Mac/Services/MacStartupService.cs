@@ -12,9 +12,14 @@ namespace Yinyue.Services
     /// repair it. macOS tracks the bundle identity instead, so moving the .app cannot leave a
     /// dangling registration.
     ///
-    /// The cost is that it only works from a **real bundle**. Run from the binary during
-    /// development and registration fails, which is correct rather than unfortunate — there
-    /// would be nothing stable to register.
+    /// It registers whatever bundle is calling, so it works from the dev build as readily as
+    /// from an installed copy — <c>NSBundle.MainBundle</c> resolves to the .app even when the
+    /// binary inside it is launched directly. Verified from both, and from the packaged
+    /// ad-hoc-signed bundle: registration succeeds and the item reports enabled.
+    ///
+    /// Signing does not gate it. What ad-hoc signing gates is the <em>first launch</em> of a
+    /// downloaded copy, which Gatekeeper refuses until the user right-clicks and chooses
+    /// Open — after that the quarantine flag is gone and a login item behaves normally.
     /// </summary>
     public sealed class MacStartupService
     {

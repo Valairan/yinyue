@@ -36,6 +36,7 @@ namespace Yinyue
             if (which is "all" or "opacity") BackgroundOpacity();
             if (which is "all" or "toast") ToastLayout();
             if (which is "all" or "playpause") PlayPauseFeedback();
+            if (which is "startup") StartAtLogin();
 
             Console.WriteLine();
             Console.WriteLine(_failed == 0 ? "PASS" : $"FAIL — {_failed} check(s)");
@@ -47,6 +48,32 @@ namespace Yinyue
             if (!ok) _failed++;
             Console.WriteLine($"  [{(ok ? "ok" : "FAIL")}] {label}{(detail is null ? "" : $"  — {detail}")}");
             Console.Out.Flush();
+        }
+
+        /// <summary>
+        /// Whether macOS will actually launch this bundle at sign-in.
+        ///
+        /// Not in the "all" run: it registers a real login item, which is a change to the
+        /// machine rather than a measurement of it. Run deliberately, from the bundle you
+        /// mean to test — SMAppService registers the CALLING app, so the answer depends on
+        /// where this copy is and how it is signed.
+        /// </summary>
+        private static void StartAtLogin()
+        {
+            Console.WriteLine("\nStart at sign-in");
+            Console.WriteLine($"  bundle: {Foundation.NSBundle.MainBundle.BundlePath}");
+
+            var startup = new Yinyue.Services.MacStartupService();
+            Check("supported on this macOS", startup.IsSupported);
+            Console.WriteLine($"  status before: {(startup.IsEnabled ? "enabled" : "not enabled")}");
+
+            string? problem = startup.SetEnabled(true);
+            Check("registering succeeds", problem is null, problem ?? "no error");
+            Check("and it reports enabled", startup.IsEnabled);
+
+            // Put the machine back as it was: this test changes real state.
+            startup.SetEnabled(false);
+            Check("unregistering leaves it off", !startup.IsEnabled);
         }
 
         /// <summary>
