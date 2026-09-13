@@ -1028,18 +1028,30 @@ The whole seam was **three types**, found by compiling rather than by reading:
 lines touched Windows, and exactly one line made a platform assumption —
 `LibraryIndexerService` resolving its own data folder.
 
-**Still open, and still the first thing to find out: tap/hold detection.** See below. Four
-shortcuts depend on it and Core cannot answer it.
+**Tap/hold is answered, and macOS is better placed than Windows.** This was the one open
+risk. Windows registers with `MOD_NOREPEAT`, which delivers one `WM_HOTKEY` on press and
+nothing on release, so `HotkeyManager` has no choice but to poll `GetAsyncKeyState`. Carbon
+delivers a real **release** event, and needs no Accessibility to do it — so the Mac shell
+times press-to-release instead of sampling, and `repeats: true` becomes a repeating timer
+cancelled on release. Same thresholds, same `HotkeyConfig`, only the detection differs.
+
+`CGEventSource.keyState` — the direct `GetAsyncKeyState` analogue, and the obvious port —
+**never reads true** for a non-modifier key from an untrusted process. Verified, not assumed:
+six presses, `AXIsProcessTrusted() == false`, taps and 2.7 s / 2.0 s holds all discriminated
+correctly from the release event alone. See `mac/spikes/taphold/FINDINGS.md`.
+
+The consequence that matters is the one that did *not* happen: **no Accessibility prompt.**
+Onboarding needs no permission step, settings has nothing to explain, and there is no
+degraded mode to design for a refusal.
 
 **What the Mac shell must provide:**
 
 - Overlay: `NSPanel` with `.nonactivatingPanel`, floating level, no title bar, carrying the
   same reserved vertical stack as Windows — hold row, toast row, applet, search bar, results,
   queue — so the two look the same by design even though they share no UI code.
-- Global hotkeys: Carbon `RegisterEventHotKey` still works and needs no Accessibility
-  permission. **Unverified: tap/hold detection.** Windows polls `GetAsyncKeyState`; the macOS
-  equivalent (`CGEventSource.keyState`) may need Accessibility for non-modifier keys. Test this
-  first — four shortcuts depend on it.
+- Global hotkeys: Carbon `RegisterEventHotKey` for the press, `kEventHotKeyReleased` for the
+  release, neither needing Accessibility. Tap/hold is the interval between the two — do not
+  port the Windows polling, which cannot work here. See above.
 - Media keys: `MPRemoteCommandCenter` and `MPNowPlayingInfoCenter`. See `media-integration`.
 - Audio: an `IAudioPlayer` over `AVPlayer`, which handles both HTTP and local files, FLAC
   included since 10.13. The interface is the specification — implement it and
