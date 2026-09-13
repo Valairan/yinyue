@@ -41,6 +41,30 @@ namespace Yinyue.UI
             ApplyBackgroundOpacity();
         }
 
+        private NSView? _glass;
+
+        /// <summary>
+        /// What the stack should add and position — this section, or the glass shape wrapped
+        /// around it.
+        ///
+        /// Each section gets its OWN glass view rather than sharing one behind the stack.
+        /// Sharing made the whole stack a single unbroken sheet, which lost the separation
+        /// between the search bar and the applet that the design depends on. The shapes are
+        /// grouped by an NSGlassEffectContainerView instead, so they still sample together
+        /// and read as one material.
+        /// </summary>
+        public NSView Mounted => _glass ??= BuildGlass();
+
+        private NSView BuildGlass()
+        {
+            if (!_config.LiquidGlass || !GlassEffect.IsAvailable) return this;
+
+            return GlassEffect.WrapAndTint(this, OverlayMetrics.RootCornerRadius, TintColour);
+        }
+
+        private NSColor TintColour =>
+            Theme.Base.ColorWithAlphaComponent((nfloat)_config.BackgroundOpacity);
+
         /// <summary>
         /// Whether this section is part of the stack right now. Hidden rather than removed,
         /// so its contents survive and the layout only has to skip it.
@@ -76,14 +100,16 @@ namespace Yinyue.UI
 
             bool glass = _config.LiquidGlass && GlassEffect.IsAvailable;
 
-            layer.BackgroundColor = glass
-                ? NSColor.Clear.CGColor
-                : Theme.Base.ColorWithAlphaComponent((nfloat)_config.BackgroundOpacity).CGColor;
+            // With glass the colour goes to the material rather than over it; the section's
+            // own fill would sit in front and hide it.
+            layer.BackgroundColor = glass ? NSColor.Clear.CGColor : TintColour.CGColor;
 
-            // Without a fill of its own, a border would be the only thing marking the section
-            // out — and inside one continuous sheet of glass that reads as a box drawn on the
-            // material rather than as a surface. The container's own edge does that job.
-            layer.BorderWidth = glass ? 0 : (nfloat)OverlayMetrics.RootBorderThickness;
+            // The border stays either way. Each section is its own surface — the separation
+            // between the search bar and the applet is part of the design, not an artefact of
+            // them having been separate windows.
+            layer.BorderWidth = (nfloat)OverlayMetrics.RootBorderThickness;
+
+            if (glass && _glass is { } wrapper) GlassEffect.Tint(wrapper, TintColour);
         }
 
         /// <summary>

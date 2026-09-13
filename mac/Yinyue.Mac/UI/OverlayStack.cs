@@ -38,8 +38,8 @@ namespace Yinyue.UI
 
         // Two toasts, not one: a track change can land while a hold is in progress and one
         // window cannot occupy two rows at once.
-        private readonly ToastPanel _message;
-        private readonly ToastPanel _hold;
+        private readonly ToastSection _message;
+        private readonly ToastSection _hold;
 
         private NSTimer? _debounce;
         private CancellationTokenSource? _search;
@@ -52,26 +52,35 @@ namespace Yinyue.UI
             _playback = playback;
             _applet = applet;
 
+            _appletView = new AppletView(config, playback);
             _searchBar = new SearchBarSection(config);
             _results = new SearchResultsSection(config);
             _queue = new QueueSection(config, playback);
 
-            _message = new ToastPanel(config, ToastRole.Message);
-            _hold = new ToastPanel(config, ToastRole.Hold);
+            _message = new ToastSection(config, ToastRole.Message);
+            _hold = new ToastSection(config, ToastRole.Hold);
 
             _searchBar.QueryChanged += (_, text) => OnQueryChanged(text);
 
             // Sections, not child windows. One window means one glass view behind the whole
             // stack, which is the only way adjacent glass merges into a single material.
-            foreach (var section in Sections)
+            foreach (var section in AllSections)
             {
-                _applet.StackRoot.AddSubview(section);
+                // Mounted, not the section itself: with glass on, each section is wrapped in
+                // its own shape and it is the wrapper that goes in the stack.
+                _applet.StackRoot.AddSubview(section.Mounted);
+
                 section.HeightChanged += (_, _) => Layout();
                 section.Interacted += (_, _) => _applet.RestartAutoHide();
             }
 
-            // The toasts stay separate windows: a toast exists to be seen while the overlay
-            // is hidden, and anything inside the overlay's window goes with it.
+            // The toasts are sections too. They were separate windows, which meant separate
+            // glass sampling separate backdrops — so a toast never matched the panel it sat
+            // under. Being in the window does not stop them showing while the overlay is
+            // dismissed: "dismissed" hides the applet and the panels above it, and the window
+            // itself stays up for as long as anything in it is visible.
+            _message.Appeared += (_, _) => Layout();
+            _hold.Appeared += (_, _) => Layout();
 
             // The stack owns its relationship to the applet rather than having the delegate
             // wire it: a stack that has not been laid out sits at the window origin, and
@@ -97,12 +106,13 @@ namespace Yinyue.UI
                 ("queue", _queue),
             };
 
-        /// <summary>The toasts, which remain separate windows.</summary>
-        public IReadOnlyList<(string Name, NSWindow Panel)> ToastsForTest => new (string, NSWindow)[]
-        {
-            ("toast", _message),
-            ("hold", _hold),
-        };
+        /// <summary>The toast rows, which are sections in the same window as everything else.</summary>
+        public IReadOnlyList<(string Name, OverlaySection Section)> ToastsForTest =>
+            new (string, OverlaySection)[]
+            {
+                ("toast", _message),
+                ("hold", _hold),
+            };
 
         /// <summary>
         /// Stacks the sections bottom-up inside the window and sizes the window to fit.
@@ -115,21 +125,45 @@ namespace Yinyue.UI
         {
             double y = 0;
 
-            // The applet's own view is placed by the window; the sections stack above it.
-            double appletHeight = OverlayMetrics.AppletHeight;
-            _appletView?.SetFrameOrigin(new CGPoint(0, 0));
-            y += appletHeight;
+            // Bottom upwards: the hold dial, the message toast, the applet, the search bar,
+            // the results, the queue. The two toast rows are reserved PERMANENTLY, showing or
+            // not — toasts arrive unbidden, and a panel that jumped upward mid-interaction
+            // would move the thing being read.
+            Place(_hold, ref y, reserved: true);
+            Place(_message, ref y, reserved: true);
 
-            foreach (var section in Sections)
-            {
-                if (!section.Shown) continue;
+            Place(_appletView, ref y, reserved: true);
 
-                y += OverlayMetrics.SideGap;
-                section.Frame = new CGRect(0, y, OverlayMetrics.PanelWidth, section.Frame.Height);
-                y += section.Frame.Height;
-            }
+            foreach (var section in Sections) Place(section, ref y, reserved: false);
 
             _applet.SetStackHeight(y);
+        }
+
+        /// <summary>
+        /// Places one section and advances the cursor. A reserved row keeps its height even
+        /// while hidden; anything else is skipped entirely so a closed panel leaves no hole.
+        /// </summary>
+        private static void Place(OverlaySection section, ref double y, bool reserved)
+        {
+            if (!section.Shown && !reserved) return;
+
+            y += OverlayMetrics.SideGap;
+            double height = section.Frame.Height;
+
+            // Position the mounted view — which is the section itself without glass, and its
+            // wrapper with. Writing both unconditionally put the section back at y=0 in the
+            // no-glass case, because there the two are the same view.
+            if (ReferenceEquals(section.Mounted, section))
+            {
+                section.Frame = new CGRect(0, y, OverlayMetrics.PanelWidth, height);
+            }
+            else
+            {
+                section.Mounted.Frame = new CGRect(0, y, OverlayMetrics.PanelWidth, height);
+                section.Frame = new CGRect(0, 0, OverlayMetrics.PanelWidth, height);
+            }
+
+            y += height;
         }
 
         /// <summary>Bottom-up: the search bar sits on the applet, the results above it, the queue beyond.</summary>
@@ -143,29 +177,39 @@ namespace Yinyue.UI
             }
         }
 
-        private AppletView? _appletView;
+        /// <summary>Everything the window holds, including the applet and the toast rows.</summary>
+        private IEnumerable<OverlaySection> AllSections
+        {
+            get
+            {
+                yield return _hold;
+                yield return _message;
+                yield return _appletView;
+
+                foreach (var section in Sections) yield return section;
+            }
+        }
 
         /// <summary>
-        /// The applet is a section like the others — it carries the same background, border
-        /// and tint — but it is the anchor rather than part of the stack, so it is laid out
-        /// separately and never hidden.
+        /// The applet is a section like the others — same background, border and tint — but
+        /// it is the anchor rather than part of the stack, so it is never hidden.
+        ///
+        /// <b>Built here rather than handed in.</b> It was passed in at first, and a caller
+        /// that forgot left the applet out of the layout entirely: the stack sat where the
+        /// applet should have been and every section above it was 170 points low. A component
+        /// that needs the caller to complete it will meet a caller that does not.
         /// </summary>
-        public void SetAppletView(AppletView view)
-        {
-            _appletView = view;
-            view.Interacted += (_, _) => _applet.RestartAutoHide();
-        }
+        public AppletView Applet => _appletView;
+
+        private readonly AppletView _appletView;
 
         /// <summary>Re-applies the background tint across the whole stack.</summary>
         public void ApplyBackgroundOpacity()
         {
             _applet.ApplyBackgroundOpacity();
 
-            _appletView?.ApplyBackgroundOpacity();
-            foreach (var section in Sections) section.ApplyBackgroundOpacity();
-
-            _message.ApplyBackgroundOpacity();
-            _hold.ApplyBackgroundOpacity();
+            _appletView.ApplyBackgroundOpacity();
+            foreach (var section in AllSections) section.ApplyBackgroundOpacity();
         }
 
         public void Show()
@@ -321,17 +365,38 @@ namespace Yinyue.UI
         {
             if (!evenWhileOverlayShown && _applet.IsVisible) return;
 
+            // The window has to be up for a toast to be seen, even when the overlay is not.
+            _applet.EnsureVisible();
+
             _message.Show(message, icon, level);
-            _message.Dismiss(ToastPanel.VisibleFor);
+            _message.Dismiss(ToastSection.VisibleFor);
         }
 
-        public void ShowHold(string message, double progress) => _hold.ShowHold(message, progress);
+        public void ShowHold(string message, double progress)
+        {
+            _applet.EnsureVisible();
+            _hold.ShowHold(message, progress);
+        }
 
         public void EndHold() => _hold.EndHold();
 
         /// <summary>Plays the highlighted row, or the top one when nothing is highlighted.</summary>
+        /// <summary>What produced the rows now showing, so Enter can act on them correctly.</summary>
+        private SearchQuery _resultsQuery = SearchQuery.Parse(string.Empty);
+
         public void PlaySelected()
         {
+            // A hit from queue: is already queued, so Enter JUMPS to it. Rebuilding the queue
+            // from the results would throw away everything that did not match the search.
+            if (_resultsQuery.Target == SearchTarget.Queue && _results.Selected is Track queued)
+            {
+                int position = _playback.PlayOrder.ToList().IndexOf(queued);
+                CloseResults();
+
+                if (position >= 0) _ = _playback.JumpToAsync(position);
+                return;
+            }
+
             switch (_results.Selected)
             {
                 case Track track:
@@ -377,8 +442,38 @@ namespace Yinyue.UI
                 return;
             }
 
+            // queue: never consults a source. The tracks are already in hand, and asking a
+            // server about them would be slower and wrong. Handled here rather than in
+            // MusicLibrary because the queue belongs to playback, not to the library --
+            // sending it to the library, as this did, searched the whole collection instead.
+            if (parsed.Target == SearchTarget.Queue)
+            {
+                _debounce = NSTimer.CreateScheduledTimer(Debounce.TotalSeconds,
+                    _ => ShowResults(parsed, SearchTheQueue(parsed)));
+                return;
+            }
+
             _debounce = NSTimer.CreateScheduledTimer(Debounce.TotalSeconds, _ => RunSearch(text));
         }
+
+        /// <summary>
+        /// Matches on title, artist or album — the same three fields the row shows, so a hit
+        /// is always explicable by what is on screen.
+        /// </summary>
+        private SearchResult SearchTheQueue(SearchQuery query)
+        {
+            var matches = _playback.PlayOrder
+                .Where(t => Matches(t, query.Term))
+                .Take(SearchLimit)
+                .ToList();
+
+            return SearchResult.Ok(matches);
+        }
+
+        private static bool Matches(Track track, string term) =>
+            track.Title.Contains(term, StringComparison.OrdinalIgnoreCase)
+            || track.Artist.Contains(term, StringComparison.OrdinalIgnoreCase)
+            || track.Album.Contains(term, StringComparison.OrdinalIgnoreCase);
 
         private void RunSearch(string text)
         {
@@ -393,7 +488,8 @@ namespace Yinyue.UI
                     var result = await _library.SearchAsync(text, SearchLimit, token).ConfigureAwait(false);
                     if (token.IsCancellationRequested) return;
 
-                    NSApplication.SharedApplication.BeginInvokeOnMainThread(() => ShowResults(text, result));
+                    NSApplication.SharedApplication.BeginInvokeOnMainThread(
+                        () => ShowResults(SearchQuery.Parse(text), result));
                 }
                 catch (OperationCanceledException)
                 {
@@ -407,8 +503,10 @@ namespace Yinyue.UI
             }, token);
         }
 
-        private void ShowResults(string term, SearchResult result)
+        private void ShowResults(SearchQuery query, SearchResult result)
         {
+            _resultsQuery = query;
+
             if (result.Error is { } error)
             {
                 ShowResultsMessage(error);
@@ -417,7 +515,11 @@ namespace Yinyue.UI
 
             if (result.Tracks.Count == 0 && result.Collections.Count == 0)
             {
-                ShowResultsMessage($"Nothing found for “{term}”.");
+                // A scoped search says WHICH kind found nothing, so the term need not be
+                // retyped to find out.
+                ShowResultsMessage(query.IsScoped
+                    ? $"No {query.Noun} match “{query.Term}”."
+                    : $"Nothing found for “{query.Term}”.");
                 return;
             }
 
@@ -450,9 +552,7 @@ namespace Yinyue.UI
             _search?.Cancel();
             _search?.Dispose();
 
-            _results.RemoveFromSuperview();
-            _searchBar.RemoveFromSuperview();
-            _queue.RemoveFromSuperview();
+            foreach (var section in AllSections) section.Mounted.RemoveFromSuperview();
         }
     }
 }

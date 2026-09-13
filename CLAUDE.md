@@ -581,11 +581,23 @@ and never again — has no counterpart either way.
   bottom-anchored overlay keeps its bottom edge while growing upward.
 - A hidden section is `Hidden`, not removed, so it keeps its contents and the layout simply
   skips it.
-- **The toasts stay separate windows.** A toast exists to be seen while the overlay is
-  *hidden*, and anything inside the overlay's window goes with it.
-- With glass on, the sections' own fills step aside and the colour goes to the material —
-  one glass view sits behind the whole stack, so a section painting its own background would
-  punch an opaque hole through it.
+- **The toast rows are sections too**, and the window stays up for as long as anything in it
+  is showing. "Dismissed" hides the applet and the panels above it, not the window — which is
+  how a toast still appears while the overlay is down. As separate windows they were separate
+  glass sampling a separate backdrop, so a toast never matched the panel above it.
+- **Each section carries its own glass shape**, grouped by an `NSGlassEffectContainerView`
+  with `spacing: 0`. One shared sheet behind the whole stack made it a single unbroken
+  surface and lost the separation between the search bar and the applet, which is part of the
+  design. The container makes them sample together — one material — while staying distinct
+  shapes; `spacing` is how close two must be before they merge, so zero keeps them apart.
+- **Sections must not autoresize.** `GlassEffect.Wrap` set `HeightSizable`, correct when the
+  glass filled a window and disastrous once it was one row in a stack: every section grew with
+  the window, the next layout measured the inflated heights and grew it again. 354 points
+  became 15,810 in four passes. The suite asserts that laying out twice gives the same answer.
+- The stack **builds the applet itself** rather than being handed it. It was passed in, and a
+  caller that forgot left the applet out of the layout entirely — every section above it sat
+  170 points low. A component that needs its caller to complete it will meet a caller that
+  does not.
 
 **A Popup does not follow its window.** It is placed when it opens and never again, so moving
 the overlay — a changed anchor, a different monitor — strands every panel where the overlay

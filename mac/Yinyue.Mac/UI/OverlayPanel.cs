@@ -57,13 +57,17 @@ namespace Yinyue.UI
             // be: the anchor decides where it sits, not the pointer.
             MovableByWindowBackground = false;
 
-            // The whole stack lives in this one window, inside one glass view, which is what
-            // lets the sections merge into a single material instead of each sampling its own
-            // backdrop. See OverlaySection.
+            // The whole stack lives in this one window. Each section carries its own glass
+            // shape, and a container groups them so they sample together and read as one
+            // material while staying visibly separate surfaces — the separation between the
+            // search bar and the applet is part of the design.
+            //
+            // Spacing zero: shapes closer than the spacing merge into a single blob, which is
+            // exactly what the stack must not do.
             _stackRoot = new NSView(new CGRect(0, 0, OverlayMetrics.PanelWidth, height));
 
-            ContentView = _config.LiquidGlass && GlassEffect.IsAvailable
-                ? GlassEffect.WrapAndTint(_stackRoot, OverlayMetrics.RootCornerRadius, TintColour)
+            ContentView = _config.LiquidGlass
+                ? GlassEffect.Container(_stackRoot, spacing: 0) ?? _stackRoot
                 : _stackRoot;
 
             ApplyBackgroundOpacity();
@@ -146,6 +150,24 @@ namespace Yinyue.UI
 
         /// <summary>A key that reached the overlay rather than the search box.</summary>
         public event EventHandler<NSEvent>? KeyReceived;
+
+        /// <summary>
+        /// Puts the window on screen without summoning the overlay or taking focus.
+        ///
+        /// A toast lives in this window now, and has to be visible while the overlay itself
+        /// is dismissed — so "dismissed" means the applet and the panels above it are hidden,
+        /// not that the window is gone. It stays up for as long as anything in it is showing.
+        /// </summary>
+        public void EnsureVisible()
+        {
+            if (!IsVisible) OrderFrontRegardless();
+        }
+
+        /// <summary>Orders the window out once nothing in it is left to see.</summary>
+        public void HideIfEmpty(Func<bool> anythingShowing)
+        {
+            if (!anythingShowing()) OrderOut(this);
+        }
 
         public void ShowOverlay()
         {

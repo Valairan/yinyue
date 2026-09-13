@@ -41,9 +41,8 @@ namespace Yinyue.UI
     /// would have hidden it at the only moment it matters. It positions itself against the
     /// anchor instead, exactly as the Windows toast does.
     /// </remarks>
-    public sealed class ToastPanel : NSPanel
+    public sealed class ToastSection : OverlaySection
     {
-        private readonly NSView _root;
 
         private readonly OverlayConfig _config;
         private readonly NSImageView _glyph;
@@ -57,41 +56,11 @@ namespace Yinyue.UI
         /// </summary>
         private int _generation;
 
-        public ToastPanel(OverlayConfig config, ToastRole role)
-            : base(new CGRect(0, 0, OverlayMetrics.PanelWidth, OverlayMetrics.ToastRowHeight),
-                   NSWindowStyle.Borderless | NSWindowStyle.NonactivatingPanel | NSWindowStyle.Utility,
-                   NSBackingStore.Buffered, deferCreation: false)
+        public ToastSection(OverlayConfig config, ToastRole role)
+            : base(config, OverlayMetrics.ToastRowHeight)
         {
             _config = config;
             Role = role;
-
-            Level = NSWindowLevel.Floating;
-            HidesOnDeactivate = false;
-            IsOpaque = false;
-            BackgroundColor = NSColor.Clear;
-            HasShadow = true;
-            MovableByWindowBackground = false;
-
-            CollectionBehavior = NSWindowCollectionBehavior.CanJoinAllSpaces
-                               | NSWindowCollectionBehavior.FullScreenAuxiliary
-                               | NSWindowCollectionBehavior.IgnoresCycle;
-
-            _root = new NSView(new CGRect(0, 0, OverlayMetrics.PanelWidth, OverlayMetrics.ToastRowHeight))
-            {
-                WantsLayer = true,
-            };
-
-            var layer = _root.Layer!;
-            layer.CornerRadius = (nfloat)OverlayMetrics.RootCornerRadius;
-            layer.BorderWidth = (nfloat)OverlayMetrics.RootBorderThickness;
-            layer.BorderColor = Theme.Surface0.CGColor;
-            layer.MasksToBounds = true;
-
-            ContentView = _config.LiquidGlass
-                ? GlassEffect.WrapAndTint(_root, OverlayMetrics.RootCornerRadius, TintColour)
-                : _root;
-
-            ApplyBackgroundOpacity();
 
             var area = ContentArea;
 
@@ -107,7 +76,7 @@ namespace Yinyue.UI
                 Frame = new CGRect(area.X, markY, MarkSize, MarkSize),
                 ImageScaling = NSImageScale.ProportionallyDown,
             };
-            PanelRoot.AddSubview(_glyph);
+            AddSubview(_glyph);
 
             _text = new NSTextField
             {
@@ -122,7 +91,7 @@ namespace Yinyue.UI
                 StringValue = string.Empty,
                 Cell = { UsesSingleLineMode = true },
             };
-            PanelRoot.AddSubview(_text);
+            AddSubview(_text);
 
             _level = new NSProgressIndicator(new CGRect(area.X, LevelY, area.Width, LevelHeight))
             {
@@ -132,7 +101,7 @@ namespace Yinyue.UI
                 MaxValue = 1,
                 Hidden = true,
             };
-            PanelRoot.AddSubview(_level);
+            AddSubview(_level);
 
             // The same reserved cell the glyph uses, so swapping one for the other moves
             // nothing.
@@ -140,47 +109,10 @@ namespace Yinyue.UI
             {
                 Hidden = true,
             };
-            PanelRoot.AddSubview(_dial);
+            AddSubview(_dial);
 
-            OrderOut(null);
+            Shown = false;
         }
-
-        /// <summary>Never takes focus: it exists so feedback need not steal the keyboard.</summary>
-        public override bool CanBecomeKeyWindow => false;
-
-        public override bool CanBecomeMainWindow => false;
-
-        private NSColor TintColour =>
-            Theme.Base.ColorWithAlphaComponent((nfloat)_config.BackgroundOpacity);
-
-        /// <summary>
-        /// With glass on the fill steps aside and the colour goes to the material; otherwise
-        /// the root carries it directly.
-        /// </summary>
-        public void ApplyBackgroundOpacity()
-        {
-            if (_root.Layer is not { } layer) return;
-
-            bool glass = _config.LiquidGlass && GlassEffect.IsAvailable;
-
-            layer.BackgroundColor = glass ? NSColor.Clear.CGColor : TintColour.CGColor;
-            layer.BorderWidth = glass ? 0 : (nfloat)OverlayMetrics.RootBorderThickness;
-
-            if (glass && ContentView is { } wrapper) GlassEffect.Tint(wrapper, TintColour);
-        }
-
-        private CGRect ContentArea
-        {
-            get
-            {
-                double inset = OverlayMetrics.RootPadding + OverlayMetrics.RootBorderThickness;
-                return new CGRect(inset, inset,
-                    OverlayMetrics.PanelWidth - inset * 2,
-                    Frame.Height - inset * 2);
-            }
-        }
-
-        private NSView PanelRoot => _root;
 
         public ToastRole Role { get; }
 
@@ -216,7 +148,7 @@ namespace Yinyue.UI
             // Positioned and faded in only on the way in. A repeat call must not reposition
             // or re-run the entrance -- doing that on every call is what made rapid volume
             // steps strobe on Windows.
-            if (!IsVisible) Enter();
+            if (!Shown) Enter();
         }
 
         /// <summary>
@@ -240,7 +172,7 @@ namespace Yinyue.UI
             _generation++;
             AlphaValue = 1;
 
-            if (!IsVisible) Enter();
+            if (!Shown) Enter();
 
             // No ordinary auto-hide while the keys are down, but a dial that stops being
             // updated must not stay up for good, so this runs as a watchdog at a short
@@ -272,23 +204,30 @@ namespace Yinyue.UI
             Dismiss(VisibleFor);
         }
 
+        /// <summary>
+        /// Fades in. The row's position is the stack's business now, not the toast's — it is
+        /// a section in the same window as everything else, which is what makes the glass one
+        /// material rather than one per window.
+        /// </summary>
         private void Enter()
         {
-            OverlayPositioner.PositionToastRow(this, _config, (int)Role);
+            Shown = true;
+            Appeared?.Invoke(this, EventArgs.Empty);
 
             double seconds = _config.Animations ? _config.AnimationMilliseconds / 1000.0 : 0;
 
             if (seconds <= 0)
             {
                 AlphaValue = 1;
-                OrderFrontRegardless();
                 return;
             }
 
             AlphaValue = 0;
-            OrderFrontRegardless();
             Fade(to: 1, seconds, onDone: null);
         }
+
+        /// <summary>Raised when the row appears or goes, so the stack can re-lay itself.</summary>
+        public event EventHandler? Appeared;
 
         /// <summary>
         /// Drives the fade from a timer rather than through AppKit's <c>Animator</c> proxy.
@@ -319,6 +258,12 @@ namespace Yinyue.UI
         }
 
         private NSTimer? _fade;
+
+        private void Hide()
+        {
+            Shown = false;
+            Appeared?.Invoke(this, EventArgs.Empty);
+        }
 
         /// <summary>The reserved cell for the glyph or the dial, and the gap after it.</summary>
         private const double MarkSize = 22;
@@ -377,13 +322,13 @@ namespace Yinyue.UI
 
                 if (seconds <= 0)
                 {
-                    OrderOut(null);
+                    Hide();
                     return;
                 }
 
                 Fade(to: 0, seconds, onDone: () =>
                 {
-                    if (generation == _generation) OrderOut(null);
+                    if (generation == _generation) Hide();
                 });
             });
         }

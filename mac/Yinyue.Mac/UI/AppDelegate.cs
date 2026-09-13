@@ -177,7 +177,9 @@ namespace Yinyue.UI
             // reserved toast rows are the next piece of work.
             _overlay = new OverlayPanel(_config.Current.Overlay, OverlayMetrics.AppletHeight);
 
-            var applet = new AppletView(_config.Current.Overlay, _playback);
+            _stack = new OverlayStack(_config.Current.Overlay, _library, _playback, _overlay);
+
+            var applet = _stack.Applet;
             applet.ShowArtwork(_playback.CurrentArtworkPath);
             applet.SettingsRequested += (_, _) => ShowSettings();
             applet.QueueRequested += (_, _) => _stack?.ToggleQueue();
@@ -185,12 +187,6 @@ namespace Yinyue.UI
             applet.ShuffleFavoritesRequested += (_, _) => _ = ShuffleFavoritesAsync();
             applet.FavoriteRequested += (_, _) => _ = ToggleFavoriteAsync();
             _applet = applet;
-            _overlay.StackRoot.AddSubview(applet);
-
-            // The stack subscribes to the applet's own Shown/Hidden, so there is nothing to
-            // wire here beyond the keys.
-            _stack = new OverlayStack(_config.Current.Overlay, _library, _playback, _overlay);
-            _stack.SetAppletView(applet);
             _stack.Layout();
 
             _overlay.WatchForFocusLoss();

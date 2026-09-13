@@ -92,6 +92,37 @@ namespace Yinyue.UI
         /// </summary>
         public static bool IsGlass(NSView view) => ClassNameOf(view).Contains("NSGlassEffectView");
 
+        /// <summary>
+        /// A container that groups sibling glass views.
+        ///
+        /// This is what keeps the stack one coherent material while leaving each section its
+        /// own shape: the views inside sample together rather than each sampling its own
+        /// backdrop, and <c>spacing</c> decides how close two of them must be before they
+        /// merge into a single blob. Zero keeps them separate, which is what the stack wants
+        /// — the search bar is meant to read as its own surface, not as part of the applet.
+        /// </summary>
+        public static NSView? Container(NSView content, double spacing)
+        {
+            if (!IsAvailable) return null;
+
+            IntPtr cls = Class.GetHandle("NSGlassEffectContainerView");
+            if (cls == IntPtr.Zero) return null;
+
+            IntPtr handle = Send(Send(cls, Selector.GetHandle("alloc")), Selector.GetHandle("init"));
+            if (handle == IntPtr.Zero) return null;
+
+            var container = Runtime.GetNSObject<NSView>(handle);
+            if (container is null) return null;
+
+            container.Frame = content.Frame;
+            container.AutoresizingMask = NSViewResizingMask.WidthSizable | NSViewResizingMask.HeightSizable;
+
+            SendDouble(handle, Selector.GetHandle("setSpacing:"), spacing);
+            SendPtr(handle, Selector.GetHandle("setContentView:"), content.Handle);
+
+            return container;
+        }
+
         /// <summary>Wraps and tints in one call, which is how every caller uses it.</summary>
         public static NSView WrapAndTint(NSView content, double cornerRadius, NSColor tint)
         {
@@ -119,7 +150,12 @@ namespace Yinyue.UI
             if (glass is null) return content;
 
             glass.Frame = content.Frame;
-            glass.AutoresizingMask = NSViewResizingMask.WidthSizable | NSViewResizingMask.HeightSizable;
+
+            // Deliberately NO autoresizing mask. A wrapped section is one row in a stack, and
+            // the stack sets its frame explicitly — leaving it HeightSizable meant every
+            // section grew with the window, so the next layout measured the inflated heights
+            // and grew the window again: 354 points became 15,810 in four passes.
+            glass.AutoresizingMask = NSViewResizingMask.NotSizable;
 
             SendDouble(handle, Selector.GetHandle("setCornerRadius:"), cornerRadius);
 
