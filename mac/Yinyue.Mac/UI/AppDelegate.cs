@@ -23,6 +23,7 @@ namespace Yinyue.UI
         private NSStatusItem? _statusItem;
         private OverlayPanel? _overlay;
         private MacHotkeyManager? _hotkeys;
+        private MacMediaControls? _media;
 
         public AppDelegate(ConfigService config, PlaybackService playback)
         {
@@ -49,6 +50,10 @@ namespace Yinyue.UI
             _overlay.SetContent(applet);
 
             BuildHotkeys();
+
+            // Media keys and the Now Playing panel. Owned here rather than by the overlay,
+            // because the overlay is hidden almost all the time and these must work anyway.
+            _media = new MacMediaControls(_playback);
 
             if (Environment.GetCommandLineArgs().Contains("--show")) _overlay.ShowOverlay();
         }
@@ -187,6 +192,9 @@ namespace Yinyue.UI
 
         public override void WillTerminate(NSNotification notification)
         {
+            // Before playback, so the Now Playing panel is cleared while there is still a
+            // service to read state from.
+            _media?.Dispose();
             _hotkeys?.Dispose();
             _playback.Dispose();
             _statusItem?.Dispose();

@@ -29,6 +29,7 @@ namespace Yinyue
             if (which is "all" or "icons") IconsRender();
             if (which is "all" or "layout") LayoutMatchesWindows();
             if (which is "all" or "hotkeys") HotkeysRegister();
+            if (which is "all" or "media") MediaControls();
 
             Console.WriteLine();
             Console.WriteLine(_failed == 0 ? "PASS" : $"FAIL — {_failed} check(s)");
@@ -40,6 +41,66 @@ namespace Yinyue
             if (!ok) _failed++;
             Console.WriteLine($"  [{(ok ? "ok" : "FAIL")}] {label}{(detail is null ? "" : $"  — {detail}")}");
             Console.Out.Flush();
+        }
+
+        /// <summary>
+        /// The Now Playing wiring, as far as it can be checked without a desktop session.
+        ///
+        /// Honest about its limits: pressing a media key and seeing the Control Center flyout
+        /// cannot be automated, and the skill says so. What this does catch is the wiring —
+        /// that the session is claimed, that state is published rather than left blank, and
+        /// that commands Yinyue does not implement are switched off, since an enabled command
+        /// nobody handles leaves a dead button in Control Center.
+        /// </summary>
+        private static void MediaControls()
+        {
+            Console.WriteLine("\nMedia keys and Now Playing");
+
+            var playback = BuildIdlePlayback();
+            using var media = new Yinyue.Services.MacMediaControls(playback);
+
+            var centre = MediaPlayer.MPNowPlayingInfoCenter.DefaultCenter;
+
+            Check("a now-playing session exists", centre is not null);
+            Check("idle publishes Stopped, not a blank Playing",
+                centre!.PlaybackState == MediaPlayer.MPNowPlayingPlaybackState.Stopped,
+                centre.PlaybackState.ToString());
+
+            var commands = MediaPlayer.MPRemoteCommandCenter.Shared;
+
+            // Handled: these must stay enabled or the keys do nothing.
+            foreach (var (name, command) in new (string, MediaPlayer.MPRemoteCommand)[]
+                     {
+                         ("play", commands.PlayCommand),
+                         ("pause", commands.PauseCommand),
+                         ("togglePlayPause", commands.TogglePlayPauseCommand),
+                         ("nextTrack", commands.NextTrackCommand),
+                         ("previousTrack", commands.PreviousTrackCommand),
+                         ("changePlaybackPosition", commands.ChangePlaybackPositionCommand),
+                     })
+            {
+                Check($"{name} is enabled", command.Enabled);
+            }
+
+            // Not handled: enabled-but-unhandled leaves a dead button in Control Center.
+            foreach (var (name, command) in new (string, MediaPlayer.MPRemoteCommand)[]
+                     {
+                         ("seekForward", commands.SeekForwardCommand),
+                         ("seekBackward", commands.SeekBackwardCommand),
+                         ("skipForward", commands.SkipForwardCommand),
+                         ("skipBackward", commands.SkipBackwardCommand),
+                         ("rating", commands.RatingCommand),
+                         ("like", commands.LikeCommand),
+                         ("changeRepeatMode", commands.ChangeRepeatModeCommand),
+                         ("changeShuffleMode", commands.ChangeShuffleModeCommand),
+                     })
+            {
+                Check($"{name} is disabled", !command.Enabled);
+            }
+
+            media.Dispose();
+            Check("disposing clears the session",
+                centre.PlaybackState == MediaPlayer.MPNowPlayingPlaybackState.Stopped);
         }
 
         /// <summary>

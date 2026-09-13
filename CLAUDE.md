@@ -1125,7 +1125,22 @@ degraded mode to design for a refusal.
   because the app runs both as a bundle and straight from the binary in development. Not
   housekeeping: a second copy fails to register all seventeen shortcuts and the symptom is
   "my hotkeys stopped working", which points nowhere near the cause.
-- Media keys: `MPRemoteCommandCenter` and `MPNowPlayingInfoCenter`. See `media-integration`.
+- Media keys: **done.** `MacMediaControls` over `MPRemoteCommandCenter` and
+  `MPNowPlayingInfoCenter`, owned by the composition root rather than the overlay, because
+  the overlay is hidden almost all the time and the keys must work anyway.
+  `MPNowPlayingInfo` is a plain object of **fields** in this binding, not the dictionary the
+  Objective-C API takes — the properties on it are Apple-specific extras, which is why a
+  scan for `Title` as a property finds nothing.
+  Published on track and state changes and on a seek, **never on the 250 ms tick**: macOS
+  extrapolates the playhead from elapsed plus rate, so pushing it four times a second is
+  pure overhead against the idle budget. A seek is the exception because extrapolation
+  cannot predict one.
+  `PlaybackState` is set explicitly rather than inferred from the rate, since media keys
+  route to whichever app holds the active session and the session follows that property.
+  Commands Yinyue does not implement are **disabled**, because an enabled command nobody
+  handles leaves a dead button in Control Center — the suite asserts both halves of that.
+  **Not verifiable headlessly:** pressing a media key, and whether the flyout shows the right
+  title, artist and art. That needs a desktop session and audio actually playing.
 - Audio: an `IAudioPlayer` over `AVPlayer`, which handles both HTTP and local files, FLAC
   included since 10.13. The interface is the specification — implement it and
   `PlaybackService` works as it does on Windows.
