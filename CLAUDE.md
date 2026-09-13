@@ -1076,6 +1076,19 @@ small polish, and keeping Core buildable for the macOS shell. Do not propose fea
 unprompted; new *sources* were always meant to be streaming backends (Navidrome/Subsonic,
 Plex) behind `IMusicSource`, and nothing else.
 
+**Other servers are deferred, not rejected.** When one is wanted, it is a new `IMusicSource` in
+Core (plus `ISupportsFavorites`/`ISupportsCollections`), one `Register` line per shell, and a
+sign-in page per shell; `ConfigService` would need per-source tokens, and `TrackSource` a new
+member. Assessed in September 2026 and worth remembering: **Plex** uses a long-lived token,
+so it fits the "never store passwords" rule as is, and has its own timeline API for
+reporting. **Navidrome** fits every capability through the Subsonic API (`search3`,
+`getPlaylist`, `getAlbum`, `getStarred2`, `star`, `getCoverArt`, `scrobble`, `/rest/stream`
+with `format=raw` for direct play), but classic Subsonic auth salts the password per request
+and so needs the password at runtime. Check `getOpenSubsonicExtensions` for the `apiKey`
+extension first — a per-user API key stored through `ISecretStore` keeps the rule; storing the
+password protected is the fallback and a documented exception, not compliance. Its stream URL
+carries the credential in the query string, so the log-redaction rule extends to it.
+
 **Spotify integration was assessed and rejected.** The only viable shape is a Spotify Connect
 remote over the Web API: search and playlists in the overlay, with the audio playing in the
 Spotify desktop app rather than in Yinyue. Spotify has no native desktop playback SDK
