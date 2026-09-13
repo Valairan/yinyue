@@ -24,12 +24,62 @@ namespace Yinyue.UI
         private OverlayPanel? _overlay;
         private MacHotkeyManager? _hotkeys;
         private MacMediaControls? _media;
+        private OverlayStack? _stack;
 
-        public AppDelegate(ConfigService config, PlaybackService playback)
+        private readonly MusicLibrary _library;
+
+        public AppDelegate(ConfigService config, PlaybackService playback, MusicLibrary library)
         {
             _config = config;
             _playback = playback;
+            _library = library;
         }
+
+        /// <summary>
+        /// Keys that reach the overlay rather than the search box.
+        ///
+        /// "Is the user typing" is a focus question, not a visibility one — the box is always
+        /// on screen, so testing visibility would be permanently true and Space would never
+        /// reach play/pause again.
+        /// </summary>
+        private void OnOverlayKey(object? sender, NSEvent e)
+        {
+            switch (e.KeyCode)
+            {
+                case 53:   // Escape: clear a search in progress, or dismiss the overlay
+                    if (_stack?.HandleEscape() != true) _overlay?.HideOverlay();
+                    break;
+
+                case 36:   // Return: play the highlighted result
+                    _stack?.PlaySelected();
+                    break;
+
+                case 126:  // Up
+                    _stack?.MoveSelection(-1);
+                    break;
+
+                case 125:  // Down
+                    _stack?.MoveSelection(1);
+                    break;
+
+                case 49 when !IsTyping:   // Space, only when the caret is not in the box
+                    Fire(_playback.TogglePlayPauseAsync());
+                    break;
+
+                default:
+                    // Any printable character opens search and keeps the character, so the
+                    // overlay can be typed into without aiming at the box first.
+                    if (!IsTyping && e.Characters is { Length: > 0 } typed
+                        && !char.IsControl(typed[0]))
+                    {
+                        _stack?.FocusSearch();
+                        _stack?.SearchBar.AppendTyped(typed);
+                    }
+                    break;
+            }
+        }
+
+        private bool IsTyping => _stack?.SearchBar.IsKeyWindow == true;
 
         public override void DidFinishLaunching(NSNotification notification)
         {
@@ -48,6 +98,11 @@ namespace Yinyue.UI
             applet.SettingsRequested += (_, _) => { /* settings window is not built yet */ };
             applet.QueueRequested += (_, _) => { /* the queue panel is not built yet */ };
             _overlay.SetContent(applet);
+
+            // The stack subscribes to the applet's own Shown/Hidden, so there is nothing to
+            // wire here beyond the keys.
+            _stack = new OverlayStack(_config.Current.Overlay, _library, _playback, _overlay);
+            _overlay.KeyReceived += OnOverlayKey;
 
             BuildHotkeys();
 
@@ -122,8 +177,14 @@ namespace Yinyue.UI
                     _playback.ToggleMute();
                     break;
 
-                case HotkeyActions.OpenSettings:
                 case HotkeyActions.QuickSearch:
+                    // Summons the overlay and moves the caret. It reveals nothing: the box is
+                    // part of the overlay, not something that gets opened.
+                    _overlay?.ShowOverlay();
+                    _stack?.FocusSearch();
+                    break;
+
+                case HotkeyActions.OpenSettings:
                 case HotkeyActions.OpenQueue:
                 case HotkeyActions.GrabQueueEntry:
                 case HotkeyActions.AddToQueue:
@@ -196,6 +257,7 @@ namespace Yinyue.UI
             // service to read state from.
             _media?.Dispose();
             _hotkeys?.Dispose();
+            _stack?.Dispose();
             _playback.Dispose();
             _statusItem?.Dispose();
         }

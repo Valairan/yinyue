@@ -67,6 +67,33 @@ namespace Yinyue.UI
         /// </summary>
         public const double ReservedForToasts = ToastRows * (ToastRowHeight + SideGap);
 
+        // ---- the search row and the panels above it ----
+
+        /// <summary>
+        /// The search bar is its own row and is open for as long as the overlay is. It used
+        /// to share the status line inside the applet and take it away while searching;
+        /// now the box is simply always there and the status keeps its place.
+        /// </summary>
+        public const double SearchBarHeight = 40;
+
+        public const double SearchFontSize = 13;
+        public const double SearchIconSize = 14;
+
+        /// <summary>Gap between the search icon and the box.</summary>
+        public const double SearchIconGap = 8;
+
+        /// <summary>One result row: title over subtitle, with duration and source at the right.</summary>
+        public const double ResultRowHeight = 40;
+
+        public const double ResultTitleFontSize = 12;
+        public const double ResultSubtitleFontSize = 10;
+
+        /// <summary>
+        /// How many result rows are shown before the panel stops growing. Keeps a long
+        /// result set from running off the top of the screen.
+        /// </summary>
+        public const int MaxVisibleResults = 7;
+
         // ---- artwork ----
 
         /// <summary>

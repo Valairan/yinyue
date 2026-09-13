@@ -30,6 +30,7 @@ namespace Yinyue
             if (which is "all" or "layout") LayoutMatchesWindows();
             if (which is "all" or "hotkeys") HotkeysRegister();
             if (which is "all" or "media") MediaControls();
+            if (which is "all" or "search") SearchStack();
 
             Console.WriteLine();
             Console.WriteLine(_failed == 0 ? "PASS" : $"FAIL — {_failed} check(s)");
@@ -41,6 +42,56 @@ namespace Yinyue
             if (!ok) _failed++;
             Console.WriteLine($"  [{(ok ? "ok" : "FAIL")}] {label}{(detail is null ? "" : $"  — {detail}")}");
             Console.Out.Flush();
+        }
+
+        /// <summary>
+        /// The stack: the search bar sits above the applet and the results above that, all
+        /// the same width and left-aligned, separated by SideGap.
+        /// </summary>
+        private static void SearchStack()
+        {
+            Console.WriteLine("\nSearch stack");
+
+            var config = new Yinyue.Models.OverlayConfig { MarginX = 16, MarginY = 16 };
+            var playback = BuildIdlePlayback();
+            var library = new Yinyue.Services.MusicLibrary(new Yinyue.Services.ConfigService());
+
+            var applet = new Yinyue.UI.OverlayPanel(config, Yinyue.UI.OverlayMetrics.AppletHeight);
+            using var stack = new Yinyue.UI.OverlayStack(config, library, playback, applet);
+
+            applet.ShowOverlay();
+
+            var appletFrame = applet.Frame;
+            var barFrame = stack.SearchBar.Frame;
+
+            Check("the search bar is PanelWidth wide",
+                Math.Abs(barFrame.Width - 420) < 0.5, barFrame.Width.ToString());
+
+            Check("it is left-aligned with the applet",
+                Math.Abs(barFrame.X - appletFrame.X) < 0.5, $"{barFrame.X} vs {appletFrame.X}");
+
+            // Above, with exactly one SideGap between. AppKit's y grows upward, so "above"
+            // means a larger y -- the inverse of the Windows arithmetic.
+            double gap = barFrame.Y - (appletFrame.Y + appletFrame.Height);
+            Check("it sits one SideGap above the applet",
+                Math.Abs(gap - Yinyue.UI.OverlayMetrics.SideGap) < 0.5, $"gap={gap}");
+
+            Check("the bar is a child of the applet, so it follows it",
+                applet.ChildWindows.Any(w => w.Equals(stack.SearchBar)));
+
+            // Moving the applet must carry the stack with it. On Windows this needs an
+            // explicit nudge per popup; here it should be free.
+            var moved = new CoreGraphics.CGPoint(appletFrame.X - 120, appletFrame.Y + 60);
+            applet.SetFrameOrigin(moved);
+            stack.Layout();
+
+            Check("the bar follows the applet when it moves",
+                Math.Abs(stack.SearchBar.Frame.X - moved.X) < 0.5,
+                $"bar x={stack.SearchBar.Frame.X}, applet x={moved.X}");
+
+            Check("an empty box means Escape falls through to dismiss", !stack.HandleEscape());
+
+            applet.Close();
         }
 
         /// <summary>

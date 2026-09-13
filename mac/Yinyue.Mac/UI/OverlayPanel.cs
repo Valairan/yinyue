@@ -110,14 +110,34 @@ namespace Yinyue.UI
         /// so the app is not activated; the panel still accepts keys because it can become key
         /// without becoming main.
         /// </summary>
+        /// <summary>Raised after the panel is placed and shown, so the stack can follow it.</summary>
+        public event EventHandler? Shown;
+
+        public event EventHandler? Hidden;
+
+        /// <summary>A key that reached the overlay rather than the search box.</summary>
+        public event EventHandler<NSEvent>? KeyReceived;
+
         public void ShowOverlay()
         {
             OverlayPositioner.PositionApplet(this, _config);
             OrderFrontRegardless();
             MakeKeyWindow();
+            Shown?.Invoke(this, EventArgs.Empty);
         }
 
-        public void HideOverlay() => OrderOut(this);
+        public void HideOverlay()
+        {
+            Hidden?.Invoke(this, EventArgs.Empty);
+            OrderOut(this);
+        }
+
+        /// <summary>
+        /// Every key that lands on the panel. Handled here rather than by a responder chain
+        /// because the stack's panels are separate windows and a routed event cannot cross
+        /// between them.
+        /// </summary>
+        public override void KeyDown(NSEvent theEvent) => KeyReceived?.Invoke(this, theEvent);
 
         public bool IsShown => IsVisible;
 

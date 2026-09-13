@@ -63,7 +63,7 @@ namespace Yinyue
 
             var playback = new PlaybackService(audio, library);
 
-            if (!check) return RunApp(config, playback, instance);
+            if (!check) return RunApp(config, playback, library, instance);
 
             Console.WriteLine("Yinyue — macOS seam check");
             Console.WriteLine(new string('-', 52));
@@ -94,10 +94,11 @@ namespace Yinyue
         private static string Describe(string? token) =>
             token is null ? "none stored (expected before sign-in)" : $"{token.Length} chars";
 
-        private static int RunApp(ConfigService config, PlaybackService playback, SingleInstance instance)
+        private static int RunApp(ConfigService config, PlaybackService playback,
+            MusicLibrary library, SingleInstance instance)
         {
             var app = NSApplication.SharedApplication;
-            var del = new AppDelegate(config, playback);
+            var del = new AppDelegate(config, playback, library);
 
             instance.ListenForSummon(del.ShowOverlay);
 

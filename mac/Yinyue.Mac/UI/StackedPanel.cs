@@ -1,0 +1,100 @@
+using AppKit;
+using CoreGraphics;
+using Yinyue.Models;
+
+namespace Yinyue.UI
+{
+    /// <summary>
+    /// A panel in the overlay's vertical stack — the search bar, the results, the queue.
+    /// Each is PanelWidth wide and carries the applet's background, border and radius, so it
+    /// reads as an extension of the applet rather than as a separate popup.
+    ///
+    /// <b>These are child windows, and that is the important difference from Windows.</b>
+    /// WPF uses Popups, which are placed once when they open and never again — so moving the
+    /// overlay strands every panel where the overlay used to be, and MainWindow has to nudge
+    /// each one back on LocationChanged. AppKit child windows move with their parent by
+    /// construction, so that whole class of bug does not exist here and there is no
+    /// ReplacePanels equivalent to write.
+    ///
+    /// They also inherit the parent's level and ordering, which is what keeps the stack
+    /// together above other applications.
+    /// </summary>
+    public class StackedPanel : NSPanel
+    {
+        private readonly OverlayConfig _config;
+
+        protected StackedPanel(OverlayConfig config, double height)
+            : base(new CGRect(0, 0, OverlayMetrics.PanelWidth, height),
+                   NSWindowStyle.Borderless | NSWindowStyle.NonactivatingPanel | NSWindowStyle.Utility,
+                   NSBackingStore.Buffered,
+                   deferCreation: false)
+        {
+            _config = config;
+
+            Level = NSWindowLevel.Floating;
+            HidesOnDeactivate = false;
+            IsOpaque = false;
+            BackgroundColor = NSColor.Clear;
+            HasShadow = true;
+            MovableByWindowBackground = false;
+
+            CollectionBehavior = NSWindowCollectionBehavior.CanJoinAllSpaces
+                               | NSWindowCollectionBehavior.FullScreenAuxiliary
+                               | NSWindowCollectionBehavior.IgnoresCycle;
+
+            ContentView = BuildRoot(height);
+        }
+
+        /// <summary>
+        /// Only the search bar takes keys; the others are read and acted on through global
+        /// shortcuts, so they must never pull focus from the box.
+        /// </summary>
+        public override bool CanBecomeKeyWindow => false;
+
+        public override bool CanBecomeMainWindow => false;
+
+        /// <summary>The area inside the border and padding, where content goes.</summary>
+        protected CGRect ContentArea
+        {
+            get
+            {
+                double inset = OverlayMetrics.RootPadding + OverlayMetrics.RootBorderThickness;
+                return new CGRect(inset, inset,
+                    OverlayMetrics.PanelWidth - inset * 2,
+                    Frame.Height - inset * 2);
+            }
+        }
+
+        private NSView BuildRoot(double height)
+        {
+            var root = new NSView(new CGRect(0, 0, OverlayMetrics.PanelWidth, height))
+            {
+                WantsLayer = true,
+            };
+
+            var layer = root.Layer!;
+            layer.BackgroundColor = Theme.Base.ColorWithAlphaComponent(
+                (nfloat)_config.BackgroundOpacity).CGColor;
+            layer.CornerRadius = (nfloat)OverlayMetrics.RootCornerRadius;
+            layer.BorderWidth = (nfloat)OverlayMetrics.RootBorderThickness;
+            layer.BorderColor = Theme.Surface0.CGColor;
+            layer.MasksToBounds = true;
+
+            return root;
+        }
+
+        /// <summary>
+        /// Resizes without moving the top edge, so a panel that grows extends downward into
+        /// the gap rather than shifting the stack above it. The stack is re-laid out by the
+        /// owner afterwards.
+        /// </summary>
+        protected void SetHeight(double height)
+        {
+            var frame = Frame;
+            SetFrame(new CGRect(frame.X, frame.Y, OverlayMetrics.PanelWidth, height), true);
+
+            if (ContentView is { } view)
+                view.Frame = new CGRect(0, 0, OverlayMetrics.PanelWidth, height);
+        }
+    }
+}

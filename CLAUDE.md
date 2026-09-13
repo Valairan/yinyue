@@ -509,6 +509,16 @@ and on show the bar appeared at full opacity while the applet came up from zero.
 open through the fade-out and `ClosePanels` runs when it completes; a re-summon mid-fade
 supersedes the completion and leaves them open.
 
+**On macOS the stacked panels are child windows, and that removes a whole class of bug.**
+`OverlayStack` adds the search bar and the results to the applet with `AddChildWindow`, so
+they move with it by construction. The WPF note immediately below — that a Popup is placed
+once and never again, stranding every panel when the overlay moves — has no counterpart here,
+and there is no `ReplacePanels` to write. The stack still has to be laid out **once** after
+the children are added, which is why `OverlayStack` subscribes to the applet's own
+`Shown`/`Hidden` rather than leaving that to the delegate: a stack nobody laid out sits at the
+window origin, and making it someone else's job is how it ends up laid out in one path and not
+the other.
+
 **A Popup does not follow its window.** It is placed when it opens and never again, so moving
 the overlay — a changed anchor, a different monitor — strands every panel where the overlay
 used to be. `MainWindow.LocationChanged` calls `ReplacePanels`, which nudges each open popup's
