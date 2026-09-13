@@ -19,9 +19,10 @@ works from any sub-path.
 
 - **Buy Me a Coffee** — the Support card links to buymeacoffee.com/valairan as a whole; the QR
   code inside it is `assets/buymeacoffee.png`, resized to 720px for the web.
-- **macOS download** — both "Download for macOS" buttons are inert (`button--soon`, no
-  `href`). When the Mac build ships, add the `href`, drop the `button--soon` class and the
-  `soon` tag, and fill in the macOS facts.
+- **macOS download** — `installer/build-mac.sh`, run on the Mac, writes
+  `website/downloads/Yinyue-<version>.dmg` and prints its SHA-256. The DMG is gitignored like
+  the MSI, so when assembling the site copy it in beside the MSI from the machine that built
+  it, and add the hash as a row on the macOS card (there is a comment marking the spot).
 
 ## Releasing a new version
 

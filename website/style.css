@@ -185,19 +185,7 @@ h1 {
 
 .button__icon { width: 18px; height: 18px; }
 
-/* A download that is not available yet: looks like a button, does nothing, says so. */
-.button--soon { cursor: default; opacity: 0.75; }
-.button--soon:hover { transform: none; background: rgba(255, 255, 255, 0.06); }
-.button__tag {
-  font-size: 0.7rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  padding: 0.15rem 0.5rem;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.12);
-  color: var(--text);
-}
+
 .button--primary .button__icon { filter: brightness(0); }
 .button--ghost .button__icon { filter: brightness(0) invert(1); }
 

@@ -62,7 +62,7 @@
         </a>
       </div>
       <p class="hero__meta">
-        v0.2.0 · free and open source · Windows 10 and 11 now, macOS next<br>
+        v0.2.0 · free and open source · Windows 10 and 11 · macOS 13 and later<br>
         <a class="muted" href="https://github.com/Valairan/yinyue" rel="noopener">Source on GitHub</a>
       </p>
     </section>
@@ -173,16 +173,18 @@
           </dl>
         </article>
 
-        <article class="platform platform--soon">
+        <article class="platform">
           <h3>macOS</h3>
-          <p class="platform__meta">In development · same features, native menu-bar app</p>
-          <a class="button button--ghost" href="downloads/Yinyue-0.2.0.dmg" download>
+          <p class="platform__meta">Version 0.2.0 · Disk image · 43 MB · Apple silicon</p>
+          <a class="button button--primary" href="downloads/Yinyue-0.2.0.dmg" download>
             <img src="assets/icons/apple.svg" alt="" class="button__icon">
             Download for macOS
           </a>
           <dl class="facts">
-            <div><dt>Will need</dt><dd>macOS 13 or later on Apple silicon or Intel.</dd></div>
-            <div><dt>Progress</dt><dd>The overlay, search, queue, toasts, sleep timer, settings and global hotkeys are done. Follow the <a href="https://github.com/Valairan/yinyue" rel="noopener">repository</a> for the release.</dd></div>
+            <div><dt>Requires</dt><dd>macOS 13 or later on Apple silicon. Intel Macs are not supported yet.</dd></div>
+            <div><dt>Install</dt><dd>Open the disk image and drag Yinyue to Applications. It lives in the menu bar; there is nothing else to set up.</dd></div>
+            <!-- SHA-256: installer/build-mac.sh prints it. Add a row here like the Windows one. -->
+            <div><dt>Unsigned</dt><dd>macOS will say it cannot verify the developer. Right-click Yinyue and choose Open the first time; after that it opens normally.</dd></div>
           </dl>
         </article>
       </div>
