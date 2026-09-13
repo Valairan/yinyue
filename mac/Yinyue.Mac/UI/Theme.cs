@@ -25,10 +25,8 @@ namespace Yinyue.UI
         public static readonly NSColor Danger = Hex(0xF38BA8);
         public static readonly NSColor Warning = Hex(0xF9E2AF);
 
-        /// <summary>Shared with the toast, exactly as PanelWidth is in App.xaml.</summary>
-        public const double PanelWidth = 420;
-
-        public const double CornerRadius = 12;
+        // Measurements are NOT here. They live in OverlayMetrics in Core, which both apps
+        // read, so the two overlays cannot drift apart. This class is colour only.
 
         private static NSColor Hex(int rgb) => NSColor.FromSrgb(
             ((rgb >> 16) & 0xFF) / 255f,

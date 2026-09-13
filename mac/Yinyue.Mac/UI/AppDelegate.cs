@@ -40,11 +40,11 @@ namespace Yinyue.UI
 
             // Height is provisional until the applet's contents exist; the stack and its
             // reserved toast rows are the next piece of work.
-            const double height = 170;
-            _overlay = new OverlayPanel(_config.Current.Overlay, height);
+            _overlay = new OverlayPanel(_config.Current.Overlay, OverlayMetrics.AppletHeight);
 
-            var applet = new AppletView(new CoreGraphics.CGRect(0, 0, Theme.PanelWidth, height), _playback);
+            var applet = new AppletView(_playback);
             applet.SettingsRequested += (_, _) => { /* settings window is not built yet */ };
+            applet.QueueRequested += (_, _) => { /* the queue panel is not built yet */ };
             _overlay.SetContent(applet);
 
             // --show summons it straight away, so the panel can be looked at without a

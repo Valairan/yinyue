@@ -32,7 +32,7 @@ namespace Yinyue.UI
         public NSView? Content { get; private set; }
 
         public OverlayPanel(OverlayConfig config, double height)
-            : base(new CGRect(0, 0, Theme.PanelWidth, height),
+            : base(new CGRect(0, 0, OverlayMetrics.PanelWidth, height),
                    // Borderless for the frameless look; Nonactivating so it never steals
                    // focus. Utility keeps it out of the window menu.
                    NSWindowStyle.Borderless | NSWindowStyle.NonactivatingPanel | NSWindowStyle.Utility,
@@ -88,15 +88,15 @@ namespace Yinyue.UI
 
         private NSView BuildRoot(double height)
         {
-            var root = new NSView(new CGRect(0, 0, Theme.PanelWidth, height))
+            var root = new NSView(new CGRect(0, 0, OverlayMetrics.PanelWidth, height))
             {
                 WantsLayer = true,
             };
 
             var layer = root.Layer!;
             layer.BackgroundColor = Theme.Base.WithAlpha(_config.BackgroundOpacity).CGColor;
-            layer.CornerRadius = (nfloat)Theme.CornerRadius;
-            layer.BorderWidth = 1;
+            layer.CornerRadius = (nfloat)OverlayMetrics.RootCornerRadius;
+            layer.BorderWidth = (nfloat)OverlayMetrics.RootBorderThickness;
             layer.BorderColor = Theme.Surface0.CGColor;
 
             // Corners have to be clipped for children to respect the radius.

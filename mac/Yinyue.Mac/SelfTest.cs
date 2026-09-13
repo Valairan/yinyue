@@ -27,6 +27,7 @@ namespace Yinyue
             if (which is "all" or "audio") AudioPlaysAFile();
             if (which is "all" or "overlay") OverlayAnchors();
             if (which is "all" or "icons") IconsRender();
+            if (which is "all" or "layout") LayoutMatchesWindows();
 
             Console.WriteLine();
             Console.WriteLine(_failed == 0 ? "PASS" : $"FAIL — {_failed} check(s)");
@@ -38,6 +39,88 @@ namespace Yinyue
             if (!ok) _failed++;
             Console.WriteLine($"  [{(ok ? "ok" : "FAIL")}] {label}{(detail is null ? "" : $"  — {detail}")}");
             Console.Out.Flush();
+        }
+
+        /// <summary>
+        /// The applet must lay out to the Windows measurements.
+        ///
+        /// These expectations are written as literals on purpose, not read back from
+        /// OverlayMetrics — a test that asserts a constant equals itself proves nothing. The
+        /// numbers below were measured from win/MainWindow.xaml, so if someone changes a
+        /// metric without changing the XAML, this fails and says so.
+        /// </summary>
+        private static void LayoutMatchesWindows()
+        {
+            Console.WriteLine("\nLayout (must match win/MainWindow.xaml)");
+
+            var m = typeof(Yinyue.UI.OverlayMetrics);
+            void Metric(string name, double expected)
+            {
+                double actual = (double)m.GetField(name)!.GetValue(null)!;
+                Check($"{name} = {expected}", Math.Abs(actual - expected) < 0.001, actual.ToString());
+            }
+
+            // Panel: 420x170, with 148 of content inside 10 padding and 1 border.
+            Metric("PanelWidth", 420);
+            Metric("AppletHeight", 170);
+            Metric("RootPadding", 10);
+            Metric("RootBorderThickness", 1);
+            Metric("RootCornerRadius", 8);
+            Metric("ContentHeight", 148);
+
+            // Artwork: a 130 square with a 6 radius, 10 clear of the content column.
+            Metric("ArtSize", 130);
+            Metric("ArtCornerRadius", 6);
+            Metric("ArtToContentGap", 10);
+
+            // Type sizes, straight from the TextBlocks.
+            Metric("StatusFontSize", 11);
+            Metric("TitleFontSize", 13);
+            Metric("ArtistFontSize", 11);
+            Metric("TimeFontSize", 10);
+
+            // Buttons: MediaBtnStyle's MinWidth and Padding, and the Icon control's default.
+            Metric("IconSize", 18);
+            Metric("ButtonMinWidth", 30);
+            Metric("ButtonPadding", 4);
+            Metric("TransportButtonMargin", 4);
+            Metric("ModeGroupGap", 12);
+            Metric("SeekBarHeight", 12);
+
+            // And the laid-out view actually honours them.
+            var applet = new Yinyue.UI.AppletView(BuildIdlePlayback());
+
+            Check("the applet fills the panel",
+                Math.Abs(applet.Frame.Width - 420) < 0.5 && Math.Abs(applet.Frame.Height - 170) < 0.5,
+                $"{applet.Frame.Width}x{applet.Frame.Height}");
+
+            var art = applet.Subviews.FirstOrDefault(v => Math.Abs(v.Frame.Width - 130) < 0.5
+                                                       && Math.Abs(v.Frame.Height - 130) < 0.5);
+            Check("the artwork is a 130 square", art is not null);
+
+            if (art is not null)
+            {
+                Check("it sits inside the padding", Math.Abs(art.Frame.X - 11) < 0.5, $"x={art.Frame.X}");
+                Check("and is centred in the content height",
+                    Math.Abs(art.Frame.Y - (11 + (148 - 130) / 2)) < 0.5, $"y={art.Frame.Y}");
+            }
+
+            // Six transport controls, not three: previous, play, next, shuffle, loop, heart.
+            int buttons = applet.Subviews.Count(v => v is AppKit.NSButton);
+            Check("ten buttons in all — four header, six transport", buttons == 10, buttons.ToString());
+
+            Check("every child is inside the panel",
+                applet.Subviews.All(v => v.Frame.X >= -0.5 && v.Frame.Y >= -0.5
+                                      && v.Frame.X + v.Frame.Width <= 420.5
+                                      && v.Frame.Y + v.Frame.Height <= 170.5));
+        }
+
+        private static Yinyue.Services.PlaybackService BuildIdlePlayback()
+        {
+            var audio = new Yinyue.Services.MacAudioPlayer();
+            var config = new Yinyue.Services.ConfigService();
+            var library = new Yinyue.Services.MusicLibrary(config);
+            return new Yinyue.Services.PlaybackService(audio, library);
         }
 
         /// <summary>
@@ -146,7 +229,7 @@ namespace Yinyue
                 $"y={bottomY:0}, reserved={Yinyue.UI.OverlayPositioner.ReservedForToasts}");
 
             Check("the panel is PanelWidth wide",
-                Math.Abs(panel.Frame.Width - Yinyue.UI.Theme.PanelWidth) < 0.5,
+                Math.Abs(panel.Frame.Width - Yinyue.UI.OverlayMetrics.PanelWidth) < 0.5,
                 panel.Frame.Width.ToString());
 
             panel.Close();

@@ -435,6 +435,26 @@ would otherwise need a new member.
 To add a prefix, extend `SearchQuery.Prefixes` and the `SearchScope` flags — the sources and
 the overlay follow from there.
 
+**The two overlays lay out identically, and one file makes that true.**
+`core/Yinyue.Core/UI/OverlayMetrics.cs` carries every measurement — panel size, padding,
+artwork square, type sizes, button box, row margins — and both shells read it. The apps share
+no UI code and never will, so numbers repeated in two places would drift the first time either
+was touched. Same argument as `Common/Icons`.
+
+- These are design constants, not platform facts, so they can live in Core without breaking
+  its rule. Nothing in the file references a toolkit.
+- **Windows is the reference.** Every value was measured from `MainWindow.xaml`. Where the two
+  disagree, `OverlayMetrics` is wrong.
+- The Mac suite asserts the metrics against **literals**, not against the constants
+  themselves — a test that checks a constant equals itself proves nothing. Change a metric
+  without changing the XAML and it fails by name.
+- `Theme` on macOS is colour only. Putting a width there is what started the drift the first
+  time.
+- **Still to do:** `MainWindow.xaml` holds its numbers inline rather than reading
+  `OverlayMetrics` through `{x:Static}`. Until it does, the guarantee is a convention plus a
+  test rather than a single source. Wiring it up is a Windows-side change and needs verifying
+  there.
+
 **Everything lives in one vertical stack, and every surface has a reserved slot.** Bottom
 upwards: the hold dial, the message toast, the applet, the search bar, the search results,
 the queue. All are

@@ -1,212 +1,298 @@
 using AppKit;
 using CoreGraphics;
-using Foundation;
 using Yinyue.Models;
 using Yinyue.Services;
+using Metrics = Yinyue.UI.OverlayMetrics;
 
 namespace Yinyue.UI
 {
     /// <summary>
-    /// The applet: artwork and status, then title and artist, then the seek row, then
-    /// transport. The same four rows the Windows overlay carries, in the same order, because
-    /// the two apps are meant to look alike by design even though they share no UI code.
+    /// The applet, laid out to the same measurements as the Windows overlay.
     ///
-    /// It is a <i>view</i> of playback and owns none of it. Every piece of state here comes
-    /// from <see cref="PlaybackService"/> events and nothing is cached beyond what is being
-    /// displayed — the same rule as MainWindow on Windows, and for the same reason: the panel
-    /// spends most of its life hidden while playback carries on without it.
+    /// Two columns: a 130-unit artwork square on the left, and a content column carrying four
+    /// rows — header, metadata, seek, transport. Every number comes from
+    /// <see cref="OverlayMetrics"/> in Core, which both apps read, because the two shells
+    /// share no UI code and nothing else could keep them in step.
+    ///
+    /// AppKit has no Grid, so the rows are placed arithmetically. The arithmetic reproduces
+    /// what WPF's Grid does with <c>Auto, *, Auto, Auto</c>: the fixed rows take their natural
+    /// heights and the starred row absorbs the remainder. Done explicitly here so the result
+    /// can be asserted rather than eyeballed.
+    ///
+    /// It is a <i>view</i> of playback and owns none of it — every value comes from a
+    /// <see cref="PlaybackService"/> event, the same rule MainWindow follows.
     /// </summary>
     public sealed class AppletView : NSView
     {
-        private const double Pad = 12;
-        private const double ArtSize = 56;
-
         private readonly PlaybackService _playback;
 
+        private readonly NSView _artFrame = new();
         private readonly NSImageView _art = new();
-        private readonly NSTextField _status = Label(11, dim: true);
-        private readonly NSTextField _title = Label(13, bold: true);
-        private readonly NSTextField _artist = Label(11, dim: true);
-        private readonly NSTextField _elapsed = Label(10, dim: true);
-        private readonly NSTextField _total = Label(10, dim: true);
+
+        private readonly NSTextField _status;
+        private readonly NSTextField _title;
+        private readonly NSTextField _artist;
+        private readonly NSTextField _elapsed;
+        private readonly NSTextField _total;
         private readonly NSSlider _seek = new();
 
+        // Header, left to right, matching MainWindow's HeaderButtonsPanel.
+        private readonly NSButton _queue;
+        private readonly NSButton _offline;
+        private readonly NSButton _shuffleFavorites;
+        private readonly NSButton _settings;
+
+        // Transport, left to right, matching MainWindow's row 3.
         private readonly NSButton _previous;
         private readonly NSButton _playPause;
         private readonly NSButton _next;
         private readonly NSButton _shuffle;
         private readonly NSButton _loop;
-        private readonly NSButton _settings;
+        private readonly NSButton _favorite;
 
         /// <summary>
-        /// True while the user is dragging the seek handle. Progress events keep arriving
-        /// four times a second and would otherwise yank the handle back under the pointer.
+        /// True while the seek handle is held. Progress events arrive four times a second and
+        /// would otherwise drag the handle back out from under the pointer.
         /// </summary>
         private bool _scrubbing;
 
         public event EventHandler? SettingsRequested;
+        public event EventHandler? QueueRequested;
 
-        public AppletView(CGRect frame, PlaybackService playback) : base(frame)
+        public AppletView(PlaybackService playback)
+            : base(new CGRect(0, 0, Metrics.PanelWidth, Metrics.AppletHeight))
         {
             _playback = playback;
-
             WantsLayer = true;
 
-            _previous = Button(Icons.SkipBack, "Previous", 18, OnPrevious);
-            _playPause = Button(Icons.Play, "Play / pause", 18, OnPlayPause);
-            _next = Button(Icons.SkipForward, "Next", 18, OnNext);
-            _shuffle = Button(Icons.Shuffle, "Shuffle", 14, OnShuffle);
-            _loop = Button(Icons.Repeat, "Loop", 14, OnLoop);
-            _settings = Button(Icons.Cog, "Settings", 14,
-                (_, _) => SettingsRequested?.Invoke(this, EventArgs.Empty));
+            _status = Label(Metrics.StatusFontSize, Theme.Subtext);
+            _title = Label(Metrics.TitleFontSize, Theme.Text, bold: true);
+            _artist = Label(Metrics.ArtistFontSize, Theme.Subtext);
+            _elapsed = Label(Metrics.TimeFontSize, Theme.Subtext);
+            _total = Label(Metrics.TimeFontSize, Theme.Subtext);
 
-            BuildLayout();
+            _queue = Button(Icons.List, "Queue", (_, _) => QueueRequested?.Invoke(this, EventArgs.Empty));
+            _offline = Button(Icons.Cloud, "Offline mode", OnOffline);
+            _shuffleFavorites = Button(Icons.HeartShuffle, "Shuffle all favourites", OnShuffleFavorites);
+            _settings = Button(Icons.Cog, "Settings", (_, _) => SettingsRequested?.Invoke(this, EventArgs.Empty));
+
+            _previous = Button(Icons.SkipBack, "Previous", OnPrevious);
+            _playPause = Button(Icons.Play, "Play / Pause", OnPlayPause);
+            _next = Button(Icons.SkipForward, "Next", OnNext);
+            _shuffle = Button(Icons.Shuffle, "Shuffle off", OnShuffle);
+            _loop = Button(Icons.RepeatOff, "Loop off", OnLoop);
+            _favorite = Button(Icons.HeartPlus, "Toggle Favorite", OnFavorite);
+
+            Layout();
             Subscribe();
             Refresh();
         }
 
-        // ---------------------------------------------------------------- layout
+        // ------------------------------------------------------------------ layout
 
-        private void BuildLayout()
+        /// <summary>
+        /// Frames every child. Named the rows the XAML names them so the two can be read
+        /// side by side.
+        /// </summary>
+        private new void Layout()
         {
-            double w = Frame.Width;
-            double inner = w - Pad * 2;
+            double inset = Metrics.RootPadding + Metrics.RootBorderThickness;
+            double contentTop = Metrics.AppletHeight - inset;   // AppKit y grows upward
 
-            _art.Frame = new CGRect(Pad, Frame.Height - Pad - ArtSize, ArtSize, ArtSize);
-            _art.WantsLayer = true;
-            _art.Layer!.CornerRadius = 6;
-            _art.Layer.MasksToBounds = true;
-            _art.Layer.BackgroundColor = Theme.Surface0.CGColor;
+            // --- artwork column: a square centred vertically in the content height
+            double artY = inset + (Metrics.ContentHeight - Metrics.ArtSize) / 2;
+            _artFrame.Frame = new CGRect(inset, artY, Metrics.ArtSize, Metrics.ArtSize);
+            _artFrame.WantsLayer = true;
+            _artFrame.Layer!.CornerRadius = (nfloat)Metrics.ArtCornerRadius;
+            _artFrame.Layer.MasksToBounds = true;
+            _artFrame.Layer.BackgroundColor = Theme.Mantle.CGColor;
+
+            _art.Frame = new CGRect(0, 0, Metrics.ArtSize, Metrics.ArtSize);
             _art.ImageScaling = NSImageScale.ProportionallyUpOrDown;
-            AddSubview(_art);
+            _artFrame.AddSubview(_art);
+            AddSubview(_artFrame);
 
-            double textLeft = Pad + ArtSize + 10;
-            double textWidth = w - textLeft - Pad - 28;
+            // --- content column
+            double colX = inset + Metrics.ArtSize + Metrics.ArtToContentGap;
+            double colW = Metrics.PanelWidth - inset - colX;
 
-            // The settings button sits in its own column and is never collapsed. On Windows
-            // hiding it once locked users out of the app entirely: the overlay opens into
-            // search when nothing is playing, and a fresh install had no reachable way to add
-            // a library, so nothing could ever play. Keep it visible unconditionally.
-            _settings.Frame = new CGRect(w - Pad - 24, Frame.Height - Pad - 24, 24, 24);
-            AddSubview(_settings);
+            double headerH = ButtonHeight;
+            double metaH = LineHeight(Metrics.TitleFontSize) + LineHeight(Metrics.ArtistFontSize)
+                         + Metrics.MetadataTopMargin + Metrics.MetadataBottomMargin;
+            double seekH = Metrics.SeekBarHeight + Metrics.SeekRowMargin * 2;
+            double transportH = ButtonHeight + Metrics.TransportTopMargin;
 
-            _status.Frame = new CGRect(textLeft, Frame.Height - Pad - 18, textWidth, 16);
+            // Row 0 — header: status on the left, four buttons hard right.
+            double y = contentTop - headerH;
+            LayoutHeader(colX, y, colW, headerH);
+
+            // Row 3 — transport sits on the bottom edge; the starred row takes what is left.
+            double transportY = inset;
+            LayoutTransport(colX, transportY, colW);
+
+            // Row 2 — seek, directly above transport.
+            double seekY = transportY + transportH;
+            LayoutSeek(colX, seekY, colW);
+
+            // Row 1 — metadata fills the gap between header and seek, bottom-aligned to the
+            // seek row exactly as WPF's starred row does with VerticalAlignment="Center".
+            double metaTop = y;
+            double metaBottom = seekY + seekH;
+            double metaY = metaBottom + (metaTop - metaBottom - metaH) / 2;
+            LayoutMetadata(colX, metaY, colW, metaH);
+        }
+
+        private void LayoutHeader(double x, double y, double width, double height)
+        {
+            NSButton[] buttons = { _queue, _offline, _shuffleFavorites, _settings };
+
+            double buttonsW = buttons.Length * Metrics.ButtonMinWidth
+                            + (buttons.Length - 1) * Metrics.HeaderButtonMargin * 2;
+
+            // The status line takes what the buttons leave. The buttons are ALWAYS visible:
+            // collapsing them on Windows once hid the settings cog, and since the overlay
+            // opens into search when nothing is playing, that made settings unreachable on a
+            // fresh install — so no library could ever be added, so nothing could ever play.
+            double statusW = Math.Max(0, width - buttonsW - Metrics.StatusRightGap);
+            _status.Frame = new CGRect(x, y + (height - LineHeight(Metrics.StatusFontSize)) / 2,
+                                       statusW, LineHeight(Metrics.StatusFontSize));
             AddSubview(_status);
 
-            _title.Frame = new CGRect(textLeft, Frame.Height - Pad - 38, textWidth, 18);
+            double bx = x + width - buttonsW;
+            foreach (var b in buttons)
+            {
+                b.Frame = new CGRect(bx, y, Metrics.ButtonMinWidth, height);
+                AddSubview(b);
+                bx += Metrics.ButtonMinWidth + Metrics.HeaderButtonMargin * 2;
+            }
+        }
+
+        private void LayoutMetadata(double x, double y, double width, double height)
+        {
+            double titleH = LineHeight(Metrics.TitleFontSize);
+            double artistH = LineHeight(Metrics.ArtistFontSize);
+
+            _artist.Frame = new CGRect(x, y + Metrics.MetadataBottomMargin, width, artistH);
+            _title.Frame = new CGRect(x, y + Metrics.MetadataBottomMargin + artistH, width, titleH);
+
             AddSubview(_title);
-
-            _artist.Frame = new CGRect(textLeft, Frame.Height - Pad - 56, textWidth, 16);
             AddSubview(_artist);
+        }
 
-            double seekY = Pad + 44;
-            _elapsed.Frame = new CGRect(Pad, seekY, 38, 14);
+        private void LayoutSeek(double x, double y, double width)
+        {
+            double labelH = LineHeight(Metrics.TimeFontSize);
+            double labelW = 34;
+            double barY = y + Metrics.SeekRowMargin;
+
+            _elapsed.Frame = new CGRect(x, barY + (Metrics.SeekBarHeight - labelH) / 2, labelW, labelH);
             _elapsed.Alignment = NSTextAlignment.Left;
             AddSubview(_elapsed);
 
-            _total.Frame = new CGRect(w - Pad - 38, seekY, 38, 14);
+            _total.Frame = new CGRect(x + width - labelW,
+                                      barY + (Metrics.SeekBarHeight - labelH) / 2, labelW, labelH);
             _total.Alignment = NSTextAlignment.Right;
             AddSubview(_total);
 
-            _seek.Frame = new CGRect(Pad + 44, seekY - 2, inner - 88, 18);
+            double barX = x + labelW + Metrics.SeekLabelGap;
+            double barW = width - labelW * 2 - Metrics.SeekLabelGap * 2;
+
+            _seek.Frame = new CGRect(barX, barY, barW, Metrics.SeekBarHeight);
             _seek.MinValue = 0;
             _seek.MaxValue = 100;
-            _seek.DoubleValue = 0;
             _seek.Continuous = true;
+            _seek.ControlSize = NSControlSize.Mini;
             _seek.Activated += OnSeekChanged;
             AddSubview(_seek);
-
-            // Centred transport row. The buttons are fixed-width so swapping the play glyph
-            // for pause cannot shift the row — the same reason MediaBtnStyle carries a
-            // MinWidth on Windows, where the play triangle measures 8px narrower than
-            // everything beside it and made the whole row appear to jump.
-            NSButton[] transport = { _previous, _playPause, _next };
-            const double btn = 34, gap = 6;
-            double totalW = transport.Length * btn + (transport.Length - 1) * gap;
-            double x = (w - totalW) / 2;
-
-            foreach (var b in transport)
-            {
-                b.Frame = new CGRect(x, Pad, btn, btn);
-                AddSubview(b);
-                x += btn + gap;
-            }
-
-            _shuffle.Frame = new CGRect(w - Pad - 28 - 6 - 28, Pad + 4, 28, 26);
-            _loop.Frame = new CGRect(w - Pad - 28, Pad + 4, 28, 26);
-            AddSubview(_shuffle);
-            AddSubview(_loop);
-        }
-
-        private static NSTextField Label(double size, bool bold = false, bool dim = false)
-        {
-            var f = new NSTextField
-            {
-                Editable = false,
-                Selectable = false,
-                Bezeled = false,
-                DrawsBackground = false,
-                TextColor = dim ? Theme.Subtext : Theme.Text,
-                Font = SystemFont(size, bold),
-                LineBreakMode = NSLineBreakMode.TruncatingTail,
-                StringValue = string.Empty,
-            };
-            return f;
         }
 
         /// <summary>
-        /// System fonts are always present, but the binding types them as nullable. Asserted
-        /// in one place rather than scattering null-forgiving operators through the layout.
+        /// Six buttons, centred as one group: previous, play/pause, next, then shuffle, loop
+        /// and favourite after an extra gap. The gap separates transport from modes without
+        /// needing a divider.
+        /// </summary>
+        private void LayoutTransport(double x, double y, double width)
+        {
+            NSButton[] buttons = { _previous, _playPause, _next, _shuffle, _loop, _favorite };
+            const int modeGroupStart = 3;
+
+            double margin = Metrics.TransportButtonMargin;
+            double total = buttons.Length * (Metrics.ButtonMinWidth + margin * 2) + Metrics.ModeGroupGap;
+
+            double bx = x + (width - total) / 2;
+
+            for (int i = 0; i < buttons.Length; i++)
+            {
+                if (i == modeGroupStart) bx += Metrics.ModeGroupGap;
+
+                bx += margin;
+                buttons[i].Frame = new CGRect(bx, y + Metrics.TransportTopMargin,
+                                              Metrics.ButtonMinWidth, ButtonHeight);
+                AddSubview(buttons[i]);
+                bx += Metrics.ButtonMinWidth + margin;
+            }
+        }
+
+        /// <summary>Icon box plus the template's padding on each side, as MediaBtnStyle gives it.</summary>
+        private static double ButtonHeight => Metrics.IconSize + Metrics.ButtonPadding * 2;
+
+        private static double LineHeight(double fontSize) => Math.Ceiling(fontSize * 1.35);
+
+        // ------------------------------------------------------------------ children
+
+        private static NSTextField Label(double size, NSColor colour, bool bold = false) => new()
+        {
+            Editable = false,
+            Selectable = false,
+            Bezeled = false,
+            DrawsBackground = false,
+            TextColor = colour,
+            Font = SystemFont(size, bold),
+            LineBreakMode = NSLineBreakMode.TruncatingTail,
+            StringValue = string.Empty,
+            Cell = { UsesSingleLineMode = true },
+        };
+
+        /// <summary>
+        /// System fonts are always present but the binding types them as nullable. Asserted
+        /// here rather than scattering null-forgiving operators through the layout.
         /// </summary>
         private static NSFont SystemFont(double size, bool bold = false) =>
             (bold ? NSFont.BoldSystemFontOfSize((nfloat)size) : NSFont.SystemFontOfSize((nfloat)size))
             ?? NSFont.SystemFontOfSize(NSFont.SystemFontSize)!;
 
         /// <summary>
-        /// The shared Lucide marks from Common/Icons, not SF Symbols.
-        ///
-        /// SF Symbols were the tempting shortcut and are the wrong answer here: they exist
-        /// only on macOS and are drawn to Apple's metrics, so the Mac overlay would have been
-        /// quietly different from the Windows one. These are generated from the same SVGs the
-        /// WPF app draws, so an icon added there appears on both or on neither.
-        ///
-        /// Stroked at a fixed colour rather than tinted, because the palette is a thing the
-        /// two apps share and AppKit's automatic tinting follows the system's colours.
-        /// Recoloured through <see cref="SetTint"/> when a mode toggles.
+        /// The shared Lucide marks from Common/Icons, at the same size Windows draws them.
+        /// SF Symbols would be the shortcut and are macOS-only and drawn to Apple's metrics,
+        /// so the two overlays would not match.
         /// </summary>
-        private NSButton Button(string pathData, string tip, double size, EventHandler handler)
+        private NSButton Button(string pathData, string tip, EventHandler handler)
         {
             var b = new NSButton
             {
                 Bordered = false,
                 ToolTip = tip,
-                ImageScaling = NSImageScale.ProportionallyDown,
                 Title = string.Empty,
-                Image = Icon.Make(pathData, size, Theme.Text),
+                ImageScaling = NSImageScale.ProportionallyDown,
+                Image = Icon.Make(pathData, Metrics.IconSize, Theme.Text),
             };
 
-            // Without this the mark is announced as the empty title.
-            b.AccessibilityTitle = tip;
-
+            b.AccessibilityTitle = tip;   // the mark would otherwise be announced as empty
             b.SetButtonType(NSButtonType.MomentaryChange);
             b.Activated += handler;
             return b;
         }
 
-        /// <summary>Redraws a button's mark, in a new colour or from new path data.</summary>
-        private static void SetIcon(NSButton button, string pathData, double size, NSColor color) =>
-            button.Image = Icon.Make(pathData, size, color);
+        private static void SetIcon(NSButton button, string pathData, NSColor colour) =>
+            button.Image = Icon.Make(pathData, Metrics.IconSize, colour);
 
-        // ---------------------------------------------------------------- events
+        // ------------------------------------------------------------------ state
 
         /// <summary>
         /// Every one of these arrives off the main thread — progress from the engine's timer,
-        /// the rest from whatever task advanced the queue. AppKit must be touched on the main
-        /// thread only, so each hops before doing anything.
-        ///
-        /// <see cref="NSObject.BeginInvokeOnMainThread"/> and not the blocking form: blocking
-        /// the main thread on macOS is how the self-test deadlocked, and a progress event
-        /// fires four times a second.
+        /// the rest from whatever task advanced the queue — so each hops before touching
+        /// AppKit. The non-blocking form deliberately: blocking the main thread is what
+        /// deadlocked the self-test, and progress fires four times a second.
         /// </summary>
         private void Subscribe()
         {
@@ -221,8 +307,9 @@ namespace Yinyue.UI
         {
             var track = _playback.CurrentTrack;
 
-            _title.StringValue = track?.Title ?? "Nothing playing";
-            _artist.StringValue = track?.SearchSubtitle ?? string.Empty;
+            _status.StringValue = "Yinyue";
+            _title.StringValue = track?.Title ?? "No Track Selected";
+            _artist.StringValue = track?.SearchSubtitle ?? "Unknown Artist";
             _total.StringValue = track?.DurationText ?? "00:00";
 
             if (track is null)
@@ -235,15 +322,16 @@ namespace Yinyue.UI
             RefreshModes();
         }
 
-                private void RefreshPlayGlyph() =>
-            SetIcon(_playPause, _playback.IsPlaying ? Icons.Pause : Icons.Play, 18, Theme.Text);
+        private void RefreshPlayGlyph() =>
+            SetIcon(_playPause, _playback.IsPlaying ? Icons.Pause : Icons.Play, Theme.Text);
 
         private void RefreshModes()
         {
-            SetIcon(_shuffle, Icons.Shuffle, 14, _playback.Shuffle ? Theme.Accent : Theme.Subtext);
+            SetIcon(_shuffle, Icons.Shuffle, _playback.Shuffle ? Theme.Accent : Theme.Text);
+            _shuffle.ToolTip = _playback.Shuffle ? "Shuffle on" : "Shuffle off";
 
-            // repeat-off is its own mark rather than a dimmed repeat, which is why the path
-            // data changes here and not only the colour.
+            // repeat-off is its own mark rather than a dimmed repeat, so the data changes
+            // here and not only the colour.
             string loopIcon = _playback.Loop switch
             {
                 LoopMode.Track => Icons.Repeat1,
@@ -251,8 +339,8 @@ namespace Yinyue.UI
                 _ => Icons.RepeatOff,
             };
 
-            SetIcon(_loop, loopIcon, 14, _playback.Loop == LoopMode.Off ? Theme.Subtext : Theme.Accent);
-            _loop.ToolTip = $"Loop: {_playback.Loop}";
+            SetIcon(_loop, loopIcon, _playback.Loop == LoopMode.Off ? Theme.Text : Theme.Accent);
+            _loop.ToolTip = $"Loop {_playback.Loop}".ToLowerInvariant();
         }
 
         private void RefreshProgress(AudioProgressEventArgs e)
@@ -265,38 +353,31 @@ namespace Yinyue.UI
 
         private static string Format(TimeSpan t) => $"{(int)t.TotalMinutes:00}:{t.Seconds:00}";
 
-        // ---------------------------------------------------------------- actions
+        // ------------------------------------------------------------------ actions
 
         private void OnPlayPause(object? s, EventArgs e) => Fire(_playback.TogglePlayPauseAsync());
         private void OnNext(object? s, EventArgs e) => Fire(_playback.NextAsync());
         private void OnPrevious(object? s, EventArgs e) => Fire(_playback.PreviousAsync());
 
-        private void OnShuffle(object? s, EventArgs e)
-        {
-            _playback.ToggleShuffle();
-            RefreshModes();
-        }
+        private void OnShuffle(object? s, EventArgs e) { _playback.ToggleShuffle(); RefreshModes(); }
+        private void OnLoop(object? s, EventArgs e) { _playback.CycleLoop(); RefreshModes(); }
 
-        private void OnLoop(object? s, EventArgs e)
-        {
-            _playback.CycleLoop();
-            RefreshModes();
-        }
+        // Not wired yet: favourites, offline and shuffle-favourites need the library surface
+        // the overlay does not have until search exists.
+        private void OnFavorite(object? s, EventArgs e) { }
+        private void OnOffline(object? s, EventArgs e) { }
+        private void OnShuffleFavorites(object? s, EventArgs e) { }
 
         private void OnSeekChanged(object? s, EventArgs e)
         {
-            // NSSlider is continuous, so this fires throughout the drag. Seek on every tick
-            // rather than only on mouse-up: it matches the Windows behaviour and AVPlayer
-            // coalesces seeks issued faster than it can service them.
             _scrubbing = true;
             _playback.SeekPercent(_seek.DoubleValue);
             _scrubbing = false;
         }
 
         /// <summary>
-        /// Transport actions are fire-and-forget from a click. Nothing on the main thread may
-        /// wait on them — that is the deadlock the self-test found — and a failure surfaces
-        /// through PlaybackFailed rather than through this task.
+        /// Fire-and-forget from a click. Nothing on the main thread may wait on these — that
+        /// is the deadlock the self-test found — and failures surface through PlaybackFailed.
         /// </summary>
         private static void Fire(Task work) =>
             _ = work.ContinueWith(t => System.Diagnostics.Debug.WriteLine($"[Applet] {t.Exception}"),
