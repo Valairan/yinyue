@@ -1148,9 +1148,24 @@ What this means in practice:
 
 **The macOS app is feature-complete for the overlay itself**: playback, search, the queue,
 toasts, global hotkeys, media keys, the sleep timer, and settings in the same four tabs
-Windows has — including rebinding. **Not yet ported: packaging.** There is no `.app` →
-signed → notarised → DMG pipeline, which is the last thing `installer/` has with no
-counterpart.
+Windows has — including rebinding. **Packaging:** `installer/build-mac.sh`, the counterpart to `build.ps1`. It publishes,
+stamps the version, signs, and writes `website/downloads/Yinyue-<version>.dmg`.
+
+- **A DMG, not a `.pkg`**, even though the macOS SDK produces one for free — and it does, so
+  `CreatePackage=false` is needed or a `.pkg` is what lands in the output directory. A
+  menu-bar app is one bundle with no system-wide state: there is nothing for an installer to
+  do that dragging it to Applications does not. The MSI exists because Windows has no such
+  gesture and because its wizard seeds a first-run configuration.
+- **The version is stamped after the build, not passed to it.** `Info.plist` is hand-written
+  here — it has to be, since `LSUIElement` is not something the SDK properties express — and a
+  hand-written plist beats `ApplicationDisplayVersion`, so the bundle reported 1.0.0 while the
+  DMG beside it said 0.2.0.
+- **Ad-hoc signed by default, which is not enough to distribute.** Gatekeeper refuses a
+  downloaded ad-hoc bundle until the user right-clicks and chooses Open. Set `DEVELOPER_ID`
+  for a Developer ID Application certificate and `NOTARY_PROFILE` for notarisation; both need
+  an Apple Developer Program membership, and until then the download carries that caveat.
+- No entitlements are needed: nothing is sandboxed, the Keychain item is the app's own, and
+  the global hotkeys deliberately avoid anything requiring Accessibility.
 
 **Start-at-login registers the bundle, not a path**, which removes the failure the Windows
 one documents: the Run key holds an absolute path, so moving or republishing the app strands

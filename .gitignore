@@ -34,3 +34,5 @@ mac/**/obj/
 
 # The landing page carries the current MSI when it is copied to the website; the repo does not
 website/downloads/*.msi
+website/downloads/*.dmg
+installer/obj/
