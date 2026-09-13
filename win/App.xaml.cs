@@ -522,7 +522,7 @@ namespace Yinyue
             _hotkeys.HoldProgress += (action, fraction) => Dispatcher.BeginInvoke(() =>
                 _holdToast?.ShowHoldProgress(HotkeyActions.Describe(action), fraction));
 
-            _hotkeys.HoldCancelled += _ => Dispatcher.BeginInvoke(() => _holdToast?.EndHoldProgress());
+            _hotkeys.HoldEnded += _ => Dispatcher.BeginInvoke(() => _holdToast?.EndHoldProgress());
         }
 
         private void OnHotkey(string action)

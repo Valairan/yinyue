@@ -255,7 +255,8 @@ namespace Yinyue
             Show();
             Activate();
 
-            // The bar belongs to the overlay: on screen for exactly as long as it is.
+            // The bar belongs to the overlay: on screen for exactly as long as it is. Its
+            // panel's Opacity is bound to the window's, so it fades in step with the applet.
             SearchBarPopup.IsOpen = true;
             UpdatePanelStack();
 
@@ -307,15 +308,11 @@ namespace Yinyue
             _isShown = false;
             _autoHideTimer.Stop();
 
-            // Popups are separate windows and would hang in the air through the fade.
-            QueuePopup.IsOpen = false;
-            SearchPopup.IsOpen = false;
-            SearchBarPopup.IsOpen = false;
-
             int generation = ++_hideGeneration;
 
             if (!_animate)
             {
+                ClosePanels();
                 CloseSearch();
                 Hide();
                 return;
@@ -329,11 +326,26 @@ namespace Yinyue
                 if (generation != _hideGeneration) return;
 
                 // Tear down only once invisible: clearing the search box mid-fade shows.
+                ClosePanels();
                 CloseSearch();
                 Hide();
             };
 
             BeginAnimation(OpacityProperty, fade);
+        }
+
+        /// <summary>
+        /// Takes the popups down. Called when a fade-out completes, not when it starts: each
+        /// panel's Opacity is bound to the window's, so the panels fade with the applet and
+        /// there is nothing left hanging in the air. Closing them first — the old approach —
+        /// made the search bar vanish while the applet was still fading, two rates for one
+        /// gesture. A re-summon mid-fade supersedes the completion and leaves them open.
+        /// </summary>
+        private void ClosePanels()
+        {
+            QueuePopup.IsOpen = false;
+            SearchPopup.IsOpen = false;
+            SearchBarPopup.IsOpen = false;
         }
 
         /// <summary>

@@ -481,6 +481,14 @@ keeps its place, and `OpenSearch` only moves the caret — it reveals nothing.
   row stayed selected, it read as stuck. The suite drives the real key events through both
   paths and checks which row holds focus, not just which is selected.
 
+**The panels fade with the applet.** Each popup panel's `Opacity` is bound to the window's
+(`ElementName=OverlayWindow`), so the search bar, the results and the queue fade in and out at
+the applet's rate. The popups used to be closed at the *start* of a fade-out, on the theory
+that they would hang in the air — which made the bar vanish while the applet was still fading,
+and on show the bar appeared at full opacity while the applet came up from zero. They now stay
+open through the fade-out and `ClosePanels` runs when it completes; a re-summon mid-fade
+supersedes the completion and leaves them open.
+
 **A Popup does not follow its window.** It is placed when it opens and never again, so moving
 the overlay — a changed anchor, a different monitor — strands every panel where the overlay
 used to be. `MainWindow.LocationChanged` calls `ReplacePanels`, which nudges each open popup's
@@ -884,6 +892,11 @@ Requirements on it, all load-bearing:
   Re-running the entrance on every call is what made rapid volume steps strobe. The window
   is repositioned only when the level bar appears or disappears, since that is the only
   thing that changes its height.
+- **A hold dial ends itself.** Progress arrives every 40 ms while a hold is live, so once it
+  stops for 600 ms the toast fades on its own even if nobody said the hold was over. Found the
+  hard way: `HotkeyManager` raised its end event only when a hold-to-activate hold was
+  *cancelled*, not when it succeeded, so a successful hold left its dial on screen for good.
+  The manager now raises `HoldEnded` either way, and the watchdog catches the next such gap.
 - **A fade-out in progress is reversible.** `_fadeGeneration` invalidates the pending
   completion handler, so a toast raised mid-fade is not hidden a moment later by the old
   animation finishing.

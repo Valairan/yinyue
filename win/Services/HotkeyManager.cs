@@ -51,8 +51,13 @@ namespace Yinyue.Services
         /// <summary>Progress of a pending hold: action name and a 0-1 fraction elapsed.</summary>
         public event Action<string, double>? HoldProgress;
 
-        /// <summary>A hold was abandoned before the delay elapsed.</summary>
-        public event Action<string>? HoldCancelled;
+        /// <summary>
+        /// A pending hold is over, whether it was abandoned early or ran its course. Raised
+        /// on success as well as on cancellation: it used to fire only for a cancelled hold,
+        /// so a hold that succeeded never told the toast to take its dial down, and the dial
+        /// stayed on screen for good.
+        /// </summary>
+        public event Action<string>? HoldEnded;
 
         public IReadOnlyDictionary<int, HotkeyRegistration> Active { get; private set; } =
             new Dictionary<int, HotkeyRegistration>();
@@ -200,13 +205,14 @@ namespace Yinyue.Services
             if (!IsKeyDown((int)pending.Binding.VirtualKey))
             {
                 CancelHold();
-                HoldCancelled?.Invoke(pending.Action);
+                HoldEnded?.Invoke(pending.Action);
                 return;
             }
 
             if (elapsed >= _holdDelay)
             {
                 CancelHold();
+                HoldEnded?.Invoke(pending.Action);
                 Triggered?.Invoke(pending.Action);
                 return;
             }

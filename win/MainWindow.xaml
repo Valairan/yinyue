@@ -1,4 +1,5 @@
 <Window x:Class="Yinyue.MainWindow"
+        x:Name="OverlayWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:ui="clr-namespace:Yinyue.Controls"
@@ -236,6 +237,7 @@
                            IsOpen="False"
                            Width="{StaticResource PanelWidth}">
                         <Border x:Name="QueuePanel"
+                                Opacity="{Binding Opacity, ElementName=OverlayWindow}"
                                 Background="{StaticResource BaseBrush}"
                                 BorderBrush="{StaticResource Surface0Brush}"
                                 BorderThickness="1"
@@ -360,6 +362,11 @@
                         is. Nothing to summon and nothing that takes the status line away:
                         the box is simply there, and typing anywhere in the overlay lands in
                         it. Results stack above this row, the queue above those.
+
+                        Every panel's Opacity is bound to the window's, so all of them fade
+                        in and out at the applet's rate. Popups are separate windows and
+                        would otherwise appear at full opacity while the applet was still
+                        coming up.
                     -->
                     <Popup x:Name="SearchBarPopup"
                            AllowsTransparency="True"
@@ -369,6 +376,7 @@
                            IsOpen="False"
                            Width="{StaticResource PanelWidth}">
                         <Border x:Name="SearchBarPanel"
+                                Opacity="{Binding Opacity, ElementName=OverlayWindow}"
                                 Background="{StaticResource BaseBrush}"
                                 BorderBrush="{StaticResource Surface0Brush}"
                                 BorderThickness="1"
@@ -424,6 +432,7 @@
                            IsOpen="False"
                            Width="{StaticResource PanelWidth}">
                         <Border x:Name="SearchPanel"
+                                Opacity="{Binding Opacity, ElementName=OverlayWindow}"
                                 Background="{StaticResource BaseBrush}"
                                 BorderBrush="{StaticResource Surface0Brush}"
                                 BorderThickness="1"

@@ -23,6 +23,13 @@ namespace Yinyue
     public partial class ToastWindow : Window
     {
         private static readonly TimeSpan VisibleFor = TimeSpan.FromMilliseconds(1400);
+
+        /// <summary>
+        /// How long a hold dial survives without a progress update before it takes itself
+        /// down. Progress arrives every 40 ms while a hold is live, so this is a long
+        /// silence — the hold ended and nobody said so.
+        /// </summary>
+        private static readonly TimeSpan HoldStale = TimeSpan.FromMilliseconds(600);
         /// <summary>Read at use rather than cached, so the setting takes effect at once.</summary>
         private TimeSpan FadeDuration =>
             TimeSpan.FromMilliseconds(_config.Current.Overlay.AnimationMilliseconds);
@@ -84,6 +91,12 @@ namespace Yinyue
             _hideTimer.Tick += (_, _) =>
             {
                 _hideTimer.Stop();
+                _hideTimer.Interval = VisibleFor;
+
+                // A dial whose updates dried up: end the hold ourselves rather than wait for
+                // a call that is not coming.
+                _holding = false;
+
                 FadeAway();
             };
         }
@@ -145,6 +158,7 @@ namespace Yinyue
             _onScreen = true;
 
             _hideTimer.Stop();
+            _hideTimer.Interval = VisibleFor;
             _hideTimer.Start();
         }
 
@@ -209,8 +223,14 @@ namespace Yinyue
                 _onScreen = true;
             }
 
-            // No auto-hide while the keys are still down.
+            // No ordinary auto-hide while the keys are down — but a dial that stops being
+            // updated must not stay up forever. The hold-to-activate path once succeeded
+            // without telling the toast the hold was over, and the dial stayed on screen for
+            // good. So the timer runs as a watchdog at the stale interval instead, restarted
+            // by every update; EndHoldProgress and Show put the normal interval back.
             _hideTimer.Stop();
+            _hideTimer.Interval = HoldStale;
+            _hideTimer.Start();
         }
 
         /// <summary>
@@ -225,6 +245,7 @@ namespace Yinyue
             ShowDial(false);
 
             _hideTimer.Stop();
+            _hideTimer.Interval = VisibleFor;
             _hideTimer.Start();
         }
 

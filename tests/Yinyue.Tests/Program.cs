@@ -596,6 +596,7 @@ public static class WindowTests
             var overlay = new MainWindow(config, FadeLibrary(), FadePlayback(), () => null!);
 
             var bar = overlay.FindName("SearchBarPopup") as System.Windows.Controls.Primitives.Popup;
+            var panel = (Border)overlay.FindName("SearchBarPanel");
             var box = overlay.FindName("SearchTextBox") as System.Windows.Controls.TextBox;
             var results = overlay.FindName("SearchPopup") as System.Windows.Controls.Primitives.Popup;
             var status = overlay.FindName("TxtStatus") as TextBlock;
@@ -608,6 +609,9 @@ public static class WindowTests
             Pump();
 
             Check.That("open as soon as the overlay is", bar.IsOpen);
+            Check.That("and fading in at the applet's rate, not popping", panel.Opacity == overlay.Opacity);
+            WaitUntil(() => overlay.Opacity >= 1);
+            Check.Equal("both fully up together", 1.0, panel.Opacity);
             Check.Equal("and the box is not hidden", Visibility.Visible, box!.Visibility);
 
             // The status line no longer gives up its place to the search box.
@@ -630,7 +634,10 @@ public static class WindowTests
 
             overlay.HideOverlay();
             Pump();
-            Check.That("and goes with the overlay", !bar.IsOpen);
+            Check.That("it stays through the fade rather than vanishing first", bar.IsOpen);
+            Check.That("fading with the applet", panel.Opacity == overlay.Opacity);
+            WaitUntil(() => !bar.IsOpen);
+            Check.That("and goes with the overlay once the fade is done", !bar.IsOpen);
 
             overlay.Close();
         });
@@ -695,6 +702,24 @@ public static class WindowTests
             Check.Equal("and the very next Down moves to the second", 1, FocusedRow());
 
             overlay.Close();
+        });
+
+        Check.Group("a hold dial that stops being updated takes itself down", () =>
+        {
+            var config = new ConfigService();
+            config.Current.Overlay.Animations = false;      // hide is immediate, so IsVisible answers
+
+            var toast = new ToastWindow(config, ToastWindow.ToastRole.Hold);
+            toast.ShowHoldProgress("Keep holding", 0.5);
+            Pump();
+            Check.That("on screen while progress arrives", toast.IsVisible);
+
+            // No EndHoldProgress. The hold-to-activate path once succeeded without sending
+            // one, and the dial stayed up for good.
+            WaitUntil(() => !toast.IsVisible, 3000);
+            Check.That("gone on its own once progress stops", !toast.IsVisible);
+
+            toast.Close();
         });
 
         Check.Group("panels stack above the applet", () =>
@@ -1354,6 +1379,20 @@ public static class WindowTests
     /// change would see the state from before it. Draining at Background priority — lower
     /// than both — guarantees they have run.
     /// </summary>
+    /// <summary>
+    /// Pumps until <paramref name="condition"/> holds or the timeout passes. For fades: they
+    /// finish on the render clock, not on anything a single Pump can drain.
+    /// </summary>
+    private static void WaitUntil(Func<bool> condition, int timeoutMs = 2000)
+    {
+        var deadline = DateTime.UtcNow.AddMilliseconds(timeoutMs);
+        while (!condition() && DateTime.UtcNow < deadline)
+        {
+            Pump();
+            System.Threading.Thread.Sleep(15);
+        }
+    }
+
     private static void Pump()
     {
         var frame = new DispatcherFrame();
