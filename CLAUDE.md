@@ -509,6 +509,16 @@ and on show the bar appeared at full opacity while the applet came up from zero.
 open through the fade-out and `ClosePanels` runs when it completes; a re-summon mid-fade
 supersedes the completion and leaves them open.
 
+**Open a popup before filling its list.** Filling the results or queue list and then opening
+its popup left the list two pixels tall whenever the results fitted inside `MaxHeight`: the
+ListBox's ScrollViewer reported zero desired height on that first layout and stayed there
+until the collection changed again. Long result sets escaped because their extent exceeded
+the viewport, which is why it went unnoticed until a screenshot harness searched a six-track
+library. Measured in fresh processes: 2, 3 and 4 hits laid out at 24px, 6 at 222px, and the
+same 3-hit search made second was fine. `OpenPanelBeforeFilling` opens the popup and runs its
+layout, then the list is filled while on screen. The suite reproduces the two-hit first search
+on both panels.
+
 **On macOS the stacked panels are child windows, and that removes a whole class of bug.**
 `OverlayStack` adds the search bar and the results to the applet with `AddChildWindow`, so
 they move with it by construction. The WPF note immediately below — that a Popup is placed
@@ -701,7 +711,11 @@ centre-aligned so anything non-square clips evenly.
 control styles. WPF's stock `CheckBox`, `ComboBox` and `TabControl` all ignore `Background`
 and draw light chrome, so each is fully retemplated there — `ToggleSwitchStyle`,
 `ModernComboBoxStyle`, `ModernTabControlStyle`. Use those rather than the defaults, or
-controls will look pasted in from another app.
+controls will look pasted in from another app. A retemplated ComboBox must bind its
+`ContentTemplateSelector` to `ItemTemplateSelector` as well as the item and its template:
+`DisplayMemberPath` is implemented as an internal template selector, and without it the
+selected item shows its `ToString()` — the quality combo read
+`QualityOption { Label = 320 kbps, Bitrate = 320000 }`. Caught in a screenshot.
 
 **Icons.** Every icon is a [Lucide](https://lucide.dev) icon (ISC licence, copy in
 `Common/Icons/LICENSE`), kept as the original SVG in `Common/Icons/`, shared with the Mac shell. WPF has no SVG

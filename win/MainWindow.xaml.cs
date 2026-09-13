@@ -625,6 +625,9 @@ namespace Yinyue
                 _resultsQuery = query;
                 _searchResults.Clear();
 
+                // Open first, fill second. See OpenPanelBeforeFilling.
+                OpenPanelBeforeFilling(SearchPopup, SearchPanel);
+
                 if (!result.Succeeded)
                 {
                     ShowSearchMessage(result.Error ?? "Search failed.");
@@ -1143,6 +1146,27 @@ namespace Yinyue
             QueuePanel.Background = tint;
         }
 
+        /// <summary>
+        /// Opens a panel's popup and lays it out <em>before</em> its list is filled.
+        ///
+        /// Filling the list and then opening the popup — the obvious order — left the list
+        /// two pixels tall whenever the results fitted inside its MaxHeight: the ListBox's
+        /// ScrollViewer reported a desired height of zero on that first layout, and stayed
+        /// there until the collection changed again. Long result sets escaped it because the
+        /// scroll extent exceeded the viewport. Measured, not inferred: in a fresh process, a
+        /// first search with 2, 3 or 4 hits laid out at 24px and with 6 at 222px, while the
+        /// same 3-hit search made second was fine. Items added to a list that is already on
+        /// screen are measured properly, so the popup is opened and laid out first, and the
+        /// closed-popup pre-measure in <see cref="PanelHeight"/> never sees a populated list.
+        /// The suite reproduces the short first search on both panels.
+        /// </summary>
+        private static void OpenPanelBeforeFilling(System.Windows.Controls.Primitives.Popup popup, FrameworkElement panel)
+        {
+            if (popup.IsOpen) return;
+            popup.IsOpen = true;
+            panel.UpdateLayout();
+        }
+
         /// <summary>Breathing room between the applet and the panels stacked above it.</summary>
         private const double PanelGap = 6;
 
@@ -1324,8 +1348,9 @@ namespace Yinyue
             // happened to be left last time.
             LstQueue.SelectedIndex = -1;
 
+            // Open first, fill second. See OpenPanelBeforeFilling.
+            OpenPanelBeforeFilling(QueuePopup, QueuePanel);
             RefreshQueue();
-            QueuePopup.IsOpen = true;
 
             LstQueue.Focus();
             RestoreQueueFocus();

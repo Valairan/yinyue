@@ -259,7 +259,9 @@ h2 {
   font-weight: 600;
   line-height: 1.4;
 }
-.shot img { border-style: solid; object-fit: cover; display: block; }
+/* Real captures keep their own proportions; the dashed box below is only for placeholders. */
+.shot img { aspect-ratio: auto; height: auto; border-style: solid; display: block; background: #11111b; }
+.shots { align-items: start; }
 .shot__placeholder span { display: block; font-weight: 400; font-size: 0.9rem; color: var(--surface2); }
 
 .shot figcaption { margin-top: 0.6rem; color: var(--subtext); font-size: 0.92rem; text-align: center; }

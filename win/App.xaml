@@ -436,9 +436,19 @@
                                           ClickMode="Press"
                                           IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}"/>
 
+                            <!--
+                                ContentTemplateSelector is what makes DisplayMemberPath work
+                                in a retemplated ComboBox: WPF implements DisplayMemberPath as
+                                an internal template selector, so a template that binds only
+                                the item and its template shows the item's ToString() — which
+                                for a record is "QualityOption { Label = ..., Bitrate = ... }".
+                                Caught in a screenshot, not by the suite.
+                            -->
                             <ContentPresenter x:Name="ContentSite"
                                               Content="{TemplateBinding SelectionBoxItem}"
                                               ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+                                              ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}"
+                                              ContentStringFormat="{TemplateBinding SelectionBoxItemStringFormat}"
                                               Margin="10,0,28,0"
                                               VerticalAlignment="Center"
                                               HorizontalAlignment="Left"

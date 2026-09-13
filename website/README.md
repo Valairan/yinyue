@@ -10,9 +10,10 @@ works from any sub-path.
   recording of the app in use, looped. Keep it short and small: 15–30 s, 1080p or 1440p,
   no audio track (the video is muted anyway). Until the file exists the page shows
   `media/poster-applet.png`, a real render of the applet, so nothing looks broken.
-- **Screenshots** — the four dashed boxes in the "What it looks like" section. Replace each
-  `<div class="shot__placeholder">` with `<img class="shot__placeholder" src="…" alt="…">`
-  (the class carries the sizing). The captions say what to capture.
+- **Screenshots** — `media/screenshot-*.png` are real captures of the app driven with sample
+  tracks and rendered at 2x by a small harness (a console project referencing `win/Yinyue.csproj`
+  that shows the overlay, plays a fake track, opens each panel and composites the windows onto
+  a dark canvas). Regenerate them when the UI changes; the `<figcaption>`s say what each shows.
 
 ## Releasing a new version
 

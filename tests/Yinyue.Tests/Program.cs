@@ -54,6 +54,11 @@ public static class Program
         // Application down with it, failing everything after with "being shut down".
         app.ShutdownMode = ShutdownMode.OnExplicitShutdown;
 
+        // Application.Run would install this. Without it an awaited search in the overlay
+        // resumes on a threadpool thread and touches the UI from there.
+        SynchronizationContext.SetSynchronizationContext(
+            new DispatcherSynchronizationContext(Dispatcher.CurrentDispatcher));
+
         HotkeyTests.Run();
         ScanTests.Run();
         WindowTests.Run();
@@ -935,6 +940,43 @@ public static class WindowTests
             Check.Equal("up by the configured step", 0.6, playback.Volume);
             overlay.BeginVolumeRepeat(default, -1);
             Check.Equal("and down again", 0.5, playback.Volume);
+
+            overlay.Close();
+            playback.Dispose();
+        });
+
+        Check.Group("a short first search lays out its panel", () =>
+        {
+            // Two hits fit well inside the list's MaxHeight, which is exactly the case that
+            // used to lay out at 24px on the first search after a summon.
+            var (library, _) = Make.Library(new FakeSource("Fake", Yinyue.Models.TrackSource.Local, Make.Tracks("a", "b")));
+            var config = new ConfigService();
+            var playback = new PlaybackService(new SilentAudioPlayer(), library);
+            var overlay = new MainWindow(config, library, playback, () => null!);
+            ShowAndActivate(overlay);
+            overlay.ShowOverlay();
+            Pump();
+
+            var box = (System.Windows.Controls.TextBox)overlay.FindName("SearchTextBox");
+            var popup = (System.Windows.Controls.Primitives.Popup)overlay.FindName("SearchPopup");
+            var panel = (Border)overlay.FindName("SearchPanel");
+            var list = (ListBox)overlay.FindName("LstSearchResults");
+
+            box.Text = "a";
+            WaitUntil(() => popup.IsOpen && list.Items.Count > 0, 3000);
+            Pump(); Pump();
+            Check.Equal("two results", 2, list.Items.Count);
+            Check.That("and the panel is tall enough to show them", panel.ActualHeight > 60,
+                $"{panel.ActualHeight:F0}px");
+
+            // The queue has the same shape and the same fix.
+            playback.PlayQueueAsync(Make.Tracks("a", "b"), 0).GetAwaiter().GetResult();
+            Pump();
+            overlay.ShowQueue();
+            Pump(); Pump();
+            var queuePanel = (Border)overlay.FindName("QueuePanel");
+            Check.That("a two-entry queue opens tall enough to show them", queuePanel.ActualHeight > 80,
+                $"{queuePanel.ActualHeight:F0}px");
 
             overlay.Close();
             playback.Dispose();
