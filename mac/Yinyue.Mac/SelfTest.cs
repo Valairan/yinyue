@@ -201,7 +201,7 @@ namespace Yinyue
             // A toast must work with the overlay DOWN -- that is its entire purpose, and a
             // child window would be hidden with its parent at exactly that moment.
             applet.HideOverlay();
-            stack.Toast("hidden-overlay toast");
+            stack.Toast("hidden-overlay toast", Yinyue.UI.Icons.Music);
 
             var (_, toastPanel) = stack.PanelsForTest.First(p => p.Name == "toast");
             Check("a toast shows while the overlay is hidden", toastPanel.IsVisible);
@@ -214,7 +214,7 @@ namespace Yinyue
             // measured in AppKit points -- CGWindowList reports Quartz display coordinates,
             // which differ from points on a scaled Retina mode and would look like a bug.
             stack.ToggleQueue();
-            stack.Toast("measuring", evenWhileOverlayShown: true);
+            stack.Toast("measuring", Yinyue.UI.Icons.Music, evenWhileOverlayShown: true);
             stack.ShowHold("measuring", 0.5);
             stack.Layout();
 

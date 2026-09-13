@@ -260,17 +260,18 @@ namespace Yinyue.UI
         /// overlay is hidden</b>: with the overlay open the applet already says the same
         /// thing, and two readouts of one change is noise.
         /// </summary>
-        public void Toast(string message, double? level = null, bool evenWhileOverlayShown = false)
+        public void Toast(string message, string? icon = null, double? level = null,
+                          bool evenWhileOverlayShown = false)
         {
             if (!evenWhileOverlayShown && _applet.IsVisible) return;
 
-            _message.Show(message, level);
-            _message.Dismiss(TimeSpan.FromSeconds(2));
+            _message.Show(message, icon, level);
+            _message.Dismiss(ToastPanel.VisibleFor);
         }
 
         public void ShowHold(string message, double progress) => _hold.ShowHold(message, progress);
 
-        public void EndHold() => _hold.Dismiss(TimeSpan.Zero);
+        public void EndHold() => _hold.EndHold();
 
         /// <summary>Plays the highlighted row, or the top one when nothing is highlighted.</summary>
         public void PlaySelected()

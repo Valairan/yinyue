@@ -283,33 +283,32 @@ namespace Yinyue.Services
                 double held = (DateTime.UtcNow - registration.PressedAt).TotalSeconds;
                 double fraction = Math.Clamp(held / _holdDelaySeconds, 0, 1);
 
-                if (!registration.HoldFired)
+                if (fraction < 1)
                 {
                     // Only where a hold means something: the four with a built-in escalation,
                     // and anything the user has set to hold-to-activate. Filling a dial for a
                     // shortcut whose hold does nothing would promise an action that is not
                     // coming.
                     if (registration.ShowsDial) RaiseProgress(registration.Action, fraction);
-
-                    if (fraction < 1) return;
-
-                    registration.HoldFired = true;
-                    if (registration.ShowsDial) RaiseHoldEnded(registration.Action);
-                    Raise(registration.Action, held: true);
-
-                    if (!repeats) registration.HoldTimer?.Invalidate();
                     return;
                 }
 
-                // Already fired: only a repeating hold has anything left to do, once per
-                // delay rather than once per dial tick.
-                if (!repeats) return;
+                bool first = !registration.HoldFired;
+                registration.HoldFired = true;
 
-                if (held >= _holdDelaySeconds)
+                if (repeats)
                 {
+                    // Start the clock again and leave the timer running, so continuing to
+                    // hold fires once per delay and the dial refills rather than vanishing.
+                    // Watching it fill again is the feedback that the gesture is still live.
                     registration.PressedAt = DateTime.UtcNow;
-                    Raise(registration.Action, held: true, repeat: true);
+                    Raise(registration.Action, held: true, repeat: !first);
+                    return;
                 }
+
+                if (registration.ShowsDial) RaiseHoldEnded(registration.Action);
+                Raise(registration.Action, held: true);
+                registration.HoldTimer?.Invalidate();
             });
         }
 

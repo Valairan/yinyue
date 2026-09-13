@@ -60,7 +60,8 @@ namespace Yinyue.UI
                 // A menu item that silently does nothing is the worst failure mode there is,
                 // and settings is the only route into the app on a fresh install.
                 Console.Error.WriteLine($"[Settings] {ex}");
-                _stack?.Toast("Settings could not be opened.", evenWhileOverlayShown: true);
+                _stack?.Toast("Settings could not be opened.", Icons.Info,
+                    evenWhileOverlayShown: true);
                 return;
             }
 
@@ -192,7 +193,7 @@ namespace Yinyue.UI
                 if (args.Automatic || args.Track is null) return;
 
                 NSApplication.SharedApplication.BeginInvokeOnMainThread(() =>
-                    _stack?.Toast($"{args.Track.Title} — {args.Track.DisplayArtist}"));
+                    _stack?.Toast($"{args.Track.Title} — {args.Track.DisplayArtist}", Icons.Music));
             };
 
             if (Environment.GetCommandLineArgs().Contains("--show")) _overlay.ShowOverlay();
@@ -232,7 +233,13 @@ namespace Yinyue.UI
             };
 
             _sleep.SetSteps(_config.Current.SleepTimer.Steps);
-            _sleep.Elapsed += () => Fire(_playback.PauseAsync());
+            _sleep.Elapsed += () =>
+            {
+                Fire(_playback.PauseAsync());
+
+                NSApplication.SharedApplication.BeginInvokeOnMainThread(
+                    () => _stack?.Toast("Sleep timer finished — paused", Icons.Moon));
+            };
 
             _sleep.Changed += _ => NSApplication.SharedApplication.BeginInvokeOnMainThread(UpdateTooltip);
 
@@ -293,11 +300,13 @@ namespace Yinyue.UI
                     break;
 
                 case HotkeyActions.ToggleShuffle:
-                    _stack?.Toast(_playback.ToggleShuffle() ? "Shuffle on" : "Shuffle off");
+                    _playback.ToggleShuffle();
+                    AnnounceModes();
                     break;
 
                 case HotkeyActions.CycleLoop:
-                    _stack?.Toast($"Loop {_playback.CycleLoop()}".ToLowerInvariant());
+                    _playback.CycleLoop();
+                    AnnounceModes();
                     break;
 
                 case HotkeyActions.VolumeUp:
@@ -310,8 +319,7 @@ namespace Yinyue.UI
 
                 case HotkeyActions.Mute:
                     _playback.ToggleMute();
-                    _stack?.Toast(_playback.IsMuted ? "Muted" : "Unmuted",
-                        _playback.IsMuted ? 0 : _playback.Volume, evenWhileOverlayShown: true);
+                    AnnounceVolume(_playback.IsMuted ? 0 : _playback.Volume);
                     break;
 
                 case HotkeyActions.OpenQueue:
@@ -345,7 +353,8 @@ namespace Yinyue.UI
                 case HotkeyActions.OfflineMode:
                     _config.Current.OfflineMode = !_config.Current.OfflineMode;
                     _config.Save();
-                    _stack?.Toast(_config.Current.OfflineMode ? "Offline mode on" : "Offline mode off");
+                    _stack?.Toast(_config.Current.OfflineMode ? "Offline mode on" : "Offline mode off",
+                        _config.Current.OfflineMode ? Icons.CloudOff : Icons.Cloud);
                     break;
 
                 case HotkeyActions.ShuffleFavorites:
@@ -357,14 +366,15 @@ namespace Yinyue.UI
                     // shortcut.
                     if (_sleep is null || !_sleep.Enabled)
                     {
-                        _stack?.Toast("The sleep timer is switched off in settings.");
+                        _stack?.Toast("Sleep timer is turned off in settings", Icons.Moon);
                         break;
                     }
 
                     int minutes = _sleep.Cycle();
                     _stack?.Toast(minutes == 0
                         ? "Sleep timer off"
-                        : $"Sleep timer {MacSleepTimer.Describe(TimeSpan.FromMinutes(minutes))}");
+                        : $"Sleep timer {MacSleepTimer.Describe(TimeSpan.FromMinutes(minutes))}",
+                        Icons.Moon);
                     break;
 
                 case HotkeyActions.OpenSettings:
@@ -402,15 +412,44 @@ namespace Yinyue.UI
         /// different ways was less polished than one consistent readout with a level bar.
         /// The toast has its own reserved row, so it never covers anything.
         /// </summary>
-        private void AnnounceVolume(double level) =>
-            _stack?.Toast($"Volume {Math.Round(level * 100)}%", level, evenWhileOverlayShown: true);
+        private void AnnounceVolume(double level)
+        {
+            bool muted = _playback.IsMuted || level <= 0.0001;
+
+            _stack?.Toast(muted ? "Muted" : $"Volume {Math.Round(level * 100)}%",
+                muted ? Icons.VolumeX : Icons.Volume2,
+                level, evenWhileOverlayShown: true);
+        }
+
+        /// <summary>
+        /// Loop and shuffle share one toast, as on Windows. They are one idea — how the queue
+        /// is being played — and two readouts arriving together would fight for the same row.
+        /// </summary>
+        private void AnnounceModes()
+        {
+            string loop = _playback.Loop switch
+            {
+                LoopMode.Track => "Repeat track",
+                LoopMode.Queue => "Repeat queue",
+                _ => "Repeat off",
+            };
+
+            string icon = _playback.Loop switch
+            {
+                LoopMode.Track => Icons.Repeat1,
+                LoopMode.Queue => Icons.Repeat,
+                _ => Icons.RepeatOff,
+            };
+
+            _stack?.Toast(_playback.Shuffle ? $"{loop} · shuffle on" : loop, icon);
+        }
 
         private async Task ShuffleFavoritesAsync()
         {
             var source = _library.Sources.OfType<ISupportsFavorites>().FirstOrDefault();
             if (source is null)
             {
-                _stack?.Toast("No source provides favourites.");
+                _stack?.Toast("No source provides favourites.", Icons.Heart);
                 return;
             }
 
@@ -419,7 +458,7 @@ namespace Yinyue.UI
 
             if (result.Tracks.Count == 0)
             {
-                _stack?.Toast(result.Error ?? "No favourites found.");
+                _stack?.Toast(result.Error ?? "No favourites found.", Icons.Heart);
                 return;
             }
 
