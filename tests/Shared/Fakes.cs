@@ -23,11 +23,18 @@ public sealed class FakeSource : IMusicSource
     public TrackSource SourceKind { get; }
     public bool IsAvailable { get; set; } = true;
 
+    /// <summary>
+    /// When true, tracks resolve to a fake URI so the silent engine can "play" them and
+    /// play/pause has a source to act on. Off by default: most queue tests want the queue
+    /// bookkeeping alone, with nothing resolved.
+    /// </summary>
+    public bool Resolves { get; set; }
+
     public Task<SearchResult> SearchAsync(SearchQuery query, int limit, CancellationToken ct) =>
         Task.FromResult(SearchResult.Ok(_tracks));
 
     public Task<string?> ResolvePlaybackUriAsync(Track track, CancellationToken ct) =>
-        Task.FromResult<string?>(null);
+        Task.FromResult(Resolves ? "fake://" + track.Id : null);
 
     public Task<string?> ResolveArtworkPathAsync(Track track, CancellationToken ct) =>
         Task.FromResult<string?>(null);

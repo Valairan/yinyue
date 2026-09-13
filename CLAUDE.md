@@ -856,7 +856,8 @@ entry points supply the two actions and their preconditions.
 `PlayPause` passes `repeats: true`, so holding it keeps firing once per hold delay instead
 of once per press — hold it and the queue walks forward a track at a time. It is also the
 one escalation that does **not** summon the overlay, since play/pause is used while working
-in another window; the toast reports where a skip landed.
+in another window; the toast reports where a skip landed, and whether a tap paused or
+resumed.
 
 Any shortcut can be set to **hold to activate** — it then fires only after being held for
 `HoldDelaySeconds` (0.2–5 s, three decimals, one setting shared by every hold gesture). Off
@@ -945,7 +946,8 @@ Mute is a remembered state, not just "volume 0":
 
 `ToastWindow` is a small transient readout for changes made by global hotkeys — volume,
 loop mode, shuffle. It also announces track changes as `Title — Artist`, so skipping by hotkey says what you
-landed on. `App.ShowToast` is the single entry point and it shows the toast **only
+landed on, and a deliberate pause or resume as `Paused · Title — Artist`, so a tap on the
+play/pause key from another window gets something back. `App.ShowToast` is the single entry point and it shows the toast **only
 while the overlay is hidden**; with the overlay open its status line already says the same
 thing, and two readouts of one change is noise.
 
@@ -985,6 +987,13 @@ Requirements on it, all load-bearing:
   animation finishing.
 - **Follows the overlay's anchor**, and shares its width through the `PanelWidth` resource
   in `App.xaml`. The two sit at the same anchor, so any mismatch would be obvious.
+- **A deliberate pause or resume toasts; the engine's own transitions do not.**
+  `PlaybackService.PlayPauseRequested` fires only from `PlayAsync`, `PauseAsync` and the
+  toggle — the paths a key, a button or a media key reach — with the resulting state.
+  `PlayingStateChanged` also fires between tracks and at the end of a queue, and toasting it
+  would announce "Playing" all day. The sleep timer pauses with `announce: false`, since it
+  has its own message. The tray tooltip carries the state too, so it can be found again after
+  the toast has gone.
 - **Automatic advances do not toast.** `TrackChangedEventArgs.Automatic` marks a queue
   advancing on its own at the end of a track; announcing those would fire all day for
   something the user never asked for. Only deliberate changes are reported.

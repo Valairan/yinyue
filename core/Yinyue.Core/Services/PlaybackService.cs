@@ -62,6 +62,15 @@ namespace Yinyue.Services
 
         public event EventHandler<TrackChangedEventArgs>? TrackChanged;
         public event EventHandler<bool>? PlayingStateChanged;
+
+        /// <summary>
+        /// Play or pause was <em>asked for</em> — by a key, a button, a media key — and this
+        /// is the state that resulted. Distinct from <see cref="PlayingStateChanged"/>, which
+        /// also fires when the engine changes state on its own between tracks or at the end
+        /// of a queue. The shells give this one a readout and that one none, so "Paused" and
+        /// "Playing" appear for deliberate acts only, not all day as tracks roll over.
+        /// </summary>
+        public event EventHandler<bool>? PlayPauseRequested;
         public event EventHandler<AudioProgressEventArgs>? ProgressUpdated;
         public event EventHandler<string>? PlaybackFailed;
 
@@ -688,6 +697,7 @@ namespace Yinyue.Services
             if (!_audio.HasSource)
             {
                 await PlayCurrentAsync().ConfigureAwait(false);
+                PlayPauseRequested?.Invoke(this, true);
                 return;
             }
 
@@ -695,11 +705,13 @@ namespace Yinyue.Services
             {
                 await _audio.PauseAsync().ConfigureAwait(false);
                 PlayingStateChanged?.Invoke(this, false);
+                PlayPauseRequested?.Invoke(this, false);
             }
             else
             {
                 await _audio.PlayAsync().ConfigureAwait(false);
                 PlayingStateChanged?.Invoke(this, true);
+                PlayPauseRequested?.Invoke(this, true);
             }
         }
 
@@ -710,17 +722,24 @@ namespace Yinyue.Services
             if (!_audio.HasSource)
             {
                 await PlayCurrentAsync().ConfigureAwait(false);
+                PlayPauseRequested?.Invoke(this, true);
                 return;
             }
 
             await _audio.PlayAsync().ConfigureAwait(false);
             PlayingStateChanged?.Invoke(this, true);
+            PlayPauseRequested?.Invoke(this, true);
         }
 
-        public async Task PauseAsync()
+        /// <param name="announce">
+        /// False for a pause nobody pressed — the sleep timer's — which has its own message
+        /// and must not also read as a "Paused" the user asked for.
+        /// </param>
+        public async Task PauseAsync(bool announce = true)
         {
             await _audio.PauseAsync().ConfigureAwait(false);
             PlayingStateChanged?.Invoke(this, false);
+            if (announce) PlayPauseRequested?.Invoke(this, false);
         }
 
         public async Task NextAsync(bool automatic = false)

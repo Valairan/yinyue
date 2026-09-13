@@ -209,6 +209,8 @@ namespace Yinyue
             _playback.TrackChanged += OnTrackChangedForSmtc;
             _playback.TrackChanged += OnTrackChangedForToast;
             _playback.PlayingStateChanged += OnPlayingStateChangedForSmtc;
+            _playback.PlayingStateChanged += (_, _) => Dispatcher.BeginInvoke(UpdateTrayTooltip);
+            _playback.PlayPauseRequested += OnPlayPauseRequested;
 
             _playback.Volume = _config.Current.Playback.Volume;
             _playback.VolumeChanged += OnVolumeChanged;
@@ -227,7 +229,7 @@ namespace Yinyue
             });
             _sleepTimer.Elapsed += () =>
             {
-                _ = _playback!.PauseAsync();
+                _ = _playback!.PauseAsync(announce: false);   // it has its own message, below
                 ShowToast("Moon", "Sleep timer finished — paused");
             };
 
@@ -479,6 +481,25 @@ namespace Yinyue
         /// Keeps the tray tooltip current. The sleep timer shares it with volume, so both
         /// are written from one place rather than overwriting each other.
         /// </summary>
+        /// <summary>
+        /// A deliberate pause or resume gets a readout while the overlay is hidden: the
+        /// play/pause key is used from other windows and deliberately does not summon the
+        /// overlay, so until now a tap gave nothing back and the ears had to confirm it.
+        /// Only the requested kind — the engine's own transitions between tracks do not fire
+        /// this — and, like every toast, only while the overlay is hidden.
+        /// </summary>
+        private void OnPlayPauseRequested(object? sender, bool playing)
+        {
+            Dispatcher.BeginInvoke(() =>
+            {
+                UpdateTrayTooltip();
+
+                var track = _playback!.CurrentTrack;
+                string what = track == null ? string.Empty : $" · {track.Title} — {track.DisplayArtist}";
+                ShowToast(playing ? "Play" : "Pause", (playing ? "Playing" : "Paused") + what);
+            });
+        }
+
         private void UpdateTrayTooltip()
         {
             if (_notifyIcon == null) return;
@@ -487,6 +508,11 @@ namespace Yinyue
 
             if (_playback != null)
             {
+                // The one persistent surface, so the state a toast showed a minute ago can
+                // still be found by hovering the tray.
+                if (_playback.IsPlaying) text += " — playing";
+                else if (_playback.CurrentTrack != null) text += " — paused";
+
                 text += _playback.IsMuted || _playback.Volume <= 0.0001
                     ? " — muted"
                     : $" — volume {_playback.Volume * 100:F0}%";

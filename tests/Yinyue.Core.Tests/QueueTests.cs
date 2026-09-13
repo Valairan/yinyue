@@ -94,6 +94,42 @@ public static class QueueTests
             await Task.CompletedTask;
         });
 
+        await Check.GroupAsync("play and pause announce themselves only when asked for", async () =>
+        {
+            var engine = new SilentAudioPlayer();
+            var (library, _) = Make.Library(
+                new FakeSource("Fake", TrackSource.Local, Make.Tracks("t0", "t1", "t2")) { Resolves = true });
+            var playback = new PlaybackService(engine, library);
+
+            var requests = new List<bool>();
+            playback.PlayPauseRequested += (_, playing) => requests.Add(playing);
+
+            await playback.PlayQueueAsync(Make.Tracks("t0", "t1", "t2"), 0);
+            Check.That("playing", playback.IsPlaying);
+            Check.Equal("starting a queue is a track change, not a play request", 0, requests.Count);
+
+            await playback.TogglePlayPauseAsync();
+            Check.That("toggle pauses", !playback.IsPlaying);
+            Check.That("and announces the pause", requests.SequenceEqual(new[] { false }));
+
+            await playback.TogglePlayPauseAsync();
+            Check.That("toggle resumes and announces it", requests.SequenceEqual(new[] { false, true }));
+
+            await playback.PauseAsync(announce: false);
+            Check.That("paused", !playback.IsPlaying);
+            Check.Equal("the sleep timer's pause says nothing", 2, requests.Count);
+
+            await playback.PlayAsync();
+            Check.That("an explicit play announces", requests.SequenceEqual(new[] { false, true, true }));
+
+            engine.RaisePlaybackEnded();
+            await Task.Delay(100);
+            Check.Equal("the queue advanced on its own", "t1", playback.CurrentTrack?.Id);
+            Check.Equal("without announcing anything", 3, requests.Count);
+
+            playback.Dispose();
+        });
+
         await Check.GroupAsync("queue — shuffle", async () =>
         {
             var (playback, _) = NewPlayback("t0", "t1", "t2", "t3");
