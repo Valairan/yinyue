@@ -183,6 +183,20 @@ h1 {
 .button--ghost:hover { background: rgba(255, 255, 255, 0.11); }
 
 .button__icon { width: 18px; height: 18px; }
+
+/* A download that is not available yet: looks like a button, does nothing, says so. */
+.button--soon { cursor: default; opacity: 0.75; }
+.button--soon:hover { transform: none; background: rgba(255, 255, 255, 0.06); }
+.button__tag {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--text);
+}
 .button--primary .button__icon { filter: brightness(0); }
 .button--ghost .button__icon { filter: brightness(0) invert(1); }
 
@@ -281,17 +295,60 @@ h2 {
   margin-bottom: 4rem;
 }
 
+/* One card per platform, side by side where there is room. */
+.platforms {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1.4rem;
+  margin-top: 2.4rem;
+}
+.platform {
+  background: rgba(17, 17, 27, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: var(--radius);
+  padding: 1.6rem 1.5rem;
+}
+.platform h3 { margin: 0 0 0.2rem; font-size: 1.25rem; color: var(--white); }
+.platform__meta { margin: 0 0 1.2rem; color: var(--subtext); font-size: 0.92rem; }
+.platform .facts { margin-top: 1.6rem; }
+
 .facts {
   max-width: 44rem;
   margin: 2.4rem auto 0;
   display: grid;
   gap: 0.9rem;
 }
-.facts div { display: grid; grid-template-columns: 7rem 1fr; gap: 1rem; align-items: baseline; }
+.facts div { display: grid; grid-template-columns: 6.5rem 1fr; gap: 1rem; align-items: baseline; }
 .facts dt { color: var(--white); font-weight: 600; }
 .facts dd { margin: 0; color: var(--subtext); }
 
 .hash { word-break: break-all; font-size: 0.8em; }
+
+/* -------------------------------------------------------------- support */
+
+.section--support { padding-top: 0; }
+.support {
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+  max-width: 44rem;
+  margin: 0 auto;
+  padding: 1.8rem;
+  background: rgba(30, 30, 46, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: var(--radius);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+.support__qr { margin: 0; flex: 0 0 auto; }
+.support__qr img { display: block; width: 180px; height: 180px; border-radius: 10px; background: #fff; padding: 8px; }
+.support__text h2 { text-align: left; margin-bottom: 0.5rem; font-size: 1.5rem; }
+.support__text p { margin: 0; color: var(--subtext); }
+
+@media (max-width: 640px) {
+  .support { flex-direction: column; text-align: center; }
+  .support__text h2 { text-align: center; }
+}
 
 /* --------------------------------------------------------------- footer */
 

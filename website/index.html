@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Yinyue — a keyboard-driven music player for Jellyfin and local files</title>
-  <meta name="description" content="Yinyue is a lightweight Windows music player that lives in the tray. Summon it with a hotkey, search your Jellyfin server or local files, and get back to work.">
+  <title>Yinyue — a keyboard-driven music player for Jellyfin and local files, on Windows and macOS</title>
+  <meta name="description" content="Yinyue is a lightweight music player for Windows and macOS that lives in the tray. Summon it with a hotkey, search your Jellyfin server or local files, and get back to work.">
   <meta property="og:title" content="Yinyue">
   <meta property="og:description" content="A lightweight, keyboard-driven music player for Jellyfin and local files. Summon it, act, and it gets out of the way.">
   <meta property="og:image" content="media/poster-applet.png">
@@ -37,6 +37,7 @@
       <a href="#features">Features</a>
       <a href="#screens">Screens</a>
       <a href="#download">Download</a>
+      <a href="#support">Support</a>
       <a href="https://github.com/Valairan/yinyue" rel="noopener">GitHub</a>
     </nav>
   </header>
@@ -48,22 +49,25 @@
       <img src="assets/logo-white.png" alt="Yinyue" class="hero__mark">
       <h1>Say hello to Yinyue.</h1>
       <p class="hero__lead">
-        A music player that lives in your tray, not on your taskbar. Press a hotkey, search
-        your Jellyfin server or your local files, play, and it gets out of the way again.
+        A music player that lives in your tray or menu bar, not on your taskbar. Press a
+        hotkey, search your Jellyfin server or your local files, play, and it gets out of the
+        way again. The same app on Windows and macOS.
       </p>
       <div class="hero__actions">
         <a class="button button--primary" href="downloads/Yinyue-0.2.0.msi" download>
           <img src="assets/icons/app-window.svg" alt="" class="button__icon">
           Download for Windows
         </a>
-        <a class="button button--ghost" href="https://github.com/Valairan/yinyue" rel="noopener">
-          <img src="assets/icons/github.svg" alt="" class="button__icon">
-          Source on GitHub
+        <!-- Inert until the Mac build ships: no href to follow, announced as unavailable. -->
+        <a class="button button--ghost button--soon" role="link" aria-disabled="true" tabindex="-1">
+          <img src="assets/icons/apple.svg" alt="" class="button__icon">
+          Download for macOS
+          <span class="button__tag">soon</span>
         </a>
       </div>
       <p class="hero__meta">
-        v0.2.0 · 6.6 MB installer · Windows 10 and 11 · free and open source<br>
-        <span class="muted">macOS version in development</span>
+        v0.2.0 · free and open source · Windows 10 and 11 now, macOS next<br>
+        <a class="muted" href="https://github.com/Valairan/yinyue" rel="noopener">Source on GitHub</a>
       </p>
     </section>
 
@@ -71,8 +75,9 @@
     <section class="section" id="features">
       <h2>Made to be summoned, not stared at.</h2>
       <p class="section__lead">
-        Yinyue starts with Windows and waits in the tray. Everything is reachable from the
-        keyboard, and most of it works without ever showing the window.
+        Yinyue starts with your computer and waits in the tray on Windows or the menu bar on
+        a Mac. Everything is reachable from the keyboard, and most of it works without ever
+        showing the window.
       </p>
 
       <div class="grid">
@@ -109,12 +114,12 @@
         <article class="card">
           <img src="assets/icons/headphones.svg" alt="" class="card__icon">
           <h3>Media keys and the OS</h3>
-          <p>Play, pause and skip from your keyboard's media keys. Windows shows what is playing, with artwork.</p>
+          <p>Play, pause and skip from your keyboard's media keys. Windows and macOS both show what is playing, with artwork.</p>
         </article>
         <article class="card">
           <img src="assets/icons/zap.svg" alt="" class="card__icon">
           <h3>Lightweight by design</h3>
-          <p>Idle at zero CPU with a small footprint, all day. A resident app should never be the reason your laptop fan spins.</p>
+          <p>Native on each platform, not a web view in a frame. Idle at zero CPU with a small footprint, all day: a resident app should never be the reason your laptop fan spins.</p>
         </article>
       </div>
     </section>
@@ -122,7 +127,7 @@
     <!-- ============================= Screenshots ============================ -->
     <section class="section" id="screens">
       <h2>What it looks like.</h2>
-      <p class="section__lead">The applet sits in a corner of your screen. Everything else stacks upwards from it, and disappears with it.</p>
+      <p class="section__lead">The applet sits in a corner of your screen. Everything else stacks upwards from it, and disappears with it. Shown on Windows; the Mac app is laid out to the same measurements.</p>
 
       <!--
         Real captures of the app driven with sample tracks, rendered at 2x. Regenerate them
@@ -152,21 +157,62 @@
     <section class="section section--download" id="download">
       <h2>Get Yinyue.</h2>
       <p class="section__lead">
-        Free and open source. Installs for the current user only, so it never asks for
-        administrator rights.
+        Free and open source, with the same features on both platforms. Installs for the current
+        user only, so it never asks for administrator rights.
       </p>
-      <div class="hero__actions">
-        <a class="button button--primary" href="downloads/Yinyue-0.2.0.msi" download>
-          <img src="assets/icons/app-window.svg" alt="" class="button__icon">
-          Download Yinyue 0.2.0 for Windows
-        </a>
+
+      <div class="platforms">
+        <article class="platform">
+          <h3>Windows</h3>
+          <p class="platform__meta">Version 0.2.0 · MSI · 6.6 MB</p>
+          <a class="button button--primary" href="downloads/Yinyue-0.2.0.msi" download>
+            <img src="assets/icons/app-window.svg" alt="" class="button__icon">
+            Download for Windows
+          </a>
+          <dl class="facts">
+            <div><dt>Requires</dt><dd>Windows 10 or 11 and the <a href="https://dotnet.microsoft.com/download/dotnet/8.0" rel="noopener">.NET 8 Desktop Runtime</a>. Windows offers to install it on first launch if it is missing.</dd></div>
+            <div><dt>Installer</dt><dd>Asks for your overlay corner, whether to start with Windows, and a music folder. All three can be changed later.</dd></div>
+            <div><dt>SHA-256</dt><dd><code class="hash">14bfa1633f98915c7d3dbaefbb7d3d034d0c647d26f22cd814f95a003dc5e2d8</code></dd></div>
+            <div><dt>Unsigned</dt><dd>Windows may warn about an unknown publisher. Choose “More info”, then “Run anyway”, or verify the hash above.</dd></div>
+          </dl>
+        </article>
+
+        <article class="platform platform--soon">
+          <h3>macOS</h3>
+          <p class="platform__meta">In development · same features, native menu-bar app</p>
+          <!-- Inert until the Mac build ships. Give it an href and drop button--soon then. -->
+          <a class="button button--ghost button--soon" role="link" aria-disabled="true" tabindex="-1">
+            <img src="assets/icons/apple.svg" alt="" class="button__icon">
+            Download for macOS
+            <span class="button__tag">soon</span>
+          </a>
+          <dl class="facts">
+            <div><dt>Will need</dt><dd>macOS 13 or later on Apple silicon or Intel.</dd></div>
+            <div><dt>Progress</dt><dd>The overlay, search, queue, toasts, sleep timer, settings and global hotkeys are done. Follow the <a href="https://github.com/Valairan/yinyue" rel="noopener">repository</a> for the release.</dd></div>
+          </dl>
+        </article>
       </div>
-      <dl class="facts">
-        <div><dt>Requires</dt><dd>Windows 10 or 11 and the <a href="https://dotnet.microsoft.com/download/dotnet/8.0" rel="noopener">.NET 8 Desktop Runtime</a>. Windows offers to install it on first launch if it is missing.</dd></div>
-        <div><dt>Installer</dt><dd>MSI, 6.6 MB, per-user. Asks for your overlay corner, whether to start with Windows, and a music folder.</dd></div>
-        <div><dt>SHA-256</dt><dd><code class="hash">14bfa1633f98915c7d3dbaefbb7d3d034d0c647d26f22cd814f95a003dc5e2d8</code></dd></div>
-        <div><dt>Unsigned</dt><dd>Windows may warn about an unknown publisher. Choose “More info”, then “Run anyway”, or verify the hash above.</dd></div>
-      </dl>
+    </section>
+
+    <!-- =============================== Support ============================== -->
+    <section class="section section--support" id="support">
+      <div class="support">
+        <!--
+          The QR code links to the Buy Me a Coffee page. Add the same URL as an href around the
+          image so desktop visitors can click it rather than scan it.
+        -->
+        <figure class="support__qr">
+          <img src="assets/buymeacoffee.png" alt="QR code for Buy Me a Coffee" width="180" height="180" loading="lazy">
+        </figure>
+        <div class="support__text">
+          <h2>Buy me a coffee.</h2>
+          <p>
+            Yinyue is free, open source, and made by one person in the evenings. If it has earned
+            a place in your tray, scanning this is a nice way to say so. No account, no
+            subscription, no features locked behind it.
+          </p>
+        </div>
+      </div>
     </section>
 
   </main>
