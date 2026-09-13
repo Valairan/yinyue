@@ -900,8 +900,38 @@ DWM rounded corners), shared by the overlay and the toast.
 
 ## Branding assets
 
-`Common/` holds the shared logo masters (including `Logo.ai`); `win/Assets/` holds the
-Windows-specific derivatives. **`Dark` and `Light` name the colour of the mark, not the
+`Common/` holds everything both apps draw from: the logo masters (including `Logo.ai`) and
+`Common/Icons/` — the Lucide SVGs that generate the in-app icon set. `win/Assets/` and
+`mac/Assets/` hold the per-platform derivatives, and both are generated, never hand-edited.
+
+**The two apps must show the same marks, and the only way to guarantee that is one source.**
+`Common/Icons/generate.py` emits both `win/Icons.xaml` (WPF geometries) and
+`mac/Yinyue.Mac/UI/Icons.g.cs` (the same path data as C# strings) from one run, so an icon
+added there appears on both platforms or on neither. Neither toolkit renders SVG and neither
+would be worth a renderer for twenty line drawings.
+
+- The Mac output is reduced to **four commands — M, L, C, Z**. The generator turns H and V
+  into lines and converts arcs to cubics, because AppKit has no endpoint-arc API: its arcs
+  are drawn from a centre and an angle. That arithmetic belongs at generation time where it
+  can be read and diffed, not in a runtime parser. WPF renders arcs natively, so the Windows
+  output is byte-identical to before the split.
+- **SF Symbols are not an option for these.** They exist only on macOS and are drawn to
+  Apple's metrics, so using them would make the Mac overlay quietly different. They are the
+  obvious shortcut and the wrong answer.
+- **The y axis flips.** SVG grows downward, AppKit upward, so `Icon.cs` mirrors every point.
+  Skipping it turns skip-back, repeat and the heart into different icons rather than into an
+  obvious bug, which is why the suite counts opaque pixels rather than only checking that the
+  data parsed.
+- Lucide's geometry — a 24-unit box, a 2-unit round stroke, no fill — is applied by the
+  drawing code on both platforms, not carried in the path data.
+
+`Common/make-mac-assets.sh` generates `mac/Assets/` from the same masters: the menu-bar mark
+and `Yinyue.icns`.
+
+**The menu bar needs one asset where the tray needs two.** A macOS template image is a mask —
+AppKit reads only its alpha and draws it in whatever colour the menu bar requires, inverting
+automatically between light and dark. So there is no `menubar-light`/`menubar-dark` pair and
+nothing watches for a theme change, which is `App.ApplyTrayIcon`'s entire job on Windows. **`Dark` and `Light` name the colour of the mark, not the
 theme it belongs to** — `Dark.png` is the black 音樂 for light backgrounds, `Light.png` the
 white one for dark backgrounds. Getting this backwards makes the mark invisible rather than
 merely wrong, which is how it goes unnoticed.

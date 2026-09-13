@@ -58,10 +58,24 @@ namespace Yinyue.UI
 
             if (_statusItem.Button is { } button)
             {
-                // The mark itself comes later; a template glyph inverts correctly on light
-                // and dark menu bars without shipping two assets, which is the macOS answer
-                // to the tray-light/tray-dark pair on Windows.
-                button.Title = "♪";
+                // The same 音樂 mark the Windows tray shows, from the same master in Common/.
+                //
+                // ONE asset here, not the pair Windows needs. A template image is a mask:
+                // AppKit reads only its alpha and draws it in whatever colour the menu bar
+                // wants, inverting automatically between light and dark. So there is no
+                // tray-light/tray-dark choice to make and nothing to watch for a theme
+                // change -- which is App.ApplyTrayIcon's entire job on Windows.
+                var mark = NSImage.ImageNamed("menubar");
+                if (mark is not null)
+                {
+                    mark.Template = true;
+                    button.Image = mark;
+                }
+                else
+                {
+                    button.Title = "Yinyue";
+                }
+
                 button.ToolTip = "Yinyue";
             }
 

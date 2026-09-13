@@ -18,6 +18,8 @@
 	<string>1</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>13.0</string>
+	<key>CFBundleIconFile</key>
+	<string>Yinyue</string>
 
 	<!--
 	  Menu-bar only: no Dock icon, no app-switcher entry. This is the AppKit equivalent of

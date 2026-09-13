@@ -28,6 +28,14 @@
       properties can express and it is the key that makes this a menu-bar app at all.
     -->
     <None Include="Info.plist" LogicalName="Info.plist" />
+
+    <!--
+      Brand assets, generated from the shared masters by Common/make-mac-assets.sh. Copied
+      into Resources/ where NSImage.ImageNamed and CFBundleIconFile both look.
+    -->
+    <BundleResource Include="..\Assets\menubar.png" Link="Resources\menubar.png" />
+    <BundleResource Include="..\Assets\menubar@2x.png" Link="Resources\menubar@2x.png" />
+    <BundleResource Include="..\Assets\Yinyue.icns" Link="Resources\Yinyue.icns" />
   </ItemGroup>
 
   <ItemGroup>

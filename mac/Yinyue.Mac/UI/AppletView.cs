@@ -52,12 +52,12 @@ namespace Yinyue.UI
 
             WantsLayer = true;
 
-            _previous = Button("backward.end.fill", "Previous", 16, OnPrevious);
-            _playPause = Button("play.fill", "Play / pause", 16, OnPlayPause);
-            _next = Button("forward.end.fill", "Next", 16, OnNext);
-            _shuffle = Button("shuffle", "Shuffle", 12, OnShuffle);
-            _loop = Button("repeat", "Loop", 12, OnLoop);
-            _settings = Button("gearshape.fill", "Settings", 12,
+            _previous = Button(Icons.SkipBack, "Previous", 18, OnPrevious);
+            _playPause = Button(Icons.Play, "Play / pause", 18, OnPlayPause);
+            _next = Button(Icons.SkipForward, "Next", 18, OnNext);
+            _shuffle = Button(Icons.Shuffle, "Shuffle", 14, OnShuffle);
+            _loop = Button(Icons.Repeat, "Loop", 14, OnLoop);
+            _settings = Button(Icons.Cog, "Settings", 14,
                 (_, _) => SettingsRequested?.Invoke(this, EventArgs.Empty));
 
             BuildLayout();
@@ -163,44 +163,39 @@ namespace Yinyue.UI
             ?? NSFont.SystemFontOfSize(NSFont.SystemFontSize)!;
 
         /// <summary>
-        /// SF Symbols by name, not by literal glyph. The private-use codepoints render only
-        /// in SF Pro and turn into tofu anywhere else — including in this source file — while
-        /// the named API scales with the button, follows ContentTintColor, and is what
-        /// VoiceOver reads. The accessibility description is the tooltip for the same reason.
+        /// The shared Lucide marks from Common/Icons, not SF Symbols.
+        ///
+        /// SF Symbols were the tempting shortcut and are the wrong answer here: they exist
+        /// only on macOS and are drawn to Apple's metrics, so the Mac overlay would have been
+        /// quietly different from the Windows one. These are generated from the same SVGs the
+        /// WPF app draws, so an icon added there appears on both or on neither.
+        ///
+        /// Stroked at a fixed colour rather than tinted, because the palette is a thing the
+        /// two apps share and AppKit's automatic tinting follows the system's colours.
+        /// Recoloured through <see cref="SetTint"/> when a mode toggles.
         /// </summary>
-        private NSButton Button(string symbol, string tip, double size, EventHandler handler)
+        private NSButton Button(string pathData, string tip, double size, EventHandler handler)
         {
-            var image = NSImage.GetSystemSymbol(symbol, tip);
-
             var b = new NSButton
             {
                 Bordered = false,
                 ToolTip = tip,
-                ContentTintColor = Theme.Text,
                 ImageScaling = NSImageScale.ProportionallyDown,
                 Title = string.Empty,
+                Image = Icon.Make(pathData, size, Theme.Text),
             };
 
-            if (image is not null)
-            {
-                b.Image = image;
-
-                // Configured on the button rather than baked into the image, so the glyph
-                // re-renders at the right weight when the button's state or tint changes.
-                b.SymbolConfiguration =
-                    NSImageSymbolConfiguration.Create((nfloat)size, (double)NSFontWeight.Regular);
-            }
-            else
-            {
-                // A missing symbol should not produce an invisible, unclickable button.
-                b.Title = "?";
-                b.Font = SystemFont(size);
-            }
+            // Without this the mark is announced as the empty title.
+            b.AccessibilityTitle = tip;
 
             b.SetButtonType(NSButtonType.MomentaryChange);
             b.Activated += handler;
             return b;
         }
+
+        /// <summary>Redraws a button's mark, in a new colour or from new path data.</summary>
+        private static void SetIcon(NSButton button, string pathData, double size, NSColor color) =>
+            button.Image = Icon.Make(pathData, size, color);
 
         // ---------------------------------------------------------------- events
 
@@ -240,24 +235,23 @@ namespace Yinyue.UI
             RefreshModes();
         }
 
-                private void RefreshPlayGlyph() => SetSymbol(_playPause, _playback.IsPlaying ? "pause.fill" : "play.fill", 16);
-
-        private static void SetSymbol(NSButton button, string symbol, double size)
-        {
-            var image = NSImage.GetSystemSymbol(symbol, button.ToolTip ?? symbol);
-            if (image is null) return;
-
-            button.Image = image;
-            button.SymbolConfiguration =
-                NSImageSymbolConfiguration.Create((nfloat)size, (double)NSFontWeight.Regular);
-        }
+                private void RefreshPlayGlyph() =>
+            SetIcon(_playPause, _playback.IsPlaying ? Icons.Pause : Icons.Play, 18, Theme.Text);
 
         private void RefreshModes()
         {
-            _shuffle.ContentTintColor = _playback.Shuffle ? Theme.Accent : Theme.Subtext;
+            SetIcon(_shuffle, Icons.Shuffle, 14, _playback.Shuffle ? Theme.Accent : Theme.Subtext);
 
-            _loop.ContentTintColor = _playback.Loop == LoopMode.Off ? Theme.Subtext : Theme.Accent;
-            SetSymbol(_loop, _playback.Loop == LoopMode.Track ? "repeat.1" : "repeat", 12);
+            // repeat-off is its own mark rather than a dimmed repeat, which is why the path
+            // data changes here and not only the colour.
+            string loopIcon = _playback.Loop switch
+            {
+                LoopMode.Track => Icons.Repeat1,
+                LoopMode.Queue => Icons.Repeat,
+                _ => Icons.RepeatOff,
+            };
+
+            SetIcon(_loop, loopIcon, 14, _playback.Loop == LoopMode.Off ? Theme.Subtext : Theme.Accent);
             _loop.ToolTip = $"Loop: {_playback.Loop}";
         }
 

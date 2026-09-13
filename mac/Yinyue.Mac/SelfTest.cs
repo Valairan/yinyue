@@ -26,6 +26,7 @@ namespace Yinyue
             if (which is "all" or "keychain") KeychainRoundTrip();
             if (which is "all" or "audio") AudioPlaysAFile();
             if (which is "all" or "overlay") OverlayAnchors();
+            if (which is "all" or "icons") IconsRender();
 
             Console.WriteLine();
             Console.WriteLine(_failed == 0 ? "PASS" : $"FAIL — {_failed} check(s)");
@@ -37,6 +38,60 @@ namespace Yinyue
             if (!ok) _failed++;
             Console.WriteLine($"  [{(ok ? "ok" : "FAIL")}] {label}{(detail is null ? "" : $"  — {detail}")}");
             Console.Out.Flush();
+        }
+
+        /// <summary>
+        /// Every shared mark must actually draw.
+        ///
+        /// Parsing is not the interesting failure. A wrong scale, a bad flip or an arc
+        /// conversion that collapsed would all parse perfectly and render an empty square —
+        /// so this counts opaque pixels rather than trusting that no exception was thrown.
+        /// </summary>
+        private static void IconsRender()
+        {
+            Console.WriteLine("\nIcons (shared with Windows, from Common/Icons)");
+
+            Check("the generated set is not empty", Yinyue.UI.Icons.All.Count > 0,
+                $"{Yinyue.UI.Icons.All.Count} icons");
+
+            int blank = 0;
+            var failures = new List<string>();
+
+            foreach (var (name, data) in Yinyue.UI.Icons.All)
+            {
+                try
+                {
+                    var image = Yinyue.UI.Icon.Make(data, 32, AppKit.NSColor.White);
+                    if (!HasInk(image)) { blank++; failures.Add(name); }
+                }
+                catch (Exception ex)
+                {
+                    failures.Add($"{name} ({ex.GetType().Name})");
+                }
+            }
+
+            Check("every icon renders visible ink", failures.Count == 0,
+                failures.Count == 0 ? $"{Yinyue.UI.Icons.All.Count} drawn"
+                                    : string.Join(", ", failures.Take(5)));
+
+            // The marks the overlay actually binds to. Named individually so a rename in
+            // Common/Icons fails here rather than silently blanking a button.
+            foreach (var required in new[] { "Play", "Pause", "SkipBack", "SkipForward",
+                                             "Shuffle", "Repeat", "Repeat1", "RepeatOff", "Cog" })
+            {
+                Check($"{required} exists", Yinyue.UI.Icons.All.ContainsKey(required));
+            }
+        }
+
+        /// <summary>True if any pixel was drawn at all.</summary>
+        private static bool HasInk(AppKit.NSImage image)
+        {
+            var rep = new AppKit.NSBitmapImageRep(image.AsTiff()!);
+            for (nint x = 0; x < rep.PixelsWide; x += 2)
+            for (nint y = 0; y < rep.PixelsHigh; y += 2)
+                if (rep.ColorAt(x, y)?.AlphaComponent > 0.05f) return true;
+
+            return false;
         }
 
         /// <summary>
