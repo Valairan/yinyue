@@ -91,6 +91,13 @@ namespace Yinyue
         /// <summary>Invalidates a pending fade-out when the overlay is summoned again.</summary>
         private int _hideGeneration;
 
+        /// <summary>
+        /// The queue panel was opened by a queue: search rather than by the user, so it goes
+        /// away with the search — closed by Escape, by the prefix being edited out, or by the
+        /// jump it was opened for.
+        /// </summary>
+        private bool _queueOpenedBySearch;
+
         /// <summary>Fixed at construction; see OverlayConfig.Animations.</summary>
         private readonly bool _animate;
 
@@ -516,6 +523,7 @@ namespace Yinyue
             _searchCts?.Cancel();
             SearchTextBox.Clear();
             SearchPopup.IsOpen = false;
+            CloseQueueOpenedBySearch();
             _searchResults.Clear();
             ShowSearchMessage(null);
             UpdateSearchPlaceholder();
@@ -575,23 +583,74 @@ namespace Yinyue
         }
 
         /// <summary>
-        /// Matches the queue in memory. No source is consulted — the tracks are already
-        /// here, and asking a server about them would be both slower and wrong.
+        /// A queue search: no results panel. The queue itself is brought up and the best
+        /// match highlighted, so the thing on screen is the thing Enter will jump to. It used
+        /// to list the hits in the results panel like any other search, which meant reading
+        /// a second list to find something already visible in the first. In memory — no
+        /// source is consulted, the tracks are already here — so it runs on every keystroke.
         /// </summary>
-        private SearchResult SearchTheQueue(SearchQuery query)
+        private void SearchTheQueue(SearchQuery query)
         {
-            var matches = _playback.PlayOrder
-                .Where(t => Matches(t, query.Term))
-                .Take(SearchLimit)
-                .ToList();
+            _resultsQuery = query;
+            _searchResults.Clear();
+            SearchPopup.IsOpen = false;
+            ShowSearchMessage(null);
 
-            return SearchResult.Ok(matches);
+            var order = _playback.PlayOrder;
+            if (order.Count == 0)
+            {
+                TxtStatus.Text = "The queue is empty";
+                return;
+            }
+
+            if (!QueuePopup.IsOpen)
+            {
+                OpenPanelBeforeFilling(QueuePopup, QueuePanel);
+                _queueOpenedBySearch = true;
+            }
+            RefreshQueue();
+
+            if (query.IsEmpty)
+            {
+                // "queue:" alone opens the queue at the playing track and says what to do next.
+                SelectInQueue(Math.Max(0, _playback.CurrentOrderPosition));
+                TxtStatus.Text = "Type to find a queued track · ↑ moves onto it";
+                return;
+            }
+
+            int best = QueueSearch.BestMatch(order, query.Term);
+            if (best < 0)
+            {
+                LstQueue.SelectedIndex = -1;
+                TxtStatus.Text = $"Nothing queued matches \"{query.Term}\"";
+                return;
+            }
+
+            SelectInQueue(best);
+            TxtStatus.Text = $"↑ moves onto \"{order[best].Title}\" · Enter jumps to it";
         }
 
-        private static bool Matches(Track track, string term) =>
-            track.Title.Contains(term, StringComparison.OrdinalIgnoreCase) ||
-            track.Artist.Contains(term, StringComparison.OrdinalIgnoreCase) ||
-            track.Album.Contains(term, StringComparison.OrdinalIgnoreCase);
+        private void CloseQueueOpenedBySearch()
+        {
+            if (!_queueOpenedBySearch) return;
+            _queueOpenedBySearch = false;
+            QueuePopup.IsOpen = false;
+        }
+
+        /// <summary>Keyboard focus onto a queue row itself — see <see cref="FocusSearchResult"/> for why the row, not the list.</summary>
+        private void FocusQueueRow(int index)
+        {
+            if (index < 0 || index >= _queueEntries.Count) return;
+
+            LstQueue.SelectedIndex = index;
+            LstQueue.UpdateLayout();
+            LstQueue.ScrollIntoView(_queueEntries[index]);
+
+            if (LstQueue.ItemContainerGenerator.ContainerFromIndex(index) is ListBoxItem row)
+                row.Focus();
+            else
+                LstQueue.Focus();
+        }
 
         private bool HasConfiguredSource() =>
             _config.Current.Library.Folders.Count > 0 || _config.Current.Jellyfin.IsConfigured;
@@ -604,6 +663,16 @@ namespace Yinyue
             // Supersede the previous keystroke's search rather than racing it — otherwise
             // out-of-order responses make results flicker while typing.
             _searchCts?.Cancel();
+
+            // Searching the queue shows no results panel. The queue itself comes up with the
+            // best match highlighted, so what you see is where you are about to go; ↑ moves
+            // onto it and Enter jumps. In memory, so no debounce either.
+            if (query.Target == SearchTarget.Queue)
+            {
+                SearchTheQueue(query);
+                return;
+            }
+            CloseQueueOpenedBySearch();
 
             if (query.IsEmpty)
             {
@@ -633,9 +702,7 @@ namespace Yinyue
             {
                 await Task.Delay(SearchDebounceMs, cts.Token);
 
-                var result = query.Target == SearchTarget.Queue
-                    ? SearchTheQueue(query)
-                    : await _library.SearchAsync(query, SearchLimit, cts.Token);
+                var result = await _library.SearchAsync(query, SearchLimit, cts.Token);
 
                 if (cts.Token.IsCancellationRequested) return;
 
@@ -674,9 +741,24 @@ namespace Yinyue
 
         private void SearchTextBox_PreviewKeyDown(object sender, KeyEventArgs e)
         {
+            bool searchingQueue = _resultsQuery.Target == SearchTarget.Queue && QueuePopup.IsOpen;
+
             if (e.Key == Key.Down && SearchPopup.IsOpen && _searchResults.Count > 0)
             {
                 FocusSearchResult(0);
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Up && searchingQueue && LstQueue.SelectedIndex >= 0)
+            {
+                // The queue sits above the bar, so up is the way onto its highlighted row.
+                FocusQueueRow(LstQueue.SelectedIndex);
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Enter && searchingQueue && LstQueue.SelectedIndex >= 0)
+            {
+                int position = LstQueue.SelectedIndex;
+                CloseSearch();
+                _ = _playback.JumpToAsync(position);
                 e.Handled = true;
             }
             else if (e.Key == Key.Enter && _searchResults.Count > 0)
@@ -769,17 +851,6 @@ namespace Yinyue
             if (_searchResults[index] is TrackCollection collection)
             {
                 await PlayCollectionAsync(collection);
-                return;
-            }
-
-            // A hit from queue: is already queued. Rebuilding the queue from the results
-            // would throw away everything that did not match the search.
-            if (_resultsQuery.Target == SearchTarget.Queue)
-            {
-                int position = _playback.PlayOrder.ToList().IndexOf((Track)_searchResults[index]);
-                CloseSearch();
-
-                if (position >= 0) await _playback.JumpToAsync(position);
                 return;
             }
 
@@ -1097,7 +1168,17 @@ namespace Yinyue
 
             if (e.Key == Key.Enter && index >= 0)
             {
+                // A jump is what a queue search was for; the search is finished with.
+                if (_queueOpenedBySearch) CloseSearch();
                 _ = _playback.JumpToAsync(index);
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Down && _queueOpenedBySearch && index == _queueEntries.Count - 1)
+            {
+                // Arrowing off the bottom goes back to typing — the box is directly below.
+                SearchTextBox.Focus();
+                Keyboard.Focus(SearchTextBox);
+                SearchTextBox.CaretIndex = SearchTextBox.Text.Length;
                 e.Handled = true;
             }
             else if (e.Key == Key.Delete && index >= 0)

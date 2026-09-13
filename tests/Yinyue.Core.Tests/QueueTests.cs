@@ -130,6 +130,26 @@ public static class QueueTests
             playback.Dispose();
         });
 
+        Check.Group("queue search picks one best match", () =>
+        {
+            var order = new List<Track>
+            {
+                new() { Id = "0", Title = "Back in Black", Artist = "AC/DC", Album = "Back in Black" },
+                new() { Id = "1", Title = "Hells Bells", Artist = "AC/DC", Album = "Back in Black" },
+                new() { Id = "2", Title = "Hells Bells (Live)", Artist = "AC/DC", Album = "Live at Donington" },
+                new() { Id = "3", Title = "Thunderstruck", Artist = "AC/DC", Album = "The Razors Edge" },
+            };
+
+            Check.Equal("a leading title match, earliest wins the tie", 1, QueueSearch.BestMatch(order, "hells"));
+            Check.Equal("an exact title beats a leading one", 3, QueueSearch.BestMatch(order, "Thunderstruck"));
+            Check.Equal("a word inside a title", 2, QueueSearch.BestMatch(order, "live"));
+            Check.Equal("album only when no title has it", 3, QueueSearch.BestMatch(order, "razor"));
+            Check.Equal("artist on every row: the first", 0, QueueSearch.BestMatch(order, "ac/dc"));
+            Check.Equal("case does not matter", 1, QueueSearch.BestMatch(order, "HELLS"));
+            Check.Equal("nothing matches", -1, QueueSearch.BestMatch(order, "zzz"));
+            Check.Equal("nothing typed", -1, QueueSearch.BestMatch(order, "  "));
+        });
+
         await Check.GroupAsync("queue — shuffle", async () =>
         {
             var (playback, _) = NewPlayback("t0", "t1", "t2", "t3");

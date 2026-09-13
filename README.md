@@ -155,7 +155,7 @@ A prefix at the start of a search narrows what comes back:
 | `album:` | Albums only |
 | `playlist:` | Playlists only |
 | `fav:` | Favourites only |
-| `queue:` `q:` | Searches what is already queued |
+| `queue:` `q:` | Brings up the queue with the best match highlighted; ↑ moves onto it, Enter jumps to it |
 
 Plurals work, and so does `favorite:`. A colon anywhere but the start is just a colon, so
 searching for `Alive: Remastered` does what you would expect.

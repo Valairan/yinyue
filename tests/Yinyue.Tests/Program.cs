@@ -1027,6 +1027,68 @@ public static class WindowTests
             playback.Dispose();
         });
 
+        Check.Group("a queue search brings the queue up with the best match highlighted", () =>
+        {
+            var (library, _) = Make.Library(
+                new FakeSource("Fake", Yinyue.Models.TrackSource.Local, Make.Tracks("a", "b", "c")) { Resolves = true });
+            var config = new ConfigService();
+            var playback = new PlaybackService(new SilentAudioPlayer(), library);
+            var overlay = new MainWindow(config, library, playback, () => null!);
+            ShowAndActivate(overlay);
+            overlay.ShowOverlay();
+            Pump();
+
+            playback.PlayQueueAsync(new[]
+            {
+                Make.Track("a", "Hells Bells"), Make.Track("b", "Back in Black"), Make.Track("c", "Thunderstruck"),
+            }, 0).GetAwaiter().GetResult();
+            Pump();
+
+            var box = (System.Windows.Controls.TextBox)overlay.FindName("SearchTextBox");
+            var results = (System.Windows.Controls.Primitives.Popup)overlay.FindName("SearchPopup");
+            var queue = (System.Windows.Controls.Primitives.Popup)overlay.FindName("QueuePopup");
+            var list = (ListBox)overlay.FindName("LstQueue");
+
+            box.Focus();
+            Keyboard.Focus(box);
+            box.Text = "queue:thunder";
+            Pump(); Pump();
+
+            Check.That("the queue comes up", queue.IsOpen);
+            Check.That("and the results panel does not", !results.IsOpen);
+            Check.Equal("the best match is highlighted", 2, list.SelectedIndex);
+
+            int FocusedRow() => Keyboard.FocusedElement is ListBoxItem row
+                ? list.ItemContainerGenerator.IndexFromContainer(row) : -1;
+
+            Press(box, Key.Up);
+            Pump();
+            Check.Equal("Up moves onto the highlighted row", 2, FocusedRow());
+
+            Press((UIElement)Keyboard.FocusedElement, Key.Down);
+            Pump();
+            Check.That("Down off the bottom returns to typing", Keyboard.FocusedElement == box);
+
+            box.Text = "queue:zzz";
+            Pump();
+            Check.Equal("no match, no highlight", -1, list.SelectedIndex);
+            Check.That("but the queue stays up", queue.IsOpen);
+
+            box.Text = "queue:back";
+            Pump();
+            Check.Equal("a new term moves the highlight", 1, list.SelectedIndex);
+
+            Press(box, Key.Enter);
+            WaitUntil(() => playback.CurrentTrack?.Id == "b", 3000);
+            Check.Equal("Enter jumps to it", "b", playback.CurrentTrack?.Id);
+            Pump();
+            Check.That("the search is cleared", box.Text.Length == 0);
+            Check.That("and the queue it opened goes with it", !queue.IsOpen);
+
+            overlay.Close();
+            playback.Dispose();
+        });
+
         Check.Group("album art is a centred square", () =>
         {
             var config = new ConfigService();

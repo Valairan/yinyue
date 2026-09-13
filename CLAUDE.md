@@ -440,9 +440,15 @@ would otherwise need a new member.
   to protect. Still bounded: this library has 232.
 - The library enforces the scope above the sources, **per kind**, so a source answering an
   album-only search cannot slip playlists in beside them.
-- `queue:` never consults a source — the tracks are already in hand, and asking a server
-  about them would be slower and wrong. Enter on such a hit **jumps** to it rather than
-  rebuilding the queue from the results, which would discard everything that did not match.
+- **`queue:` brings the queue up, not a results list.** The tracks are already in hand, so no
+  source is consulted and it runs on every keystroke without the debounce. The queue panel
+  opens with the **best match highlighted** — `QueueSearch.BestMatch` ranks an exact title over
+  a leading one over a containing one over artist over album, ties to queue order — `↑` from
+  the box moves onto that row (the queue sits above the bar), `↓` off the bottom returns to
+  the box, and Enter in either place **jumps** to it and closes the search. It used to list
+  the hits in the results panel, which meant reading a second list to find something already
+  visible in the first. A queue the search opened closes with the search; one the user had
+  open stays. `queue:` alone opens the queue at the playing track.
 - The local index serves neither collections nor favourites, so it skips the database round
   trip entirely for those rather than returning a misleading empty success.
 - A prefix with nothing after it is intent without a subject: the overlay says what the
