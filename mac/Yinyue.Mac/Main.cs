@@ -37,6 +37,11 @@ namespace Yinyue
 
             NSApplication.Init();
 
+            // Opt in before any window is built. ReleaseWhenClosed(false) throws without it,
+            // and SettingsWindow is created lazily from a click -- so that throw is invisible:
+            // the menu item simply does nothing and nothing reaches a log.
+            NSWindow.TrackReleasedWhenClosed = true;
+
             var secrets = new KeychainSecretStore();
             var config = new ConfigService(secrets);
 

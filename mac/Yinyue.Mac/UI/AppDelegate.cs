@@ -50,7 +50,18 @@ namespace Yinyue.UI
         /// </summary>
         public void ShowSettings()
         {
-            _settings ??= new SettingsWindow(_config, _jellyfin, _indexer);
+            try
+            {
+                _settings ??= new SettingsWindow(_config, _jellyfin, _indexer);
+            }
+            catch (Exception ex)
+            {
+                // A menu item that silently does nothing is the worst failure mode there is,
+                // and settings is the only route into the app on a fresh install.
+                Console.Error.WriteLine($"[Settings] {ex}");
+                _stack?.Toast("Settings could not be opened.", evenWhileOverlayShown: true);
+                return;
+            }
 
             // Activate() is the macOS 14 spelling and ActivateIgnoringOtherApps is obsolete
             // from 14 — but the deployment target is 13, so both are needed.

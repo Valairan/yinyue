@@ -32,6 +32,7 @@ namespace Yinyue
             if (which is "all" or "media") MediaControls();
             if (which is "all" or "search") SearchStack();
             if (which is "all" or "sleep") SleepTimerRules();
+            if (which is "all" or "windows") WindowsOpen();
 
             Console.WriteLine();
             Console.WriteLine(_failed == 0 ? "PASS" : $"FAIL — {_failed} check(s)");
@@ -43,6 +44,38 @@ namespace Yinyue
             if (!ok) _failed++;
             Console.WriteLine($"  [{(ok ? "ok" : "FAIL")}] {label}{(detail is null ? "" : $"  — {detail}")}");
             Console.Out.Flush();
+        }
+
+        /// <summary>
+        /// Every window the app can open must actually construct.
+        ///
+        /// Settings is created lazily and only ever from a click, so a throw in its
+        /// constructor is invisible: the menu item does nothing and no error reaches a log.
+        /// Exactly the Windows reason for building every window in its suite.
+        /// </summary>
+        private static void WindowsOpen()
+        {
+            Console.WriteLine("\nWindows construct");
+
+            // The same opt-in Main makes, so the suite exercises the real path.
+            AppKit.NSWindow.TrackReleasedWhenClosed = true;
+
+            var config = new Yinyue.Services.ConfigService();
+
+            try
+            {
+                var indexer = new Yinyue.Services.LibraryIndexerService(new[] { "mp3" });
+                var jellyfin = new Yinyue.Services.JellyfinApiClient(new[] { "mp3" });
+
+                var settings = new Yinyue.UI.SettingsWindow(config, jellyfin, indexer);
+                Check("SettingsWindow constructs", true);
+
+                settings.Close();
+            }
+            catch (Exception ex)
+            {
+                Check("SettingsWindow constructs", false, $"{ex.GetType().Name}: {ex.Message}");
+            }
         }
 
         /// <summary>
@@ -152,6 +185,18 @@ namespace Yinyue
             Check("only the search bar is on screen after a summon",
                 showing.Count == 1 && showing[0] == "search bar",
                 showing.Count == 0 ? "nothing" : string.Join(", ", showing));
+
+            // Hiding the overlay must take the whole stack with it. The queue was left
+            // behind at first -- visible with no overlay under it and no keys routed to it.
+            stack.ToggleQueue();
+            Check("the queue opens", stack.PanelsForTest.First(p => p.Name == "queue").Panel.IsVisible);
+
+            applet.HideOverlay();
+            var stillUp = stack.PanelsForTest.Where(p => p.Panel.IsVisible).Select(p => p.Name).ToList();
+            Check("hiding the overlay dismisses every panel",
+                stillUp.Count == 0, string.Join(", ", stillUp));
+
+            applet.ShowOverlay();
 
             // A toast must work with the overlay DOWN -- that is its entire purpose, and a
             // child window would be hidden with its parent at exactly that moment.

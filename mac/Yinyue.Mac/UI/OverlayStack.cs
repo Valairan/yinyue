@@ -130,10 +130,17 @@ namespace Yinyue.UI
             Layout();
         }
 
+        /// <summary>
+        /// Hiding the overlay takes the whole stack with it — the queue included, which it
+        /// did not at first. Windows closes all three popups in ClosePanels for the same
+        /// reason: a panel left behind by a dismissed overlay is stranded, with no window to
+        /// belong to and no keys routed to it.
+        /// </summary>
         public void Hide()
         {
             _searchBar.OrderOut(null);
             _results.OrderOut(null);
+            _queue.OrderOut(null);
         }
 
         /// <summary>Puts the caret in the box. The box was already there; nothing is revealed.</summary>
