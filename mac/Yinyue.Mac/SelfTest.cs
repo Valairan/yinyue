@@ -87,6 +87,12 @@ namespace Yinyue
             Metric("ModeGroupGap", 12);
             Metric("SeekBarHeight", 12);
 
+            // The stack. ToastRowHeight was the number CLAUDE.md flagged as living in two
+            // places on Windows with a comment on each saying they must match.
+            Metric("SideGap", 6);
+            Metric("ToastRowHeight", 60);
+            Metric("ReservedForToasts", 132);
+
             // And the laid-out view actually honours them.
             var applet = new Yinyue.UI.AppletView(BuildIdlePlayback());
 

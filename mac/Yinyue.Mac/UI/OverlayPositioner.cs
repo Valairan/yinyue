@@ -22,20 +22,10 @@ namespace Yinyue.UI
     /// </summary>
     public static class OverlayPositioner
     {
-        /// <summary>Gap between stacked surfaces. Matches OverlayPositioner.SideGap on Windows.</summary>
-        public const double SideGap = 6;
-
-        /// <summary>Fixed row height, so a toast gaining a level bar cannot resize the stack.</summary>
-        public const double ToastRowHeight = 60;
-
-        public const int ToastRows = 2;
-
-        /// <summary>
-        /// Reserved permanently, showing or not. Toasts arrive unbidden — on a track change,
-        /// or a volume key pressed inside another app — and a panel that jumped upward
-        /// mid-interaction would move the thing being read.
-        /// </summary>
-        public static double ReservedForToasts => ToastRows * (ToastRowHeight + SideGap);
+        // The stack's measurements come from OverlayMetrics in Core, like every other
+        // number in the overlay. They were briefly redeclared here, which is exactly the
+        // drift that file exists to prevent.
+        public static double ReservedForToasts => OverlayMetrics.ReservedForToasts;
 
         /// <summary>
         /// Places the overlay itself, lifting it clear of the reserved toast rows when it is

@@ -39,6 +39,34 @@ namespace Yinyue.UI
         public const double ContentWidth =
             PanelWidth - RootPadding * 2 - RootBorderThickness * 2;
 
+        // ---- the stack ----
+        //
+        // Everything lives in one vertical stack and every surface has a reserved slot:
+        // bottom upwards, the hold dial, the message toast, the applet, the search bar, the
+        // results, the queue. All are PanelWidth wide and separated by SideGap.
+
+        /// <summary>Gap between stacked surfaces.</summary>
+        public const double SideGap = 6;
+
+        /// <summary>
+        /// A toast row is a fixed height, so a toast gaining or losing its level bar cannot
+        /// resize the window and shift everything above it.
+        ///
+        /// This number used to live twice on Windows — once as a resource in App.xaml sizing
+        /// the window, once as a constant in OverlayPositioner spacing the rows — with a
+        /// comment on each saying they must match. One definition is the fix.
+        /// </summary>
+        public const double ToastRowHeight = 60;
+
+        public const int ToastRows = 2;
+
+        /// <summary>
+        /// Reserved permanently, showing or not. Toasts arrive unbidden — on a track change,
+        /// or a volume key pressed inside another app — and a panel that jumped upward
+        /// mid-interaction would move the thing being read. A fixed slot is worth the pixels.
+        /// </summary>
+        public const double ReservedForToasts = ToastRows * (ToastRowHeight + SideGap);
+
         // ---- artwork ----
 
         /// <summary>
