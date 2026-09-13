@@ -1089,6 +1089,39 @@ public static class WindowTests
             playback.Dispose();
         });
 
+        Check.Group("the tray tooltip says what is playing, and fits", () =>
+        {
+            var track = Make.Track("t", "Hells Bells", artist: "AC/DC");
+
+            string text = TrayTooltip.Compose(track, playing: true, muted: false, volume: 0.75, sleepRemaining: null);
+            Check.Equal("track, state and volume, dotted like the Mac's",
+                "Yinyue  ·  Hells Bells — AC/DC  ·  playing  ·  Volume 75%", text);
+
+            Check.That("paused reads as paused",
+                TrayTooltip.Compose(track, false, false, 0.75, null).Contains("  ·  paused  ·  "));
+            Check.That("muted replaces the level",
+                TrayTooltip.Compose(track, true, true, 0.75, null).EndsWith("  ·  Muted"));
+            Check.That("the sleep timer is on the end",
+                TrayTooltip.Compose(track, true, false, 0.75, TimeSpan.FromMinutes(42)).EndsWith("  ·  Sleep in 42m"));
+            Check.Equal("nothing queued, nothing about a track",
+                "Yinyue  ·  Volume 75%", TrayTooltip.Compose(null, false, false, 0.75, null));
+
+            // NotifyIcon.Text throws past its limit rather than truncating, so a long title is
+            // what gives way — with an ellipsis, and the state and volume kept whole.
+            var epic = Make.Track("e", new string('x', 200), artist: "Someone");
+            string longText = TrayTooltip.Compose(epic, true, false, 0.5, TimeSpan.FromHours(2), TrayTooltip.Limit);
+            Check.That("fits the limit", longText.Length <= TrayTooltip.Limit, $"{longText.Length} chars");
+            Check.That("the title was shortened with an ellipsis", longText.Contains("…"));
+            Check.That("and the fixed parts survived", longText.EndsWith("  ·  playing  ·  Volume 50%  ·  Sleep in 2h"));
+
+            // The limit itself, checked against the real control rather than remembered:
+            // .NET Framework stopped at 63, .NET 8 takes 127.
+            using var icon = new NotifyIcon();
+            icon.Text = new string('a', TrayTooltip.Limit);
+            Check.Equal("the tray accepts the limit exactly", TrayTooltip.Limit, icon.Text.Length);
+            Check.Throws<ArgumentOutOfRangeException>("and refuses one more", () => icon.Text = new string('a', TrayTooltip.Limit + 1));
+        });
+
         Check.Group("album art is a centred square", () =>
         {
             var config = new ConfigService();

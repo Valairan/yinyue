@@ -411,7 +411,12 @@ names.
   cycling, so checking it meant pressing the shortcut — which also changed the setting.
   `SleepTimerService.Describe` is coarse far out and precise near the end, and rounds up, so
   it never reads "0m" with music still to come. The tooltip is shared with volume and written
-  from one place, since `NotifyIcon.Text` throws above 63 characters rather than truncating.
+  from one place — `TrayTooltip.Compose`, which is pure and tested. It carries the track, playing
+  or paused, the volume and the sleep timer, dotted like the Mac's menu-bar tooltip, and is
+  refreshed on track, state, volume and timer changes and once when the tray is built. Windows
+  caps it at 127 characters and `NotifyIcon.Text` **throws** past that rather than truncating
+  (63 was the .NET Framework limit; the suite checks the real control), so a long title is
+  shortened with an ellipsis and the state and volume are kept whole.
 
 **Search prefixes.** A leading prefix narrows what a search returns. `SearchQuery.Parse`
 turns the raw box text into a term plus three orthogonal narrowings, and `MusicLibrary`

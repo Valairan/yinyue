@@ -210,6 +210,7 @@ namespace Yinyue
             _playback.TrackChanged += OnTrackChangedForToast;
             _playback.PlayingStateChanged += OnPlayingStateChangedForSmtc;
             _playback.PlayingStateChanged += (_, _) => Dispatcher.BeginInvoke(UpdateTrayTooltip);
+            _playback.TrackChanged += (_, _) => Dispatcher.BeginInvoke(UpdateTrayTooltip);
             _playback.PlayPauseRequested += OnPlayPauseRequested;
 
             _playback.Volume = _config.Current.Playback.Volume;
@@ -500,29 +501,21 @@ namespace Yinyue
             });
         }
 
+        /// <summary>
+        /// The tray tooltip, written from one place because it has several sources — track,
+        /// state, volume, sleep timer — that would otherwise overwrite each other. The text is
+        /// composed by <see cref="TrayTooltip"/>, which the suite checks directly.
+        /// </summary>
         private void UpdateTrayTooltip()
         {
-            if (_notifyIcon == null) return;
+            if (_notifyIcon == null || _playback == null) return;
 
-            string text = "Yinyue";
-
-            if (_playback != null)
-            {
-                // The one persistent surface, so the state a toast showed a minute ago can
-                // still be found by hovering the tray.
-                if (_playback.IsPlaying) text += " — playing";
-                else if (_playback.CurrentTrack != null) text += " — paused";
-
-                text += _playback.IsMuted || _playback.Volume <= 0.0001
-                    ? " — muted"
-                    : $" — volume {_playback.Volume * 100:F0}%";
-            }
-
-            if (_sleepTimer is { IsRunning: true })
-                text += $" — sleeping in {SleepTimerService.Describe(_sleepTimer.Remaining)}";
-
-            // NotifyIcon.Text throws above 63 characters rather than truncating.
-            _notifyIcon.Text = text.Length > 63 ? text[..63] : text;
+            _notifyIcon.Text = TrayTooltip.Compose(
+                _playback.CurrentTrack,
+                _playback.IsPlaying,
+                _playback.IsMuted || _playback.Volume <= 0.0001,
+                _playback.Volume,
+                _sleepTimer is { IsRunning: true } ? _sleepTimer.Remaining : null);
         }
 
         private void ApplySleepTimerSettings()
@@ -760,6 +753,10 @@ namespace Yinyue
 
             _notifyIcon.ContextMenuStrip = menu;
             _notifyIcon.DoubleClick += (_, _) => _overlay!.ToggleOverlay();
+
+            // The restored queue and saved volume are already in place: say so from the start
+            // rather than waiting for the first change.
+            UpdateTrayTooltip();
 
             if (_pendingBalloonTitle != null)
             {
