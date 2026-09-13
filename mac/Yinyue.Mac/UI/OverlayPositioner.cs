@@ -35,6 +35,34 @@ namespace Yinyue.UI
         public static void PositionApplet(NSWindow window, OverlayConfig config) =>
             Position(window, config, IsBottomAnchored(config.Anchor) ? ReservedForToasts : 0);
 
+        /// <summary>
+        /// Places a toast in its reserved row beneath the applet's slot. <paramref name="row"/>
+        /// is 0 for the message and 1 for the hold dial, so the two can both be on screen
+        /// without colliding and neither can land on the applet.
+        ///
+        /// Computed from the applet's <i>slot</i> rather than from the applet window, because
+        /// a toast's whole job is to appear while the overlay is hidden — there may be no
+        /// applet on screen to measure.
+        /// </summary>
+        public static void PositionToastRow(NSWindow window, OverlayConfig config, int row)
+        {
+            var screen = TargetScreen(config);
+            var work = screen.VisibleFrame;
+
+            double appletHeight = OverlayMetrics.AppletHeight;
+            double lift = IsBottomAnchored(config.Anchor) ? OverlayMetrics.ReservedForToasts : 0;
+
+            double appletX = HorizontalOrigin(config.Anchor, work, OverlayMetrics.PanelWidth, config.MarginX);
+            double appletY = VerticalOrigin(config.Anchor, work, appletHeight, config.MarginY, lift);
+
+            // Rows descend from just under the applet. AppKit's y grows upward, so "below"
+            // means subtracting.
+            double pitch = OverlayMetrics.ToastRowHeight + OverlayMetrics.SideGap;
+            double y = appletY - OverlayMetrics.SideGap - OverlayMetrics.ToastRowHeight - row * pitch;
+
+            window.SetFrameOrigin(new CGPoint(appletX, y));
+        }
+
         public static void Position(NSWindow window, OverlayConfig config, double bottomInset)
         {
             var screen = TargetScreen(config);

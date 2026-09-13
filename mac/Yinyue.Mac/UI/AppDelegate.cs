@@ -229,7 +229,7 @@ namespace Yinyue.UI
                 case HotkeyActions.Mute:
                     _playback.ToggleMute();
                     _stack?.Toast(_playback.IsMuted ? "Muted" : "Unmuted",
-                        _playback.IsMuted ? 0 : _playback.Volume);
+                        _playback.IsMuted ? 0 : _playback.Volume, evenWhileOverlayShown: true);
                     break;
 
                 case HotkeyActions.OpenQueue:
@@ -304,8 +304,14 @@ namespace Yinyue.UI
         /// </summary>
         private const int FavoritesCap = 1000;
 
+        /// <summary>
+        /// Volume is the one change that toasts even while the overlay is showing. It used to
+        /// switch surfaces with the overlay's state, and the same gesture reading two
+        /// different ways was less polished than one consistent readout with a level bar.
+        /// The toast has its own reserved row, so it never covers anything.
+        /// </summary>
         private void AnnounceVolume(double level) =>
-            _stack?.Toast($"Volume {Math.Round(level * 100)}%", level);
+            _stack?.Toast($"Volume {Math.Round(level * 100)}%", level, evenWhileOverlayShown: true);
 
         private async Task ShuffleFavoritesAsync()
         {

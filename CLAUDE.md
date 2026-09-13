@@ -938,6 +938,16 @@ Requirements on it, all load-bearing:
 - **Suppressed until `_ready`.** Restoring a queue and applying the saved volume both raise
   change events during startup, and neither is something the user did.
 
+**On macOS a toast must not be a child window.** A child is hidden whenever its parent is,
+and a toast exists to be seen while the overlay is *down* — a volume key pressed inside
+another app, a track change during a skip. It was briefly built as a child of the applet,
+which both put two empty rounded boxes on screen from launch (`AddChildWindow` orders the
+child in) and would have hidden the toast at the only moment it matters.
+`OverlayPositioner.PositionToastRow` places it against the anchor's *slot* instead, computed
+without reference to the applet window, because there may be no applet on screen to measure.
+The suite now **counts** what is visible rather than only measuring what it expects to find,
+which is the check that catches a surface nobody asked for.
+
 `WindowStyling` holds the Win32 traits WPF does not expose (tool window, non-activating,
 DWM rounded corners), shared by the overlay and the toast.
 

@@ -66,9 +66,9 @@ namespace Yinyue.UI
             _applet.AddChildWindow(_results, NSWindowOrderingMode.Above);
             _applet.AddChildWindow(_queue, NSWindowOrderingMode.Above);
 
-            // The toasts go BELOW the applet, in the two rows reserved for them.
-            _applet.AddChildWindow(_message, NSWindowOrderingMode.Below);
-            _applet.AddChildWindow(_hold, NSWindowOrderingMode.Below);
+            // The toasts are deliberately NOT children: a child window is hidden with its
+            // parent, and a toast exists to be seen while the overlay is hidden. They place
+            // themselves in their reserved rows when shown.
 
             // The stack owns its relationship to the applet rather than having the delegate
             // wire it: a stack that has not been laid out sits at the window origin, and
@@ -119,14 +119,9 @@ namespace Yinyue.UI
                 if (panel.IsVisible) y += panel.Frame.Height + OverlayMetrics.SideGap;
             }
 
-            // Downward: the two toast rows, reserved permanently whether or not a toast is
-            // showing. Making room on demand would be worse — toasts arrive unbidden, and a
-            // panel that jumped mid-interaction would move the thing being read.
-            double below = anchor.Y - OverlayMetrics.SideGap - OverlayMetrics.ToastRowHeight;
-            _message.SetFrameOrigin(new CGPoint(anchor.X, below));
-
-            below -= OverlayMetrics.SideGap + OverlayMetrics.ToastRowHeight;
-            _hold.SetFrameOrigin(new CGPoint(anchor.X, below));
+            // The toast rows are not laid out here. The space below the applet is reserved
+            // for them by the bottom-anchor lift in PositionApplet, but the windows place
+            // themselves when shown — they have to work with no applet on screen at all.
         }
 
         public void Show()
@@ -258,20 +253,15 @@ namespace Yinyue.UI
         /// overlay is hidden</b>: with the overlay open the applet already says the same
         /// thing, and two readouts of one change is noise.
         /// </summary>
-        public void Toast(string message, double? level = null)
+        public void Toast(string message, double? level = null, bool evenWhileOverlayShown = false)
         {
-            if (_applet.IsVisible) return;
+            if (!evenWhileOverlayShown && _applet.IsVisible) return;
 
             _message.Show(message, level);
             _message.Dismiss(TimeSpan.FromSeconds(2));
-            Layout();
         }
 
-        public void ShowHold(string message, double progress)
-        {
-            _hold.Show(message, progress);
-            Layout();
-        }
+        public void ShowHold(string message, double progress) => _hold.Show(message, progress);
 
         public void EndHold() => _hold.Dismiss(TimeSpan.Zero);
 

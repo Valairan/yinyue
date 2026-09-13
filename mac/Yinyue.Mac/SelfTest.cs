@@ -144,11 +144,33 @@ namespace Yinyue
 
             Check("an empty box means Escape falls through to dismiss", !stack.HandleEscape());
 
+            // Nothing that has not been asked for is on screen. The toasts were child
+            // windows once, which AddChildWindow orders in -- so two empty rounded boxes sat
+            // under the applet from launch. Counting windows is the check that catches that;
+            // measuring the ones you expect never will.
+            var showing = stack.PanelsForTest.Where(p => p.Panel.IsVisible).Select(p => p.Name).ToList();
+            Check("only the search bar is on screen after a summon",
+                showing.Count == 1 && showing[0] == "search bar",
+                showing.Count == 0 ? "nothing" : string.Join(", ", showing));
+
+            // A toast must work with the overlay DOWN -- that is its entire purpose, and a
+            // child window would be hidden with its parent at exactly that moment.
+            applet.HideOverlay();
+            stack.Toast("hidden-overlay toast");
+
+            var (_, toastPanel) = stack.PanelsForTest.First(p => p.Name == "toast");
+            Check("a toast shows while the overlay is hidden", toastPanel.IsVisible);
+            Check("and it is not a child of the applet",
+                !applet.ChildWindows.Any(w => w.Equals(toastPanel)));
+
+            applet.ShowOverlay();
+
             // Every surface in the stack is the same width and left-aligned with the applet,
             // measured in AppKit points -- CGWindowList reports Quartz display coordinates,
             // which differ from points on a scaled Retina mode and would look like a bug.
             stack.ToggleQueue();
-            stack.Toast("measuring");
+            stack.Toast("measuring", evenWhileOverlayShown: true);
+            stack.ShowHold("measuring", 0.5);
             stack.Layout();
 
             foreach (var (name, panel) in stack.PanelsForTest)
@@ -161,11 +183,10 @@ namespace Yinyue
                     $"{panel.Frame.X} vs {applet.Frame.X}");
             }
 
-            // The two toast rows sit below the applet, reserved whether or not one is showing.
-            var (_, message) = stack.PanelsForTest.First(p => p.Name == "toast");
+            // The toast sits in the row reserved below the applet by the bottom-anchor lift.
             Check("the toast row is below the applet",
-                message.Frame.Y + message.Frame.Height < applet.Frame.Y + 0.5,
-                $"toast top={message.Frame.Y + message.Frame.Height}, applet y={applet.Frame.Y}");
+                toastPanel.Frame.Y + toastPanel.Frame.Height < applet.Frame.Y + 0.5,
+                $"toast top={toastPanel.Frame.Y + toastPanel.Frame.Height}, applet y={applet.Frame.Y}");
 
             applet.Close();
         }

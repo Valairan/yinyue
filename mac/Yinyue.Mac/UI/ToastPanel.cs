@@ -33,6 +33,14 @@ namespace Yinyue.UI
     /// · <b>A fade-out in progress is reversible</b>, so a toast raised mid-fade is not
     ///   hidden a moment later by the old animation finishing.
     /// </summary>
+    /// <remarks>
+    /// <b>Not a child window of the applet</b>, and that is the load-bearing part. A child
+    /// window is hidden whenever its parent is, and a toast's entire purpose is to appear
+    /// while the overlay is <i>down</i> — a volume key pressed inside another app, a track
+    /// change during a skip. Making it a child both showed it when nothing had been said and
+    /// would have hidden it at the only moment it matters. It positions itself against the
+    /// anchor instead, exactly as the Windows toast does.
+    /// </remarks>
     public sealed class ToastPanel : StackedPanel
     {
         private readonly OverlayConfig _config;
@@ -98,7 +106,15 @@ namespace Yinyue.UI
             _generation++;
             AlphaValue = 1;
 
-            if (!IsVisible) OrderFrontRegardless();
+            if (!IsVisible)
+            {
+                // Positioned only on the way in. A repeat call must not reposition: the
+                // window is re-placed solely when its height changes, which nothing here
+                // does, and re-running the entrance on every call is what made rapid volume
+                // steps strobe on Windows.
+                OverlayPositioner.PositionToastRow(this, _config, (int)Role);
+                OrderFrontRegardless();
+            }
         }
 
         /// <summary>
