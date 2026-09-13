@@ -16,7 +16,7 @@ namespace Yinyue.UI
     /// box, and a search box with placeholder text in it is a stronger hint than a lens icon
     /// anyway.
     /// </summary>
-    public sealed class SearchBarSection : OverlaySection
+    public sealed class SearchBarPanel : StackedPanel
     {
         private readonly NSTextField _box;
         private readonly NSTextField _placeholder;
@@ -27,7 +27,7 @@ namespace Yinyue.UI
         /// <summary>Enter, Escape, and the arrows the results list needs.</summary>
         public event EventHandler<NSEvent>? KeyPressed;
 
-        public SearchBarSection(OverlayConfig config)
+        public SearchBarPanel(OverlayConfig config)
             : base(config, OverlayMetrics.SearchBarHeight)
         {
             var area = ContentArea;
@@ -40,7 +40,7 @@ namespace Yinyue.UI
                 Image = Icon.Make(Icons.Search, OverlayMetrics.SearchIconSize, Theme.Subtext),
                 ImageScaling = NSImageScale.ProportionallyDown,
             };
-            AddSubview(icon);
+            ContentView!.AddSubview(icon);
 
             double boxX = area.X + 2 + OverlayMetrics.SearchIconSize + OverlayMetrics.SearchIconGap;
             double boxW = area.X + area.Width - boxX;
@@ -62,7 +62,7 @@ namespace Yinyue.UI
                 TextColor = Theme.Surface2,
                 Font = SearchFont,
             };
-            AddSubview(_placeholder);
+            ContentView.AddSubview(_placeholder);
 
             _box = new NSTextField
             {
@@ -81,8 +81,14 @@ namespace Yinyue.UI
                 QueryChanged?.Invoke(this, _box.StringValue);
             };
 
-            AddSubview(_box);
+            ContentView.AddSubview(_box);
         }
+
+        /// <summary>
+        /// This one panel does take keys — it is the only one that should. The others are
+        /// driven by global shortcuts precisely so they never have to.
+        /// </summary>
+        public override bool CanBecomeKeyWindow => true;
 
         /// <summary>
         /// System fonts are always present but the binding types them as nullable; asserted
@@ -106,7 +112,7 @@ namespace Yinyue.UI
         /// <summary>Puts the caret in the box. Reveals nothing — the box was already there.</summary>
         public void FocusBox()
         {
-            Window?.MakeFirstResponder(_box);
+            MakeFirstResponder(_box);
 
             // Caret to the end rather than selecting everything, so a shortcut pressed
             // mid-search does not lose what was typed on the next keystroke.

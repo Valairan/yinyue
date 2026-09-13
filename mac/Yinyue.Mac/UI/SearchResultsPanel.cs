@@ -15,7 +15,7 @@ namespace Yinyue.UI
     /// since two pressings of one recording share a running time. `Track.SearchSubtitle` is
     /// what carries the album, and `TrackCollection` mirrors it so one row renders either.
     /// </summary>
-    public sealed class SearchResultsSection : OverlaySection
+    public sealed class SearchResultsPanel : StackedPanel
     {
         private readonly NSView _rows;
         private readonly NSTextField _message;
@@ -25,11 +25,11 @@ namespace Yinyue.UI
 
         private int _selected = -1;
 
-        public SearchResultsSection(OverlayConfig config)
+        public SearchResultsPanel(OverlayConfig config)
             : base(config, OverlayMetrics.ResultRowHeight + Inset * 2)
         {
             _rows = new NSView(ContentArea);
-            AddSubview(_rows);
+            ContentView!.AddSubview(_rows);
 
             _message = new NSTextField
             {
@@ -43,7 +43,7 @@ namespace Yinyue.UI
                        ?? NSFont.SystemFontOfSize(NSFont.SystemFontSize)!,
                 StringValue = string.Empty,
             };
-            AddSubview(_message);
+            ContentView.AddSubview(_message);
         }
 
         private static double Inset => OverlayMetrics.RootPadding + OverlayMetrics.RootBorderThickness;
@@ -67,7 +67,7 @@ namespace Yinyue.UI
             _message.Hidden = false;
             _message.StringValue = text;
 
-            SetSectionHeight(OverlayMetrics.ResultRowHeight + Inset * 2);
+            SetHeight(OverlayMetrics.ResultRowHeight + Inset * 2);
             _message.Frame = ContentArea;
         }
 
@@ -86,7 +86,7 @@ namespace Yinyue.UI
             _message.Hidden = true;
 
             int visible = Math.Min(_items.Count, OverlayMetrics.MaxVisibleResults);
-            SetSectionHeight(Math.Max(1, visible) * OverlayMetrics.ResultRowHeight + Inset * 2);
+            SetHeight(Math.Max(1, visible) * OverlayMetrics.ResultRowHeight + Inset * 2);
 
             var area = ContentArea;
             _rows.Frame = area;

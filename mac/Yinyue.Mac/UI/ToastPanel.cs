@@ -41,9 +41,8 @@ namespace Yinyue.UI
     /// would have hidden it at the only moment it matters. It positions itself against the
     /// anchor instead, exactly as the Windows toast does.
     /// </remarks>
-    public sealed class ToastSection : OverlaySection
+    public sealed class ToastPanel : StackedPanel
     {
-
         private readonly OverlayConfig _config;
         private readonly NSImageView _glyph;
         private readonly NSTextField _text;
@@ -56,7 +55,7 @@ namespace Yinyue.UI
         /// </summary>
         private int _generation;
 
-        public ToastSection(OverlayConfig config, ToastRole role)
+        public ToastPanel(OverlayConfig config, ToastRole role)
             : base(config, OverlayMetrics.ToastRowHeight)
         {
             _config = config;
@@ -76,7 +75,7 @@ namespace Yinyue.UI
                 Frame = new CGRect(area.X, markY, MarkSize, MarkSize),
                 ImageScaling = NSImageScale.ProportionallyDown,
             };
-            AddSubview(_glyph);
+            PanelRoot.AddSubview(_glyph);
 
             _text = new NSTextField
             {
@@ -91,7 +90,7 @@ namespace Yinyue.UI
                 StringValue = string.Empty,
                 Cell = { UsesSingleLineMode = true },
             };
-            AddSubview(_text);
+            PanelRoot.AddSubview(_text);
 
             _level = new NSProgressIndicator(new CGRect(area.X, LevelY, area.Width, LevelHeight))
             {
@@ -101,7 +100,7 @@ namespace Yinyue.UI
                 MaxValue = 1,
                 Hidden = true,
             };
-            AddSubview(_level);
+            PanelRoot.AddSubview(_level);
 
             // The same reserved cell the glyph uses, so swapping one for the other moves
             // nothing.
@@ -109,9 +108,9 @@ namespace Yinyue.UI
             {
                 Hidden = true,
             };
-            AddSubview(_dial);
+            PanelRoot.AddSubview(_dial);
 
-            Shown = false;
+            OrderOut(null);
         }
 
         public ToastRole Role { get; }
@@ -148,7 +147,7 @@ namespace Yinyue.UI
             // Positioned and faded in only on the way in. A repeat call must not reposition
             // or re-run the entrance -- doing that on every call is what made rapid volume
             // steps strobe on Windows.
-            if (!Shown) Enter();
+            if (!IsVisible) Enter();
         }
 
         /// <summary>
@@ -172,7 +171,7 @@ namespace Yinyue.UI
             _generation++;
             AlphaValue = 1;
 
-            if (!Shown) Enter();
+            if (!IsVisible) Enter();
 
             // No ordinary auto-hide while the keys are down, but a dial that stops being
             // updated must not stay up for good, so this runs as a watchdog at a short
@@ -204,30 +203,23 @@ namespace Yinyue.UI
             Dismiss(VisibleFor);
         }
 
-        /// <summary>
-        /// Fades in. The row's position is the stack's business now, not the toast's — it is
-        /// a section in the same window as everything else, which is what makes the glass one
-        /// material rather than one per window.
-        /// </summary>
         private void Enter()
         {
-            Shown = true;
-            Appeared?.Invoke(this, EventArgs.Empty);
+            OverlayPositioner.PositionToastRow(this, _config, (int)Role);
 
             double seconds = _config.Animations ? _config.AnimationMilliseconds / 1000.0 : 0;
 
             if (seconds <= 0)
             {
                 AlphaValue = 1;
+                OrderFrontRegardless();
                 return;
             }
 
             AlphaValue = 0;
+            OrderFrontRegardless();
             Fade(to: 1, seconds, onDone: null);
         }
-
-        /// <summary>Raised when the row appears or goes, so the stack can re-lay itself.</summary>
-        public event EventHandler? Appeared;
 
         /// <summary>
         /// Drives the fade from a timer rather than through AppKit's <c>Animator</c> proxy.
@@ -258,12 +250,6 @@ namespace Yinyue.UI
         }
 
         private NSTimer? _fade;
-
-        private void Hide()
-        {
-            Shown = false;
-            Appeared?.Invoke(this, EventArgs.Empty);
-        }
 
         /// <summary>The reserved cell for the glyph or the dial, and the gap after it.</summary>
         private const double MarkSize = 22;
@@ -322,13 +308,13 @@ namespace Yinyue.UI
 
                 if (seconds <= 0)
                 {
-                    Hide();
+                    OrderOut(null);
                     return;
                 }
 
                 Fade(to: 0, seconds, onDone: () =>
                 {
-                    if (generation == _generation) Hide();
+                    if (generation == _generation) OrderOut(null);
                 });
             });
         }

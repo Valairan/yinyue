@@ -28,6 +28,9 @@ namespace Yinyue.UI
     {
         private readonly OverlayConfig _config;
 
+        /// <summary>The applet fills the panel; the stack above it comes later.</summary>
+        public NSView? Content { get; private set; }
+
         public OverlayPanel(OverlayConfig config, double height)
             : base(new CGRect(0, 0, OverlayMetrics.PanelWidth, height),
                    // Borderless for the frameless look; Nonactivating so it never steals
@@ -57,48 +60,18 @@ namespace Yinyue.UI
             // be: the anchor decides where it sits, not the pointer.
             MovableByWindowBackground = false;
 
-            // The whole stack lives in this one window. Each section carries its own glass
-            // shape, and a container groups them so they sample together and read as one
-            // material while staying visibly separate surfaces — the separation between the
-            // search bar and the applet is part of the design.
-            //
-            // Spacing zero: shapes closer than the spacing merge into a single blob, which is
-            // exactly what the stack must not do.
-            _stackRoot = new NSView(new CGRect(0, 0, OverlayMetrics.PanelWidth, height));
-
-            ContentView = _config.LiquidGlass
-                ? GlassEffect.Container(_stackRoot, spacing: 0) ?? _stackRoot
-                : _stackRoot;
-
-            ApplyBackgroundOpacity();
+            ContentView = BuildRoot(height);
         }
 
-        private readonly NSView _stackRoot;
-
-        /// <summary>Where the sections live. The applet is one of them.</summary>
-        public NSView StackRoot => _stackRoot;
-
-        private NSColor TintColour =>
-            Theme.Base.ColorWithAlphaComponent((nfloat)_config.BackgroundOpacity);
-
         /// <summary>
-        /// Resizes the window to fit the stack and re-anchors it.
-        ///
-        /// The sections are laid out from the bottom up, so the applet keeps its place and
-        /// the window grows upward as panels open — which is what the anchor already expects
-        /// for a bottom-anchored overlay.
+        /// Places the applet inside the rounded root. Added rather than replacing the root,
+        /// so the corner radius and border survive.
         /// </summary>
-        public void SetStackHeight(double height)
+        public void SetContent(NSView view)
         {
-            var frame = Frame;
-            SetFrame(new CGRect(frame.X, frame.Y, OverlayMetrics.PanelWidth, height), true);
-
-            _stackRoot.Frame = new CGRect(0, 0, OverlayMetrics.PanelWidth, height);
-
-            if (ContentView is { } view && !ReferenceEquals(view, _stackRoot))
-                view.Frame = new CGRect(0, 0, OverlayMetrics.PanelWidth, height);
-
-            OverlayPositioner.PositionApplet(this, _config, height);
+            Content?.RemoveFromSuperview();
+            Content = view;
+            PanelRoot.AddSubview(view);
         }
 
         /// <summary>
@@ -113,6 +86,28 @@ namespace Yinyue.UI
         /// </summary>
         public override bool CanBecomeMainWindow => false;
 
+        private NSView BuildRoot(double height)
+        {
+            var root = new NSView(new CGRect(0, 0, OverlayMetrics.PanelWidth, height))
+            {
+                WantsLayer = true,
+            };
+
+            // Held separately: once glass is on, ContentView is the wrapper, and the tint and
+            // the applet both belong to the view inside it.
+            _panelRoot = root;
+
+            var layer = root.Layer!;
+            layer.CornerRadius = (nfloat)OverlayMetrics.RootCornerRadius;
+            layer.BorderWidth = (nfloat)OverlayMetrics.RootBorderThickness;
+            layer.BorderColor = Theme.Surface0.CGColor;
+
+            // Corners have to be clipped for children to respect the radius.
+            layer.MasksToBounds = true;
+
+            ApplyBackgroundOpacity(root);
+            return root;
+        }
 
         /// <summary>
         /// Summons the panel at its anchor. OrderFrontRegardless rather than MakeKeyAndOrderFront
@@ -121,26 +116,22 @@ namespace Yinyue.UI
         /// </summary>
         /// <summary>
         /// Re-reads the tint. Applied on every config change rather than cached, so the
-        /// setting takes effect without a restart.
-        ///
-        /// With glass on, the colour goes to the material rather than over it — the glass is
-        /// one view behind the whole stack, so anything painting its own background would
-        /// punch an opaque hole through it. BackgroundOpacity is the tint strength either
-        /// way, so the control keeps one meaning: 1.0 is an opaque Catppuccin panel with or
-        /// without glass, and lower values let progressively more material through.
+        /// setting takes effect without a restart — the same rule the Windows overlay
+        /// follows, and the reason it is a panel tint rather than window opacity: fading the
+        /// window would take the text and the artwork with it.
         /// </summary>
-        public void ApplyBackgroundOpacity()
-        {
-            if (_config.LiquidGlass && GlassEffect.IsAvailable)
-            {
-                if (ContentView is { } wrapper) GlassEffect.Tint(wrapper, TintColour);
-                return;
-            }
+        private NSView? _panelRoot;
 
-            // Without glass each section paints its own background and supplies the rounded
-            // corners; the window's own root stays clear.
-            _stackRoot.WantsLayer = true;
-            if (_stackRoot.Layer is { } layer) layer.BackgroundColor = NSColor.Clear.CGColor;
+        /// <summary>The view that carries the tint and the content, inside any glass wrapper.</summary>
+        private NSView PanelRoot => _panelRoot ?? ContentView!;
+
+        public void ApplyBackgroundOpacity(NSView? root = null)
+        {
+            var view = root ?? _panelRoot;
+            if (view?.Layer is not { } layer) return;
+
+
+            layer.BackgroundColor = Theme.Base.WithAlpha(_config.BackgroundOpacity).CGColor;
         }
 
         /// <summary>Raised after the panel is placed and shown, so the stack can follow it.</summary>
@@ -150,24 +141,6 @@ namespace Yinyue.UI
 
         /// <summary>A key that reached the overlay rather than the search box.</summary>
         public event EventHandler<NSEvent>? KeyReceived;
-
-        /// <summary>
-        /// Puts the window on screen without summoning the overlay or taking focus.
-        ///
-        /// A toast lives in this window now, and has to be visible while the overlay itself
-        /// is dismissed — so "dismissed" means the applet and the panels above it are hidden,
-        /// not that the window is gone. It stays up for as long as anything in it is showing.
-        /// </summary>
-        public void EnsureVisible()
-        {
-            if (!IsVisible) OrderFrontRegardless();
-        }
-
-        /// <summary>Orders the window out once nothing in it is left to see.</summary>
-        public void HideIfEmpty(Func<bool> anythingShowing)
-        {
-            if (!anythingShowing()) OrderOut(this);
-        }
 
         public void ShowOverlay()
         {

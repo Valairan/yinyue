@@ -22,7 +22,7 @@ namespace Yinyue.UI
     /// It is a <i>view</i> of playback and owns none of it — every value comes from a
     /// <see cref="PlaybackService"/> event, the same rule MainWindow follows.
     /// </summary>
-    public sealed class AppletView : OverlaySection
+    public sealed class AppletView : NSView
     {
         private readonly PlaybackService _playback;
 
@@ -65,10 +65,11 @@ namespace Yinyue.UI
         public event EventHandler? ShuffleFavoritesRequested;
         public event EventHandler? FavoriteRequested;
 
-        public AppletView(OverlayConfig config, PlaybackService playback)
-            : base(config, Metrics.AppletHeight)
+        public AppletView(PlaybackService playback)
+            : base(new CGRect(0, 0, Metrics.PanelWidth, Metrics.AppletHeight))
         {
             _playback = playback;
+            WantsLayer = true;
 
             _status = Label(Metrics.StatusFontSize, Theme.Subtext);
             _title = Label(Metrics.TitleFontSize, Theme.Text, bold: true);

@@ -35,7 +35,6 @@ namespace Yinyue
             if (which is "all" or "windows") WindowsOpen();
             if (which is "all" or "opacity") BackgroundOpacity();
             if (which is "all" or "toast") ToastLayout();
-            if (which is "all" or "glass") GlassAcrossStack();
 
             Console.WriteLine();
             Console.WriteLine(_failed == 0 ? "PASS" : $"FAIL — {_failed} check(s)");
@@ -47,64 +46,6 @@ namespace Yinyue
             if (!ok) _failed++;
             Console.WriteLine($"  [{(ok ? "ok" : "FAIL")}] {label}{(detail is null ? "" : $"  — {detail}")}");
             Console.Out.Flush();
-        }
-
-        /// <summary>
-        /// Every surface in the stack must be glassed and tinted identically, or the overlay
-        /// reads as several different materials sitting next to each other.
-        /// </summary>
-        private static void GlassAcrossStack()
-        {
-            Console.WriteLine("\nGlass across the stack");
-
-            if (!Yinyue.UI.GlassEffect.IsAvailable)
-            {
-                Check("Liquid Glass is available", false, "needs macOS 26");
-                return;
-            }
-
-            var config = new Yinyue.Models.OverlayConfig { LiquidGlass = true, BackgroundOpacity = 0.4 };
-            var playback = BuildIdlePlayback();
-            var library = new Yinyue.Services.MusicLibrary(new Yinyue.Services.ConfigService());
-
-            var applet = new Yinyue.UI.OverlayPanel(config, Yinyue.UI.OverlayMetrics.AppletHeight);
-            using var stack = new Yinyue.UI.OverlayStack(config, library, playback, applet);
-
-            // Every surface -- the toast rows included -- is glass, tinted the same, and in
-            // the same window. Toasts used to be separate windows, which meant separate
-            // material sampling a separate backdrop: a toast never matched the panel above it.
-            Check("the window's root is a glass container",
-                Yinyue.UI.GlassEffect.ClassNameOf(applet.ContentView!).Contains("NSGlassEffectContainerView"),
-                Yinyue.UI.GlassEffect.ClassNameOf(applet.ContentView!));
-
-            var surfaces = new List<(string Name, Yinyue.UI.OverlaySection Section)>();
-            surfaces.AddRange(stack.ToastsForTest);
-            surfaces.AddRange(stack.SectionsForTest);
-
-            foreach (var (name, section) in surfaces)
-            {
-                bool glass = Yinyue.UI.GlassEffect.IsGlass(section.Mounted);
-                Check($"{name} is glass", glass, Yinyue.UI.GlassEffect.ClassNameOf(section.Mounted));
-
-                if (!glass) continue;
-
-                var tint = Yinyue.UI.GlassEffect.TintOf(section.Mounted);
-                Check($"{name} is tinted", tint is not null);
-
-                if (tint is null) continue;
-
-                var srgb = tint.UsingColorSpace(AppKit.NSColorSpace.SRGBColorSpace) ?? tint;
-                Check($"{name} tint strength matches",
-                    Math.Abs(srgb.AlphaComponent - config.BackgroundOpacity) < 0.02,
-                    srgb.AlphaComponent.ToString("0.00"));
-
-                // Each keeps its own shape: sharing one sheet lost the separation between
-                // the search bar and the applet.
-                Check($"{name} is its own shape",
-                    !ReferenceEquals(section.Mounted, applet.ContentView));
-            }
-
-            applet.Close();
         }
 
         /// <summary>
@@ -120,7 +61,7 @@ namespace Yinyue
             Console.WriteLine("\nToast layout");
 
             var config = new Yinyue.Models.OverlayConfig();
-            var toast = new Yinyue.UI.ToastSection(config, Yinyue.UI.ToastRole.Message);
+            var toast = new Yinyue.UI.ToastPanel(config, Yinyue.UI.ToastRole.Message);
 
             toast.Show("plain");
             var plain = toast.TextFrameForTest;
@@ -154,7 +95,7 @@ namespace Yinyue
             Check("a level bar does not resize the row",
                 Math.Abs(toast.Frame.Height - before) < 0.01, toast.Frame.Height.ToString());
 
-            toast.RemoveFromSuperview();
+            toast.Close();
         }
 
         /// <summary>
@@ -172,88 +113,34 @@ namespace Yinyue
             foreach (double wanted in new[] { 1.0, 0.6, 0.2 })
             {
                 var config = new Yinyue.Models.OverlayConfig { BackgroundOpacity = wanted };
+                var panel = new Yinyue.UI.OverlayPanel(config, Yinyue.UI.OverlayMetrics.AppletHeight);
 
-                // The sections carry the tint now, not the window's root: the window holds
-                // one glass view behind everything, so anything painting a background there
-                // would punch an opaque hole through the material.
-                var section = new Yinyue.UI.AppletView(config, BuildIdlePlayback());
-                double alpha = section.Layer!.BackgroundColor!.Alpha;
+                var layer = panel.ContentView!.Layer!;
+                double alpha = layer.BackgroundColor!.Alpha;
 
                 Check($"a tint of {wanted:0.0} reaches the panel",
                     Math.Abs(alpha - wanted) < 0.01, alpha.ToString("0.00"));
 
-                var panel = new Yinyue.UI.OverlayPanel(config, Yinyue.UI.OverlayMetrics.AppletHeight);
                 Check($"and the window itself stays opaque at {wanted:0.0}",
                     Math.Abs(panel.AlphaValue - 1.0) < 0.01, panel.AlphaValue.ToString("0.00"));
 
                 panel.Close();
             }
 
-            // Liquid Glass, when the machine can draw it. Checked by class name rather than
-            // by the setting having been read: a silent fall-through would look identical
-            // from the outside and leave the toggle lying.
-            Console.WriteLine($"  (Liquid Glass available: {Yinyue.UI.GlassEffect.IsAvailable})");
-
-            if (Yinyue.UI.GlassEffect.IsAvailable)
-            {
-                var glassed = new Yinyue.Models.OverlayConfig { LiquidGlass = true, BackgroundOpacity = 0.4 };
-                var glassPanel = new Yinyue.UI.OverlayPanel(glassed, Yinyue.UI.OverlayMetrics.AppletHeight);
-
-                // The window's root is the CONTAINER; the glass shapes are the sections
-                // inside it. Contains, not equals: AppKit installs a KVO subclass as soon as
-                // anything observes the view, so the runtime name comes back prefixed.
-                string cls = Yinyue.UI.GlassEffect.ClassNameOf(glassPanel.ContentView!);
-                Check("the window's root is a glass container",
-                    cls.Contains("NSGlassEffectContainerView"), cls);
-
-                var glassSection = new Yinyue.UI.AppletView(glassed, BuildIdlePlayback());
-                Check("a section carries its own glass shape",
-                    Yinyue.UI.GlassEffect.IsGlass(glassSection.Mounted),
-                    Yinyue.UI.GlassEffect.ClassNameOf(glassSection.Mounted));
-
-                // The glass carries the palette rather than being left as bare system
-                // material, so a glassed overlay is recognisably the same app.
-                var tint = Yinyue.UI.GlassEffect.TintOf(glassSection.Mounted);
-                Check("the glass is tinted", tint is not null);
-
-                if (tint is not null)
-                {
-                    var srgb = tint.UsingColorSpace(AppKit.NSColorSpace.SRGBColorSpace) ?? tint;
-
-                    // Catppuccin Base is #1E1E2E.
-                    Check("with Catppuccin Base",
-                        Math.Abs(srgb.RedComponent - 0x1E / 255f) < 0.02
-                        && Math.Abs(srgb.GreenComponent - 0x1E / 255f) < 0.02
-                        && Math.Abs(srgb.BlueComponent - 0x2E / 255f) < 0.02,
-                        $"r={srgb.RedComponent:0.00} g={srgb.GreenComponent:0.00} b={srgb.BlueComponent:0.00}");
-
-                    Check("at the configured strength",
-                        Math.Abs(srgb.AlphaComponent - glassed.BackgroundOpacity) < 0.02,
-                        srgb.AlphaComponent.ToString("0.00"));
-                }
-
-                var plainCfg = new Yinyue.Models.OverlayConfig { LiquidGlass = false };
-                var plainPanel = new Yinyue.UI.OverlayPanel(plainCfg, Yinyue.UI.OverlayMetrics.AppletHeight);
-
-                Check("and not when it is off",
-                    !Yinyue.UI.GlassEffect.ClassNameOf(plainPanel.ContentView!).Contains("Glass"),
-                    Yinyue.UI.GlassEffect.ClassNameOf(plainPanel.ContentView!));
-
-                glassPanel.Close();
-                plainPanel.Close();
-            }
 
             // Changing the setting must take effect without a restart, as on Windows. Read
             // once at construction, it did not.
             var live = new Yinyue.Models.OverlayConfig { BackgroundOpacity = 1.0 };
-            var liveSection = new Yinyue.UI.AppletView(live, BuildIdlePlayback());
+            var livePanel = new Yinyue.UI.OverlayPanel(live, Yinyue.UI.OverlayMetrics.AppletHeight);
 
             live.BackgroundOpacity = 0.4;
-            liveSection.ApplyBackgroundOpacity();
+            livePanel.ApplyBackgroundOpacity();
 
             Check("a changed tint applies without a restart",
-                Math.Abs(liveSection.Layer!.BackgroundColor!.Alpha - 0.4) < 0.01,
-                liveSection.Layer.BackgroundColor.Alpha.ToString("0.00"));
+                Math.Abs(livePanel.ContentView!.Layer!.BackgroundColor!.Alpha - 0.4) < 0.01,
+                livePanel.ContentView.Layer.BackgroundColor.Alpha.ToString("0.00"));
+
+            livePanel.Close();
 
             // The floor matters: a panel you cannot see is indistinguishable from a broken
             // one, so the config clamps rather than honouring zero.
@@ -370,40 +257,33 @@ namespace Yinyue
             Check("the search bar is PanelWidth wide",
                 Math.Abs(barFrame.Width - 420) < 0.5, barFrame.Width.ToString());
 
-            // Bottom upwards: hold row, message row, applet, search bar. The toast rows are
-            // reserved permanently, so the applet sits above them whether or not a toast is
-            // showing — an arriving toast must never move the panel being read.
-            double reserved = 2 * (Yinyue.UI.OverlayMetrics.ToastRowHeight
-                                   + Yinyue.UI.OverlayMetrics.SideGap);
+            Check("it is left-aligned with the applet",
+                Math.Abs(barFrame.X - appletFrame.X) < 0.5, $"{barFrame.X} vs {appletFrame.X}");
 
-            double expectedBarY = reserved + Yinyue.UI.OverlayMetrics.SideGap
-                                + Yinyue.UI.OverlayMetrics.AppletHeight
-                                + Yinyue.UI.OverlayMetrics.SideGap;
+            // Above, with exactly one SideGap between. AppKit's y grows upward, so "above"
+            // means a larger y -- the inverse of the Windows arithmetic.
+            double gap = barFrame.Y - (appletFrame.Y + appletFrame.Height);
+            Check("it sits one SideGap above the applet",
+                Math.Abs(gap - Yinyue.UI.OverlayMetrics.SideGap) < 0.5, $"gap={gap}");
 
-            Check("the search bar sits one SideGap above the applet",
-                Math.Abs(stack.SearchBar.Mounted.Frame.Y - expectedBarY) < 0.5,
-                $"y={stack.SearchBar.Mounted.Frame.Y}, expected {expectedBarY}");
+            Check("the bar is a child of the applet, so it follows it",
+                applet.ChildWindows.Any(w => w.Equals(stack.SearchBar)));
 
-            // Laying out twice must give the same answer. It did not: the glass wrappers
-            // were HeightSizable, so each section grew with the window and the next pass
-            // measured the inflated heights -- 354 points became 15,810 in four passes.
-            double first = applet.Frame.Height;
-            stack.Layout();
+            // Moving the applet must carry the stack with it. On Windows this needs an
+            // explicit nudge per popup; here it should be free.
+            var moved = new CoreGraphics.CGPoint(appletFrame.X - 120, appletFrame.Y + 60);
+            applet.SetFrameOrigin(moved);
             stack.Layout();
 
-            Check("layout is idempotent",
-                Math.Abs(applet.Frame.Height - first) < 0.5,
-                $"{first} then {applet.Frame.Height}");
-
-            Check("the window grew to fit the stack",
-                applet.Frame.Height >= expectedBarY + barFrame.Height - 0.5,
-                applet.Frame.Height.ToString());
+            Check("the bar follows the applet when it moves",
+                Math.Abs(stack.SearchBar.Frame.X - moved.X) < 0.5,
+                $"bar x={stack.SearchBar.Frame.X}, applet x={moved.X}");
 
             Check("an empty box means Escape falls through to dismiss", !stack.HandleEscape());
 
             // queue: searches what is already queued and never consults a source. It was
             // handed to MusicLibrary like every other query, which searched the whole
-            // collection instead -- the prefix parsed correctly and then did the wrong thing.
+            // collection instead — the prefix parsed correctly and then did the wrong thing.
             var queued = Yinyue.Models.SearchQuery.Parse("queue:hello");
             Check("queue: targets the queue",
                 queued.Target == Yinyue.Models.SearchTarget.Queue, queued.Target.ToString());
@@ -429,15 +309,13 @@ namespace Yinyue
             stack.FocusSearch();
 
             Check("focusing the search box leaves the overlay up", applet.IsVisible);
-            Check("and the caret is in the box",
-                applet.FirstResponder is AppKit.NSText or AppKit.NSTextField or AppKit.NSTextView,
-                applet.FirstResponder?.GetType().Name ?? "none");
+            Check("and the box has key status", stack.SearchBar.IsKeyWindow);
 
             // Hints must name the LIVE binding, never a literal. Every shortcut is
             // rebindable, so a tooltip with a combination written into it is wrong the moment
             // someone rebinds -- and wrong for everyone when a default moves.
             var hotkeys = new Yinyue.Models.HotkeyConfig();
-            var view = new Yinyue.UI.AppletView(new Yinyue.Models.OverlayConfig(), playback);
+            var view = new Yinyue.UI.AppletView(playback);
 
             view.ApplyShortcutHints(hotkeys);
             string before = view.SettingsTooltipForTest;
@@ -461,28 +339,23 @@ namespace Yinyue
             Check("a running timer shows its remaining time", view.SleepShownForTest,
                 view.SleepTextForTest);
 
-            // Nothing that has not been asked for is showing. Counting is the check that
-            // catches a surface nobody asked for; measuring the ones you expect never will.
-            var showing = stack.SectionsForTest.Where(p => p.Section.Shown).Select(p => p.Name).ToList();
-            Check("only the search bar shows after a summon",
+            // Nothing that has not been asked for is on screen. The toasts were child
+            // windows once, which AddChildWindow orders in -- so two empty rounded boxes sat
+            // under the applet from launch. Counting windows is the check that catches that;
+            // measuring the ones you expect never will.
+            var showing = stack.PanelsForTest.Where(p => p.Panel.IsVisible).Select(p => p.Name).ToList();
+            Check("only the search bar is on screen after a summon",
                 showing.Count == 1 && showing[0] == "search bar",
                 showing.Count == 0 ? "nothing" : string.Join(", ", showing));
 
-            // And the toasts are still separate windows, because a toast has to be seen while
-            // the overlay is hidden -- anything inside the overlay's window goes with it.
-            // The toast rows are reserved permanently: they keep their slot whether or not
-            // anything is in them, so an arriving toast never moves the panel above it.
-            foreach (var (name, section) in stack.ToastsForTest)
-                Check($"{name} starts hidden", !section.Shown);
-
-            // Hiding the overlay takes the whole stack with it, which is now structural:
-            // the sections are inside the window.
+            // Hiding the overlay must take the whole stack with it. The queue was left
+            // behind at first -- visible with no overlay under it and no keys routed to it.
             stack.ToggleQueue();
-            Check("the queue opens", stack.SectionsForTest.First(p => p.Name == "queue").Section.Shown);
+            Check("the queue opens", stack.PanelsForTest.First(p => p.Name == "queue").Panel.IsVisible);
 
             applet.HideOverlay();
-            var stillUp = stack.SectionsForTest.Where(p => p.Section.Shown).Select(p => p.Name).ToList();
-            Check("hiding the overlay dismisses every section",
+            var stillUp = stack.PanelsForTest.Where(p => p.Panel.IsVisible).Select(p => p.Name).ToList();
+            Check("hiding the overlay dismisses every panel",
                 stillUp.Count == 0, string.Join(", ", stillUp));
 
             applet.ShowOverlay();
@@ -492,9 +365,10 @@ namespace Yinyue
             applet.HideOverlay();
             stack.Toast("hidden-overlay toast", Yinyue.UI.Icons.Music);
 
-            var (_, toastPanel) = stack.ToastsForTest.First(p => p.Name == "toast");
-            Check("a toast shows while the overlay is dismissed", toastPanel.Shown);
-            Check("and the window stays up to carry it", applet.IsVisible);
+            var (_, toastPanel) = stack.PanelsForTest.First(p => p.Name == "toast");
+            Check("a toast shows while the overlay is hidden", toastPanel.IsVisible);
+            Check("and it is not a child of the applet",
+                !applet.ChildWindows.Any(w => w.Equals(toastPanel)));
 
             applet.ShowOverlay();
 
@@ -506,26 +380,20 @@ namespace Yinyue
             stack.ShowHold("measuring", 0.5);
             stack.Layout();
 
-            foreach (var (name, section) in stack.SectionsForTest)
+            foreach (var (name, panel) in stack.PanelsForTest)
             {
                 Check($"{name} is PanelWidth wide",
-                    Math.Abs(section.Frame.Width - 420) < 0.5, section.Frame.Width.ToString());
+                    Math.Abs(panel.Frame.Width - 420) < 0.5, panel.Frame.Width.ToString());
 
-                // Inside the window now, so left-alignment is x = 0 rather than the applet's
-                // screen position.
-                Check($"{name} is flush with the stack", Math.Abs(section.Frame.X) < 0.5,
-                    section.Frame.X.ToString());
+                Check($"{name} is left-aligned with the applet",
+                    Math.Abs(panel.Frame.X - applet.Frame.X) < 0.5,
+                    $"{panel.Frame.X} vs {applet.Frame.X}");
             }
 
-            foreach (var (name, section) in stack.ToastsForTest)
-                Check($"{name} is PanelWidth wide",
-                    Math.Abs(section.Frame.Width - 420) < 0.5, section.Frame.Width.ToString());
-
             // The toast sits in the row reserved below the applet by the bottom-anchor lift.
-            // Inside the window, so "below" is a smaller y than the applet's section.
             Check("the toast row is below the applet",
-                toastPanel.Mounted.Frame.Y < Yinyue.UI.OverlayMetrics.AppletHeight,
-                $"toast y={toastPanel.Mounted.Frame.Y}");
+                toastPanel.Frame.Y + toastPanel.Frame.Height < applet.Frame.Y + 0.5,
+                $"toast top={toastPanel.Frame.Y + toastPanel.Frame.Height}, applet y={applet.Frame.Y}");
 
             applet.Close();
         }
@@ -737,7 +605,7 @@ namespace Yinyue
             Metric("ReservedForToasts", 132);
 
             // And the laid-out view actually honours them.
-            var applet = new Yinyue.UI.AppletView(new Yinyue.Models.OverlayConfig(), BuildIdlePlayback());
+            var applet = new Yinyue.UI.AppletView(BuildIdlePlayback());
 
             Check("the applet fills the panel",
                 Math.Abs(applet.Frame.Width - 420) < 0.5 && Math.Abs(applet.Frame.Height - 170) < 0.5,

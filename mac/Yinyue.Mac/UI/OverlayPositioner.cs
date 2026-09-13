@@ -36,22 +36,6 @@ namespace Yinyue.UI
             Position(window, config, IsBottomAnchored(config.Anchor) ? ReservedForToasts : 0);
 
         /// <summary>
-        /// Places a window of a known height. The overlay now holds the whole stack, so it
-        /// grows and shrinks as panels open — and a bottom-anchored overlay has to stay put
-        /// at the bottom while it does, which means re-anchoring on every size change.
-        /// </summary>
-        public static void PositionApplet(NSWindow window, OverlayConfig config, double height)
-        {
-            var work = TargetScreen(config).VisibleFrame;
-            double lift = IsBottomAnchored(config.Anchor) ? ReservedForToasts : 0;
-
-            double x = HorizontalOrigin(config.Anchor, work, OverlayMetrics.PanelWidth, config.MarginX);
-            double y = VerticalOrigin(config.Anchor, work, height, config.MarginY, lift);
-
-            window.SetFrameOrigin(new CGPoint(x, y));
-        }
-
-        /// <summary>
         /// Places a toast in its reserved row beneath the applet's slot. <paramref name="row"/>
         /// is 0 for the message and 1 for the hold dial, so the two can both be on screen
         /// without colliding and neither can land on the applet.

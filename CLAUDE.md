@@ -543,18 +543,6 @@ same 3-hit search made second was fine. `OpenPanelBeforeFilling` opens the popup
 layout, then the list is filled while on screen. The suite reproduces the two-hit first search
 on both panels.
 
-**Liquid Glass is available on macOS, and off by default.** `OverlayConfig.LiquidGlass` is
-part of the shared schema but only the Mac shell reads it. `NSGlassEffectView` is macOS 26
-and the .NET 8 workload builds against the macOS 15 SDK, so it is absent from the bindings
-and present at runtime — `GlassEffect` reaches it by selector and degrades to the ordinary
-tinted panel on an older system rather than failing to launch.
-
-Off by default is the deliberate part. A backdrop material resamples whatever is behind it
-whenever that changes, which is the ongoing GPU cost requirement 4 exists to refuse. What
-makes it offerable at all is that this overlay is hidden almost all day and auto-hides after
-ten seconds, so the cost is bounded by the seconds it is on screen — an argument for offering
-it, not for switching it on.
-
 **The Windows animations switch does not need porting as a performance control.** There it
 turns off `AllowsTransparency`, which is what puts a WPF window on a *software-composited*
 path — a real per-frame cost in the app's own process. Every macOS window is GPU-composited
@@ -563,41 +551,22 @@ and nothing to reclaim. Measured with the transparent overlay on screen: **0.0% 
 and the same hidden. Resting memory is **170 MB** against WPF's 101 MB, which is the .NET
 runtime plus AppKit and is the honest cost of this shell.
 
-**On macOS the whole stack is one window, and Liquid Glass is why.**
-The applet, the search bar, the results and the queue are `OverlaySection` *views* inside a
-single `NSPanel`. They began as child windows — which followed the applet for free and cost
-nothing until glass arrived. A glass view samples and refracts what is behind it, and
-`NSGlassEffectContainerView`, Apple's mechanism for making adjacent glass merge into one
-material, groups **sibling views**. It cannot span windows. So separate windows meant every
-panel was its own material sampling its own backdrop, and the stack read as several different
-surfaces beside each other.
+**On macOS the stacked panels are child windows, and that removes a whole class of bug.**
+`OverlayStack` adds the search bar, the results and the queue to the applet with
+`AddChildWindow`, so they move with it by construction. The WPF note immediately below — that
+a Popup is placed once and never again, stranding every panel when the overlay moves — has no
+counterpart here, and there is no `ReplacePanels` to write. The stack still has to be laid out
+**once** after the children are added, which is why `OverlayStack` subscribes to the applet's
+own `Shown`/`Hidden` rather than leaving that to the delegate: a stack nobody laid out sits at
+the window origin.
 
-What the child-window arrangement bought comes free from being inside one window: the sections
-move with the applet because they are part of it, and focus is an ordinary responder chain
-rather than a negotiation between windows. The WPF note below — that a Popup is placed once
-and never again — has no counterpart either way.
-
-- The window **resizes to fit whatever is open** and re-anchors on every change, so a
-  bottom-anchored overlay keeps its bottom edge while growing upward.
-- A hidden section is `Hidden`, not removed, so it keeps its contents and the layout simply
-  skips it.
-- **The toast rows are sections too**, and the window stays up for as long as anything in it
-  is showing. "Dismissed" hides the applet and the panels above it, not the window — which is
-  how a toast still appears while the overlay is down. As separate windows they were separate
-  glass sampling a separate backdrop, so a toast never matched the panel above it.
-- **Each section carries its own glass shape**, grouped by an `NSGlassEffectContainerView`
-  with `spacing: 0`. One shared sheet behind the whole stack made it a single unbroken
-  surface and lost the separation between the search bar and the applet, which is part of the
-  design. The container makes them sample together — one material — while staying distinct
-  shapes; `spacing` is how close two must be before they merge, so zero keeps them apart.
-- **Sections must not autoresize.** `GlassEffect.Wrap` set `HeightSizable`, correct when the
-  glass filled a window and disastrous once it was one row in a stack: every section grew with
-  the window, the next layout measured the inflated heights and grew it again. 354 points
-  became 15,810 in four passes. The suite asserts that laying out twice gives the same answer.
-- The stack **builds the applet itself** rather than being handed it. It was passed in, and a
-  caller that forgot left the applet out of the layout entirely — every section above it sat
-  170 points low. A component that needs its caller to complete it will meet a caller that
-  does not.
+**Liquid Glass was built and removed.** `NSGlassEffectView` works, tints to Catppuccin, and
+can be made uniform across the stack — but only by putting every surface in one window, since
+`NSGlassEffectContainerView` groups sibling views and cannot span windows. That refactor was
+done and then reverted, because the material **desaturates when its window is not key**: the
+overlay is a non-activating panel that spends its life unfocused, so the tint dropped out
+exactly when the overlay was being looked at. Uniform-or-nothing, and it could not be uniform.
+Do not reach for it again without solving that first.
 
 **A Popup does not follow its window.** It is placed when it opens and never again, so moving
 the overlay — a changed anchor, a different monitor — strands every panel where the overlay
