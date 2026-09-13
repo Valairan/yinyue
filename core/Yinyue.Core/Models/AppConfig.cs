@@ -164,6 +164,29 @@ namespace Yinyue.Models
     {
         /// <summary>Linear 0.0-1.0, as WinRT MediaPlayer expects.</summary>
         public double Volume { get; set; } = 1.0;
+
+        public const double DefaultVolumeStepPercent = 5;
+        public const double MinVolumeStepPercent = 1;
+        public const double MaxVolumeStepPercent = 25;
+
+        private double _volumeStepPercent = DefaultVolumeStepPercent;
+
+        /// <summary>
+        /// How far one press of a volume shortcut moves the level, in percent. Holding the
+        /// shortcut repeats it. Clamped on the way in: below 1% a hold would take forever to
+        /// get anywhere, above 25% a single press is a jump rather than a step.
+        /// </summary>
+        public double VolumeStepPercent
+        {
+            get => _volumeStepPercent;
+            set => _volumeStepPercent = Math.Round(
+                Math.Clamp(double.IsFinite(value) ? value : DefaultVolumeStepPercent,
+                           MinVolumeStepPercent, MaxVolumeStepPercent), 1);
+        }
+
+        /// <summary>The step as a fraction of full volume, which is what the engine takes.</summary>
+        [System.Text.Json.Serialization.JsonIgnore]
+        public double VolumeStep => VolumeStepPercent / 100.0;
     }
 
     /// <summary>

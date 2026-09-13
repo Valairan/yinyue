@@ -1266,7 +1266,7 @@ namespace Yinyue
         {
             bool offline = _config.Current.OfflineMode;
 
-            BtnOfflineToggle.Foreground = ThemeBrush(offline ? "WarningBrush" : "TextBrush");
+            BtnOfflineToggle.Foreground = ThemeBrush(offline ? "WarningBrush" : "IconBrush");
             IcoOffline.Kind = offline ? "CloudOff" : "Cloud";
             BtnOfflineToggle.ToolTip = (offline
                 ? "Offline mode is ON — only the local library is searched"
@@ -1508,6 +1508,75 @@ namespace Yinyue
         /// Shared with the generic hold-to-activate toggle, so one setting governs every
         /// hold gesture in the app rather than each having its own private timing.
         /// </summary>
+        #region Volume repeat
+
+        private System.Windows.Threading.DispatcherTimer? _repeatTimer;
+        private HotkeyBinding _repeatBinding;
+        private Action? _repeatAction;
+        private DateTime _repeatNext;
+
+        /// <summary>How long the key must stay down before the first repeat — a keyboard's own feel.</summary>
+        private static readonly TimeSpan RepeatInitialDelay = TimeSpan.FromMilliseconds(400);
+
+        /// <summary>Between repeats once they start. At the default 5% step, silence to full in about 1.5 s.</summary>
+        private static readonly TimeSpan RepeatInterval = TimeSpan.FromMilliseconds(75);
+
+        /// <summary>
+        /// Entry point for the volume shortcuts: one step on press, then a step every
+        /// <see cref="RepeatInterval"/> for as long as the key stays down.
+        ///
+        /// Windows delivers exactly one WM_HOTKEY per press (every binding registers with
+        /// MOD_NOREPEAT), so holding the key used to do nothing after the first step and the
+        /// level had to be walked press by press. As with the tap/hold gestures, "still held"
+        /// is read from GetAsyncKeyState on the main key. Unlike them this acts on press,
+        /// not release — waiting to find out whether a press was a hold would make every
+        /// single step feel late.
+        /// </summary>
+        /// <param name="direction">Positive for up, negative for down.</param>
+        public void BeginVolumeRepeat(HotkeyBinding binding, int direction)
+        {
+            double step = _config.Current.Playback.VolumeStep * Math.Sign(direction);
+            _playback.AdjustVolume(step);
+
+            // A second shortcut pressed mid-repeat steps once and leaves the running repeat
+            // to its own key. Without a binding there is no key to watch, so it is one step.
+            if (!binding.IsValid || _repeatTimer != null) return;
+
+            _repeatBinding = binding;
+            _repeatAction = () => _playback.AdjustVolume(step);
+            _repeatNext = DateTime.UtcNow + RepeatInitialDelay;
+
+            _repeatTimer = new System.Windows.Threading.DispatcherTimer
+            {
+                Interval = TimeSpan.FromMilliseconds(25)
+            };
+            _repeatTimer.Tick += RepeatTick;
+            _repeatTimer.Start();
+        }
+
+        private void RepeatTick(object? sender, EventArgs e)
+        {
+            if (!IsKeyPhysicallyDown((int)_repeatBinding.VirtualKey))
+            {
+                StopRepeat();
+                return;
+            }
+
+            if (DateTime.UtcNow < _repeatNext) return;
+
+            _repeatNext = DateTime.UtcNow + RepeatInterval;
+            _repeatAction?.Invoke();
+        }
+
+        private void StopRepeat()
+        {
+            _repeatTimer?.Stop();
+            _repeatTimer = null;
+            _repeatAction = null;
+        }
+
+        #endregion
+
         private TimeSpan HoldDelay => TimeSpan.FromSeconds(_config.Current.Hotkeys.HoldDelaySeconds);
 
         private static bool IsKeyPhysicallyDown(int virtualKey) =>
@@ -1728,7 +1797,7 @@ namespace Yinyue
         private void UpdateShuffleButton()
         {
             bool shuffle = _playback.Shuffle;
-            BtnShuffle.Foreground = ThemeBrush(shuffle ? "AccentBrush" : "TextBrush");
+            BtnShuffle.Foreground = ThemeBrush(shuffle ? "AccentBrush" : "IconBrush");
             BtnShuffle.ToolTip = (shuffle ? "Shuffle on" : "Shuffle off")
                                  + KeyHint(HotkeyActions.ToggleShuffle);
         }
@@ -1745,7 +1814,7 @@ namespace Yinyue
                 LoopMode.Queue => "Repeat",
                 _ => "RepeatOff",
             };
-            BtnLoop.Foreground = ThemeBrush(mode == LoopMode.Off ? "TextBrush" : "AccentBrush");
+            BtnLoop.Foreground = ThemeBrush(mode == LoopMode.Off ? "IconBrush" : "AccentBrush");
             BtnLoop.ToolTip = DescribeLoop(mode) + KeyHint(HotkeyActions.CycleLoop);
         }
 
@@ -1789,7 +1858,7 @@ namespace Yinyue
             bool favourite = track?.IsFavorite == true;
 
             // heart-plus offers the action; a filled heart states the fact.
-            BtnFavorite.Foreground = ThemeBrush(favourite ? "DangerBrush" : "TextBrush");
+            BtnFavorite.Foreground = ThemeBrush(favourite ? "DangerBrush" : "IconBrush");
             IcoFavorite.Kind = favourite ? "Heart" : "HeartPlus";
             IcoFavorite.Filled = favourite;
             BtnFavorite.Opacity = supported ? 1.0 : 0.4;

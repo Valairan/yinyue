@@ -37,7 +37,7 @@
                       VerticalAlignment="Center">
                     <ui:Icon x:Name="IcoGlyph"
                              Size="18"
-                             Foreground="{StaticResource AccentBrush}"
+                             Foreground="{StaticResource IconBrush}"
                              HorizontalAlignment="Center"
                              VerticalAlignment="Center"/>
 
@@ -50,7 +50,7 @@
 
                     <Path x:Name="HoldArc"
                           Visibility="Collapsed"
-                          Stroke="{StaticResource AccentBrush}"
+                          Stroke="{StaticResource IconBrush}"
                           StrokeThickness="2.5"
                           StrokeStartLineCap="Round"
                           StrokeEndLineCap="Round"/>

@@ -187,6 +187,7 @@ namespace Yinyue
             ChkAutoHide.IsChecked = cfg.Overlay.AutoHide;
 
             ChkSleepTimer.IsChecked = cfg.SleepTimer.Enabled;
+            TxtVolumeStep.Text = cfg.Playback.VolumeStepPercent.ToString("0.#", CultureInfo.InvariantCulture);
             TxtSleepSteps.Text = string.Join(", ", cfg.SleepTimer.Steps);
             UpdateSleepStepsNote(cfg.SleepTimer.Steps);
             TxtAutoHideSeconds.Text =
@@ -778,6 +779,12 @@ namespace Yinyue
                 cfg.Overlay.AutoHideSeconds = idle;
             }
 
+            if (double.TryParse(TxtVolumeStep.Text.Trim(), NumberStyles.Float,
+                    CultureInfo.InvariantCulture, out double step))
+            {
+                cfg.Playback.VolumeStepPercent = step;
+            }
+
             cfg.OfflineMode = ChkOfflineMode.IsChecked == true;
 
             // The registry, not config — so a failure is reported rather than silently
@@ -802,6 +809,7 @@ namespace Yinyue
             TxtHoldDelay.Text = cfg.Hotkeys.HoldDelaySeconds.ToString("0.###", CultureInfo.InvariantCulture);
             TxtAutoHideSeconds.Text =
                 cfg.Overlay.AutoHideSeconds.ToString("0.#", CultureInfo.InvariantCulture);
+            TxtVolumeStep.Text = cfg.Playback.VolumeStepPercent.ToString("0.#", CultureInfo.InvariantCulture);
             TxtAnimationMs.Text = cfg.Overlay.AnimationMilliseconds.ToString(CultureInfo.InvariantCulture);
             TxtBackgroundOpacity.Text =
                 cfg.Overlay.BackgroundOpacity.ToString("0.##", CultureInfo.InvariantCulture);

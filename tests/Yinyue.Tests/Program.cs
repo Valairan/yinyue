@@ -870,6 +870,51 @@ public static class WindowTests
                 new Yinyue.Controls.Icon { Kind = "NoSuchIcon" }.Data == null);
         });
 
+        Check.Group("the seek bar and the level bar are one white line", () =>
+        {
+            var config = new ConfigService();
+            var overlay = new MainWindow(config, FadeLibrary(), FadePlayback(), () => null!);
+            ShowAndActivate(overlay);
+            overlay.ShowOverlay();
+            Pump();
+
+            var slider = (System.Windows.Controls.Slider)overlay.FindName("SliderProgress");
+            var seekLine = slider.Template.FindName("SeekLine", slider) as Border;
+            Check.That("the seek bar is retemplated", seekLine != null);
+
+            var toast = new ToastWindow(config);
+            toast.Show("Volume2", "Volume 60%", 0.6);
+            Pump();
+            var bar = (System.Windows.Controls.ProgressBar)toast.FindName("LevelBar");
+            var indicator = bar.Template.FindName("PART_Indicator", bar) as System.Windows.Shapes.Rectangle;
+
+            Check.Equal("same thickness", bar.ActualHeight, seekLine!.ActualHeight);
+            Check.That("the level bar is the icon white",
+                indicator != null && indicator.Fill == Application.Current!.Resources["IconBrush"]);
+
+            toast.Close();
+            overlay.Close();
+        });
+
+        Check.Group("volume steps by the configured amount", () =>
+        {
+            var config = new ConfigService();
+            config.Current.Playback.VolumeStepPercent = 10;
+
+            var playback = FadePlayback();
+            playback.Volume = 0.5;
+            var overlay = new MainWindow(config, FadeLibrary(), playback, () => null!);
+
+            // No binding means no key to watch, so each call is exactly one step.
+            overlay.BeginVolumeRepeat(default, +1);
+            Check.Equal("up by the configured step", 0.6, playback.Volume);
+            overlay.BeginVolumeRepeat(default, -1);
+            Check.Equal("and down again", 0.5, playback.Volume);
+
+            overlay.Close();
+            playback.Dispose();
+        });
+
         Check.Group("album art is a centred square", () =>
         {
             var config = new ConfigService();

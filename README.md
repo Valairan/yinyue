@@ -97,7 +97,7 @@ These work anywhere, whether or not the overlay is visible. All are configurable
 | `Ctrl+Alt+S` | Summon and put the caret in the search box |
 | `Ctrl+Alt+P` | Tap: play / pause. Hold: skip forward, repeatedly |
 | `Ctrl+Alt+O` | Tap: restart the track. Hold: step back, repeatedly |
-| `Ctrl+Alt+Plus` / `Ctrl+Alt+Minus` | Volume, 5% a step |
+| `Ctrl+Alt+Plus` / `Ctrl+Alt+Minus` | Volume, one step per press (5% by default, set in Settings). Hold to keep stepping |
 | `Ctrl+Alt+M` | Mute / unmute |
 | `Ctrl+Alt+R` | Cycle loop: off → queue → track |
 | `Ctrl+Alt+X` | Toggle shuffle |

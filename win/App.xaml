@@ -53,6 +53,16 @@
         <SolidColorBrush x:Key="DangerBrush" Color="{StaticResource DangerColor}"/>
         <SolidColorBrush x:Key="WarningBrush" Color="{StaticResource WarningColor}"/>
 
+        <!--
+            The resting colour of every icon and of the seek and level lines. Pure white, not
+            TextBrush: Catppuccin's text colour carries a lavender tint that reads as grey at
+            the icons' stroke weight, and the lines drawn in the accent blue did not match the
+            icons beside them. State tints still apply on top — red favourite, accent loop and
+            shuffle, amber offline and sleep timer.
+        -->
+        <Color x:Key="IconColor">#FFFFFF</Color>
+        <SolidColorBrush x:Key="IconBrush" Color="{StaticResource IconColor}"/>
+
         <!-- ============================ Typography ============================ -->
 
         <Style x:Key="SectionHeaderStyle" TargetType="TextBlock">
@@ -475,11 +485,71 @@
                             <Grid>
                                 <Rectangle x:Name="PART_Track"/>
                                 <Rectangle x:Name="PART_Indicator"
-                                           Fill="{StaticResource AccentBrush}"
+                                           Fill="{StaticResource IconBrush}"
                                            RadiusX="2" RadiusY="2"
                                            HorizontalAlignment="Left"/>
                             </Grid>
                         </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!--
+            The seek bar: the same 4px line as ThinProgressStyle above, so the seek bar in
+            the overlay and the level bar in the toast are one line at one thickness. The
+            elapsed part is the icon white over a Surface0 track, with a small round thumb.
+            The stock Slider draws a 3D groove and a grey thumb that ignore the theme.
+        -->
+        <Style x:Key="SeekLineButtonStyle" TargetType="RepeatButton">
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="IsTabStop" Value="False"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RepeatButton">
+                        <Border Height="4" CornerRadius="2" VerticalAlignment="Center"
+                                Background="{TemplateBinding Background}"/>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="SeekThumbStyle" TargetType="Thumb">
+            <Setter Property="Width" Value="10"/>
+            <Setter Property="Height" Value="10"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Thumb">
+                        <Ellipse Fill="{StaticResource IconBrush}"/>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="SeekSliderStyle" TargetType="Slider">
+            <Setter Property="Height" Value="12"/>
+            <Setter Property="IsMoveToPointEnabled" Value="True"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Slider">
+                        <Grid>
+                            <Border x:Name="SeekLine" Height="4" CornerRadius="2"
+                                    VerticalAlignment="Center"
+                                    Background="{StaticResource Surface0Brush}"/>
+                            <Track x:Name="PART_Track">
+                                <Track.DecreaseRepeatButton>
+                                    <RepeatButton Style="{StaticResource SeekLineButtonStyle}"
+                                                  Background="{StaticResource IconBrush}"/>
+                                </Track.DecreaseRepeatButton>
+                                <Track.IncreaseRepeatButton>
+                                    <RepeatButton Style="{StaticResource SeekLineButtonStyle}"
+                                                  Background="Transparent"/>
+                                </Track.IncreaseRepeatButton>
+                                <Track.Thumb>
+                                    <Thumb Style="{StaticResource SeekThumbStyle}"/>
+                                </Track.Thumb>
+                            </Track>
+                        </Grid>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>

@@ -311,6 +311,28 @@
 
                         <Border Style="{StaticResource CardStyle}">
                             <StackPanel>
+                                <TextBlock Text="Volume" Style="{StaticResource SectionHeaderStyle}"/>
+                                <TextBlock Style="{StaticResource SectionCaptionStyle}"
+                                           Text="How far one press of a volume shortcut moves the level. Holding the shortcut keeps stepping."/>
+
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="Step (%)"
+                                               Style="{StaticResource FieldLabelStyle}"
+                                               VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                    <TextBox x:Name="TxtVolumeStep" Grid.Column="1"
+                                             Style="{StaticResource TextBoxStyle}"
+                                             Margin="0,0,0,6" Width="90" HorizontalAlignment="Left"
+                                             ToolTip="1 to 25 percent"/>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Style="{StaticResource CardStyle}">
+                            <StackPanel>
                                 <TextBlock Text="Sleep timer" Style="{StaticResource SectionHeaderStyle}"/>
                                 <TextBlock Style="{StaticResource SectionCaptionStyle}"
                                            Text="Pauses playback after a set time. Unrelated to hiding the overlay above: this stops the music, and nothing you do resets it. Its shortcut cycles through off and then each step below."/>
@@ -355,7 +377,7 @@
                                     <StackPanel Orientation="Horizontal">
                                         <ui:Icon Kind="Info"
                                                  Size="14"
-                                                 Foreground="{StaticResource AccentBrush}"
+                                                 Foreground="{StaticResource IconBrush}"
                                                  VerticalAlignment="Top"
                                                  Margin="0,0,8,0"/>
                                         <TextBlock Style="{StaticResource HintStyle}"

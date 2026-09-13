@@ -695,6 +695,15 @@ inherited `Foreground`, inside Lucide's 24-unit box scaled to `Size` (18 by defa
   refuses transforms and compacted arc flags rather than guessing.
 - An unknown `Kind` draws nothing rather than throwing, so a typo cannot take a window down;
   the suite is where it is caught.
+- **Icons are white.** `IconBrush` (`#FFFFFF`) is the resting colour of every icon and of the
+  seek and level lines, not `TextBrush`: Catppuccin's text colour carries a lavender tint that
+  reads as grey at the icons' stroke weight, and lines in the accent blue did not match the
+  icons beside them. State tints sit on top — red favourite, accent loop and shuffle, amber
+  offline, amber sleep timer (icon and readout together).
+- **The seek bar and the level bar are the same 4px line.** `SeekSliderStyle` retemplates the
+  overlay's Slider to the thickness of the toast's `ThinProgressStyle`, white over a Surface0
+  track with a 10px round thumb, replacing the stock Slider's 3D groove. The suite measures the
+  two against each other.
 
 **Settings layout.** Four tabs: **Remote** (Jellyfin, offline mode), **Local** (library
 folders and scanning), **General** (anchor, monitor, margins, animations, auto-hide),
@@ -735,7 +744,7 @@ stored in `config.json`; see `HotkeyConfig` for the defaults.
 | `Ctrl+Alt+L` | Toggle offline mode |
 | `Ctrl+Alt+R` | Cycle loop mode |
 | `Ctrl+Alt+X` | Toggle shuffle |
-| `Ctrl+Alt+Plus` / `Ctrl+Alt+Minus` | Volume, 5% a step |
+| `Ctrl+Alt+Plus` / `Ctrl+Alt+Minus` | Volume, one step per press (5% by default, configurable). Hold to keep stepping |
 | `Ctrl+Alt+M` | Mute / unmute |
 | `Ctrl+Alt+T` | Sleep timer: cycles off and then each configured step |
 | `Ctrl+Alt+F` | Shuffle all favourites |
@@ -820,8 +829,16 @@ That is a rule about the *overlay*, not about bindings: a user may still assign
 | Arrows / `Enter` / `Esc` while holding an entry | Move it · confirm · put it back |
 
 Volume is the app's own level, independent of the Windows mixer. Saves are debounced 1 s,
-since holding a hotkey walks the level in 5% steps, and the level is rounded to three
+since holding a hotkey walks the level a step at a time, and the level is rounded to three
 decimals so repeated steps do not drift into `config.json` as `0.6499999999999997`.
+
+**The step is configurable and the key repeats.** `Playback.VolumeStepPercent` (1–25, 5 by
+default, clamped in the setter) is set on the General tab. Holding a volume shortcut keeps
+stepping: `MainWindow.BeginVolumeRepeat` steps once on press, then every 75 ms after a 400 ms
+delay, for as long as `GetAsyncKeyState` says the main key is down — the same poll the tap/hold
+gestures use, because `MOD_NOREPEAT` means Windows sends one `WM_HOTKEY` per press and nothing
+after. Unlike those gestures it acts on press rather than release, since waiting to learn
+whether a press was a hold would make every single step feel late.
 
 Mute is a remembered state, not just "volume 0":
 

@@ -7,6 +7,24 @@ public static class VolumeTests
 {
     public static void Run()
     {
+        Check.Group("the volume step is configurable within reason", () =>
+        {
+            var playback = new PlaybackConfig();
+            Check.Equal("5% by default", 5.0, playback.VolumeStepPercent);
+
+            playback.VolumeStepPercent = 0;
+            Check.Equal("at least 1%", 1.0, playback.VolumeStepPercent);
+            playback.VolumeStepPercent = 50;
+            Check.Equal("at most 25%", 25.0, playback.VolumeStepPercent);
+            playback.VolumeStepPercent = double.NaN;
+            Check.Equal("nonsense falls back to the default", 5.0, playback.VolumeStepPercent);
+            playback.VolumeStepPercent = 7.44;
+            Check.Equal("kept to a tenth", 7.4, playback.VolumeStepPercent);
+
+            playback.VolumeStepPercent = 10;
+            Check.Equal("and offered as a fraction for the engine", 0.1, playback.VolumeStep);
+        });
+
         Check.Group("volume and mute", () =>
         {
             var (library, _) = Make.Library(new FakeSource("Fake", TrackSource.Local, Make.Tracks("t0")));

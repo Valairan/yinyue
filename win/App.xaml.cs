@@ -50,7 +50,6 @@ namespace Yinyue
         private System.Windows.Threading.DispatcherTimer? _volumeSaveTimer;
 
         /// <summary>How much one press of the volume hotkeys moves the level.</summary>
-        private const double VolumeStep = 0.05;
 
         private NotifyIcon? _notifyIcon;
         private Icon? _trayIcon;
@@ -327,7 +326,7 @@ namespace Yinyue
 
         private void SetUpVolumePersistence()
         {
-            // Debounced: holding the hotkey walks the level in 5% steps, and each one
+            // Debounced: holding the hotkey walks the level a step at a time, and each one
             // would otherwise rewrite config.json.
             _volumeSaveTimer = new System.Windows.Threading.DispatcherTimer
             {
@@ -553,11 +552,12 @@ namespace Yinyue
                     break;
 
                 case HotkeyActions.VolumeUp:
-                    _playback!.AdjustVolume(VolumeStep);
-                    break;
-
                 case HotkeyActions.VolumeDown:
-                    _playback!.AdjustVolume(-VolumeStep);
+                    // Steps once on press and keeps stepping while held, like a keyboard's
+                    // own repeat. The step comes from config; the toast shows the level move.
+                    _overlay!.BeginVolumeRepeat(
+                        _hotkeys!.BindingFor(action) ?? default,
+                        action == HotkeyActions.VolumeUp ? +1 : -1);
                     break;
 
                 case HotkeyActions.Mute:
