@@ -296,7 +296,7 @@ namespace Yinyue
             CloseSearch();
             TxtStatus.Text = "Setup needed";
             TxtSongTitle.Text = "No music yet";
-            TxtArtistName.Text = "Click ⚙ to add a folder or a Jellyfin server";
+            TxtArtistName.Text = "Open settings to add a folder or a Jellyfin server";
             Focus();
         }
 
@@ -530,10 +530,10 @@ namespace Yinyue
         private string NoResultsMessage(SearchQuery? query = null)
         {
             if (!HasConfiguredSource())
-                return "No music configured yet — use ⚙ to add a library folder or a Jellyfin server.";
+                return "No music configured yet — open settings to add a library folder or a Jellyfin server.";
 
             if (_config.Current.OfflineMode && _config.Current.Jellyfin.IsConfigured)
-                return "No local matches. Offline mode is on, so Jellyfin is not being searched — press ✈ or "
+                return "No local matches. Offline mode is on, so Jellyfin is not being searched — press the cloud button or "
                        + _config.Current.Hotkeys.For(HotkeyActions.OfflineMode).Keys
                        + " to go back online.";
 
@@ -840,7 +840,8 @@ namespace Yinyue
             /// <summary>The entry the arrows are currently repositioning.</summary>
             public bool IsGrabbed { get; init; }
 
-            public string Marker => IsCurrent ? "▶" : string.Empty;
+            /// <summary>Icon kind for the row's leading column: a play mark on the current track.</summary>
+            public string MarkerKind => IsCurrent ? "Play" : string.Empty;
 
             /// <summary>Deferred to the track so a queue row and a search row agree.</summary>
             public string DurationText => Track.DurationText;
@@ -1251,12 +1252,14 @@ namespace Yinyue
             if (remaining <= TimeSpan.Zero)
             {
                 TxtSleepRemaining.Visibility = Visibility.Collapsed;
+                IcoSleep.Visibility = Visibility.Collapsed;
                 return;
             }
 
-            TxtSleepRemaining.Text = "⏻ " + SleepTimerService.Describe(remaining);
+            TxtSleepRemaining.Text = SleepTimerService.Describe(remaining);
             TxtSleepRemaining.ToolTip = $"Playback pauses in {SleepTimerService.Describe(remaining)}";
             TxtSleepRemaining.Visibility = Visibility.Visible;
+            IcoSleep.Visibility = Visibility.Visible;
         }
 
         private void UpdateOfflineButton()
@@ -1264,7 +1267,7 @@ namespace Yinyue
             bool offline = _config.Current.OfflineMode;
 
             BtnOfflineToggle.Foreground = ThemeBrush(offline ? "WarningBrush" : "TextBrush");
-            BtnOfflineToggle.Content = offline ? "✈" : "📶";
+            IcoOffline.Kind = offline ? "CloudOff" : "Cloud";
             BtnOfflineToggle.ToolTip = (offline
                 ? "Offline mode is ON — only the local library is searched"
                 : "Offline mode is off — all sources are searched") + KeyHint(HotkeyActions.OfflineMode);
@@ -1736,7 +1739,12 @@ namespace Yinyue
         {
             var mode = _playback.Loop;
 
-            BtnLoop.Content = mode == LoopMode.Track ? "🔂" : "🔁";
+            IcoLoop.Kind = mode switch
+            {
+                LoopMode.Track => "Repeat1",
+                LoopMode.Queue => "Repeat",
+                _ => "RepeatOff",
+            };
             BtnLoop.Foreground = ThemeBrush(mode == LoopMode.Off ? "TextBrush" : "AccentBrush");
             BtnLoop.ToolTip = DescribeLoop(mode) + KeyHint(HotkeyActions.CycleLoop);
         }
@@ -1778,7 +1786,12 @@ namespace Yinyue
         {
             bool supported = track != null && _library.SupportsFavorites(track);
 
-            BtnFavorite.Foreground = ThemeBrush(track?.IsFavorite == true ? "DangerBrush" : "TextBrush");
+            bool favourite = track?.IsFavorite == true;
+
+            // heart-plus offers the action; a filled heart states the fact.
+            BtnFavorite.Foreground = ThemeBrush(favourite ? "DangerBrush" : "TextBrush");
+            IcoFavorite.Kind = favourite ? "Heart" : "HeartPlus";
+            IcoFavorite.Filled = favourite;
             BtnFavorite.Opacity = supported ? 1.0 : 0.4;
             BtnFavorite.ToolTip = supported
                 ? (track!.IsFavorite ? "Remove from favourites" : "Add to favourites")
@@ -1829,7 +1842,7 @@ namespace Yinyue
         {
             Dispatcher.BeginInvoke(() =>
             {
-                BtnPlayPause.Content = isPlaying ? "⏸" : "▶";
+                IcoPlayPause.Kind = isPlaying ? "Pause" : "Play";
                 TxtStatus.Text = isPlaying ? "Playing" : "Paused";
             });
         }

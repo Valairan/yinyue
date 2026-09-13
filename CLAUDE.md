@@ -639,12 +639,12 @@ the old key. `MainWindow.KeyHint` reads `HotkeyConfig.For(action)`, and `ApplySh
 re-runs on `ConfigChanged` so a rebind updates the overlay without a restart. Do not put a
 key combination in markup.
 
-**A control must not resize when its glyph changes.** The transport buttons size to their
-content, and the play triangle measures 20.9px against 28.6px for every other glyph in the
-row — so swapping it for the pause bars moved the centred row by nearly 8px and every button
-appeared to jump. `MediaBtnStyle` carries a `MinWidth` that covers the widest glyph; a
-minimum rather than a fixed width, so a wider glyph still fits instead of being clipped. The
-suite measures the pairs rather than trusting the eye.
+**A control must not resize when its icon changes.** With text glyphs this was a live fault:
+the play triangle measured 20.9px against 28.6px for every other glyph in the row, so swapping
+it for the pause bars moved the centred row by nearly 8px. Icons are a fixed 24-unit box, so
+it cannot recur, but `MediaBtnStyle` keeps its `MinWidth` as a guard and to hold the row's
+spacing, and the suite still measures play against pause and the two loop icons against each
+other.
 
 **The header icons are transport-sized.** `HeaderBtnStyle` derives from `MediaBtnStyle`, so
 the four icons above the title measure exactly what the six below the seek bar do. They were a
@@ -664,6 +664,37 @@ control styles. WPF's stock `CheckBox`, `ComboBox` and `TabControl` all ignore `
 and draw light chrome, so each is fully retemplated there — `ToggleSwitchStyle`,
 `ModernComboBoxStyle`, `ModernTabControlStyle`. Use those rather than the defaults, or
 controls will look pasted in from another app.
+
+**Icons.** Every icon is a [Lucide](https://lucide.dev) icon (ISC licence, copy in
+`win/Assets/Icons/LICENSE`), kept as the original SVG in `win/Assets/Icons/`. WPF has no SVG
+renderer and adding one would cost startup time for twenty line drawings, so
+`generate.py` in that folder translates the SVGs into `win/Icons.xaml`, a committed
+`ResourceDictionary` of `Geometry` resources keyed `Icon.<PascalName>` (`skip-back.svg` →
+`Icon.SkipBack`) and merged into `App.xaml`. The `Icon` control (`win/Controls/Icon.cs`) takes a
+`Kind` — the key without the prefix — and draws the geometry as a 2-unit round stroke in the
+inherited `Foreground`, inside Lucide's 24-unit box scaled to `Size` (18 by default).
+
+- **Do not put a text glyph or an emoji in a view again.** They came from two different
+  fonts, measured differently, and the emoji heart and the text heart never matched. Every
+  glyph — buttons, the toast, the search decoration, the queue's playing marker, the sleep
+  readout, the settings info mark — is an `Icon` now. Strings that named a glyph ("click ⚙")
+  say "open settings" instead.
+- **Colour comes from `Foreground`, so the old state tints still work unchanged:** the red
+  favourite, the accent loop, the amber offline, the hover tint on the buttons. `Filled` adds
+  a fill in the same brush; it is used for the "is a favourite" heart and the queue's playing
+  triangle.
+- **Two hearts, two jobs.** The favourite toggle shows `HeartPlus` until the track is a
+  favourite, then a filled `Heart`. The header's shuffle-favourites carries `HeartShuffle`,
+  Yinyue's own mark: Lucide's `heart-x` with the x turned into a shuffle sign by adding
+  arrowheads. It is the one SVG in the folder that is not Lucide's.
+- The toast's `Show` takes a kind, not a glyph: `Volume2`/`VolumeX`, `Music`, `Repeat`,
+  `Repeat1`, `RepeatOff`, `Shuffle`, `Moon` for the sleep timer.
+- To add an icon: drop the SVG in the folder, run `python win/Assets/Icons/generate.py`, use
+  its PascalCase name as `Kind`, and add it to the suite's list of kinds — that test is what
+  ties the plain strings in markup and code to the generated dictionary. The generator
+  refuses transforms and compacted arc flags rather than guessing.
+- An unknown `Kind` draws nothing rather than throwing, so a typo cannot take a window down;
+  the suite is where it is caught.
 
 **Settings layout.** Four tabs: **Remote** (Jellyfin, offline mode), **Local** (library
 folders and scanning), **General** (anchor, monitor, margins, animations, auto-hide),

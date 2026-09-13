@@ -111,6 +111,7 @@ namespace Yinyue
         /// the fade or reposition the window: the volume keys fire this many times a
         /// second, and re-running the entrance each time reads as a flicker.
         /// </summary>
+        /// <param name="glyph">An icon kind — "Volume2", "Music" — as Icons.xaml names them.</param>
         public void Show(string glyph, string message, double? level = null)
         {
             ApplyBackgroundOpacity();
@@ -195,7 +196,7 @@ namespace Yinyue
 
             _holding = true;
             TxtMessage.Text = label;
-            TxtGlyph.Text = string.Empty;
+            IcoGlyph.Kind = string.Empty;
 
             ShowDial(true);
             HoldArc.Data = BuildArc(Math.Clamp(fraction, 0, 1), 10, 1.25);
@@ -232,7 +233,7 @@ namespace Yinyue
             var state = visible ? Visibility.Visible : Visibility.Collapsed;
             HoldTrack.Visibility = state;
             HoldArc.Visibility = state;
-            TxtGlyph.Visibility = visible ? Visibility.Collapsed : Visibility.Visible;
+            IcoGlyph.Visibility = visible ? Visibility.Collapsed : Visibility.Visible;
         }
 
         /// <summary>
@@ -277,7 +278,7 @@ namespace Yinyue
         /// <summary>Returns true when the change alters the window's height.</summary>
         private bool ApplyContent(string glyph, string message, double? level)
         {
-            TxtGlyph.Text = glyph;
+            IcoGlyph.Kind = glyph;
             TxtMessage.Text = message;
 
             var wanted = level.HasValue ? Visibility.Visible : Visibility.Collapsed;

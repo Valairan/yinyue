@@ -1,6 +1,7 @@
 <Window x:Class="Yinyue.SettingsWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="clr-namespace:Yinyue.Controls"
         Title="Yinyue Settings"
         Width="600"
         Height="700"
@@ -352,11 +353,11 @@
                                         Padding="10,8"
                                         Margin="0,0,0,14">
                                     <StackPanel Orientation="Horizontal">
-                                        <TextBlock Text="&#x2139;"
-                                                   Foreground="{StaticResource AccentBrush}"
-                                                   FontSize="13"
-                                                   VerticalAlignment="Top"
-                                                   Margin="0,0,8,0"/>
+                                        <ui:Icon Kind="Info"
+                                                 Size="14"
+                                                 Foreground="{StaticResource AccentBrush}"
+                                                 VerticalAlignment="Top"
+                                                 Margin="0,0,8,0"/>
                                         <TextBlock Style="{StaticResource HintStyle}"
                                                    MaxWidth="440"
                                                    Text="The arrow keys navigate the overlay — moving through search results and the queue. You can still bind them here; they only act as navigation when the overlay itself has focus."/>

@@ -229,7 +229,7 @@ namespace Yinyue
             _sleepTimer.Elapsed += () =>
             {
                 _ = _playback!.PauseAsync();
-                ShowToast("⏻", "Sleep timer finished — paused");
+                ShowToast("Moon", "Sleep timer finished — paused");
             };
 
             _queueStore = new QueueStore();
@@ -258,7 +258,7 @@ namespace Yinyue
                 // the applet when up, the toast when hidden — and the same gesture reading
                 // two different ways was less polished than one consistent readout with a
                 // level bar. The toast has its own reserved row, so it never covers anything.
-                ShowToast(muted ? "🔇" : "🔊",
+                ShowToast(muted ? "VolumeX" : "Volume2",
                     muted ? "Muted" : $"Volume {volume * 100:F0}%",
                     volume,
                     evenWhileOverlayShown: true);
@@ -281,7 +281,7 @@ namespace Yinyue
             _lastToastedTrack = e.Track;
 
             Dispatcher.BeginInvoke(() =>
-                ShowToast("🎵", $"{e.Track.Title} — {e.Track.DisplayArtist}"));
+                ShowToast("Music", $"{e.Track.Title} — {e.Track.DisplayArtist}"));
         }
 
         private Track? _lastToastedTrack;
@@ -294,9 +294,9 @@ namespace Yinyue
 
                 string glyph = playback.Loop switch
                 {
-                    LoopMode.Track => "🔂",
-                    LoopMode.Queue => "🔁",
-                    _ => playback.Shuffle ? "🔀" : "🔁"
+                    LoopMode.Track => "Repeat1",
+                    LoopMode.Queue => "Repeat",
+                    _ => playback.Shuffle ? "Shuffle" : "RepeatOff"
                 };
 
                 string loop = playback.Loop switch
@@ -569,12 +569,12 @@ namespace Yinyue
                     // Silence would read as a broken shortcut. Say why nothing happened.
                     if (!_config!.Current.SleepTimer.Enabled)
                     {
-                        ShowToast("⏻", "Sleep timer is turned off in settings");
+                        ShowToast("Moon", "Sleep timer is turned off in settings");
                         break;
                     }
 
                     int minutes = _sleepTimer!.Cycle();
-                    ShowToast("⏻", minutes == 0
+                    ShowToast("Moon", minutes == 0
                         ? "Sleep timer off"
                         : $"Sleeping in {DescribeMinutes(minutes)}");
                     break;

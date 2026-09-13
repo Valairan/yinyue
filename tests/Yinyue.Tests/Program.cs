@@ -264,11 +264,11 @@ public static class WindowTests
             config.Current.Overlay.Animations = true;
 
             var toast = new ToastWindow(config, ToastWindow.ToastRole.Hold);
-            toast.Show("\u266A", "seed");          // realise the template
+            toast.Show("Music", "seed");           // realise the template
 
             var arc = toast.FindName("HoldArc") as System.Windows.Shapes.Path;
             var track = toast.FindName("HoldTrack") as System.Windows.Shapes.Ellipse;
-            var glyph = toast.FindName("TxtGlyph") as TextBlock;
+            var glyph = toast.FindName("IcoGlyph") as FrameworkElement;
             var message = toast.FindName("TxtMessage") as TextBlock;
 
             Check.That("the dial exists", arc != null && track != null);
@@ -791,23 +791,24 @@ public static class WindowTests
             var loop = overlay.FindName("BtnLoop") as System.Windows.Controls.Button;
             Check.That("the transport buttons exist", play != null && loop != null);
 
-            static double WidthWith(System.Windows.Controls.Button button, string glyph)
+            static double WidthWith(System.Windows.Controls.Button button, string kind)
             {
-                button.Content = glyph;
+                ((Yinyue.Controls.Icon)button.Content).Kind = kind;
                 button.InvalidateMeasure();
                 button.Measure(new System.Windows.Size(double.PositiveInfinity, double.PositiveInfinity));
                 return button.DesiredSize.Width;
             }
 
-            // The play triangle is narrower than every other glyph in this row. Left to size
-            // itself the button would shrink, and the centred row would reflow around it.
-            double playing = WidthWith(play!, "\u23F8");
-            double paused = WidthWith(play!, "\u25B6");
+            // With text glyphs the play triangle was narrower than everything else in the
+            // row, and swapping it for the pause bars reflowed the centred row. Icons are a
+            // fixed box, so this now guards the property rather than fixing a fault.
+            double playing = WidthWith(play!, "Pause");
+            double paused = WidthWith(play!, "Play");
             Check.Equal("play and pause measure the same", paused, playing);
 
-            double loopAll = WidthWith(loop!, "\uD83D\uDD01");
-            double loopOne = WidthWith(loop!, "\uD83D\uDD02");
-            Check.Equal("both loop glyphs measure the same", loopOne, loopAll);
+            double loopAll = WidthWith(loop!, "Repeat");
+            double loopOne = WidthWith(loop!, "Repeat1");
+            Check.Equal("both loop icons measure the same", loopOne, loopAll);
 
             // Every button in the row shares one width, so nothing shifts as states change.
             var previous = overlay.FindName("BtnPrevious") as System.Windows.Controls.Button;
@@ -831,16 +832,42 @@ public static class WindowTests
             {
                 var icon = (System.Windows.Controls.Button)overlay.FindName(name);
                 Check.Equal($"{name} is the size of a transport button", transport, BoxOf(icon));
-                Check.Equal($"{name} uses the same glyph size", previous.FontSize, icon.FontSize);
+                Check.Equal($"{name} draws its icon at the transport size",
+                    ((Yinyue.Controls.Icon)previous.Content).Size, ((Yinyue.Controls.Icon)icon.Content).Size);
             }
 
-            // Two hearts, one glyph. They used to differ — text heart above, emoji heart
-            // below — and the mismatch was noticed at once.
-            var favourite = (System.Windows.Controls.Button)overlay.FindName("BtnFavorite");
-            var shuffleFavourites = (System.Windows.Controls.Button)overlay.FindName("BtnShuffleFavorites");
-            Check.Equal("both hearts are the same character", shuffleFavourites.Content, favourite.Content);
+            // Two hearts, two jobs. The toggle offers heart-plus until the track is a
+            // favourite, then a filled heart; the header's shuffle-favourites carries the
+            // heart-shuffle mark, so the two buttons are told apart at a glance.
+            var favourite = (Yinyue.Controls.Icon)overlay.FindName("IcoFavorite");
+            var shuffleFavourites = (Yinyue.Controls.Icon)overlay.FindName("IcoShuffleFavorites");
+            Check.Equal("the favourite toggle starts as heart-plus", "HeartPlus", favourite.Kind);
+            Check.That("and is not filled until it is a favourite", !favourite.Filled);
+            Check.Equal("the header carries the heart-shuffle mark", "HeartShuffle", shuffleFavourites.Kind);
 
             overlay.Close();
+        });
+
+        Check.Group("every icon the app names has a geometry", () =>
+        {
+            // Icons.xaml is generated from win/Assets/Icons; the Kind strings in markup and
+            // code are plain text. This is what ties the two together.
+            foreach (var kind in new[]
+                     {
+                         "SkipBack", "SkipForward", "Play", "Pause", "Heart", "HeartPlus", "HeartShuffle",
+                         "Search", "List", "Repeat", "Repeat1", "RepeatOff", "VolumeX", "Volume2",
+                         "Cloud", "CloudOff", "Shuffle", "Moon", "Cog", "Info", "Music", "MoveVertical",
+                     })
+            {
+                Check.That($"Icon.{kind} is a geometry with something in it",
+                    Application.Current!.Resources["Icon." + kind] is Geometry g && !g.IsEmpty());
+
+                var icon = new Yinyue.Controls.Icon { Kind = kind };
+                Check.That($"an Icon resolves '{kind}' on its own", icon.Data != null);
+            }
+
+            Check.That("an unknown kind draws nothing rather than throwing",
+                new Yinyue.Controls.Icon { Kind = "NoSuchIcon" }.Data == null);
         });
 
         Check.Group("album art is a centred square", () =>

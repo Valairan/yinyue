@@ -197,3 +197,10 @@ panel placement, and hotkeys the OS has to actually accept.
 Both are plain console runners rather than a test framework, because the Windows one needs an
 STA thread, a live WPF `Application`, and real Win32 hotkey registration. It builds every
 window for real, which is the only way XAML errors surface.
+
+## Credits
+
+Icons are [Lucide](https://lucide.dev), used under the ISC licence; the SVGs and the licence
+are in `win/Assets/Icons/`. The one exception is `heart-shuffle.svg`, Yinyue's own mark for
+"shuffle all favourites", made from Lucide's heart-x. The colour scheme is
+[Catppuccin](https://catppuccin.com) Mocha.

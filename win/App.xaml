@@ -2,8 +2,17 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:sys="clr-namespace:System;assembly=System.Runtime"
+             xmlns:ui="clr-namespace:Yinyue.Controls"
              ShutdownMode="OnExplicitShutdown">
     <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <!--
+                    Every icon in the app, generated from win/Assets/Icons/*.svg by
+                    generate.py there. Do not edit Icons.xaml by hand.
+                -->
+                <ResourceDictionary Source="pack://application:,,,/Yinyue;component/Icons.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
         <!--
             Shared by the overlay and the toast so the two always line up. They sit at the
             same anchor, so a mismatch would be obvious the moment both appeared.
@@ -549,5 +558,37 @@
             </Setter>
         </Style>
 
+        <!--
+            The Icon control: one Lucide geometry, stroked in the inherited Foreground, its
+            24-unit box scaled to Size so the stroke scales with it. Filled adds a fill in the
+            same brush, for the "is a favourite" heart. See CLAUDE.md, "Icons".
+        -->
+        <Style TargetType="{x:Type ui:Icon}">
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="IsTabStop" Value="False"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type ui:Icon}">
+                        <Viewbox Width="{TemplateBinding Size}" Height="{TemplateBinding Size}" Stretch="Uniform">
+                            <Path x:Name="Shape"
+                                  Width="24" Height="24"
+                                  Data="{TemplateBinding Data}"
+                                  Stroke="{TemplateBinding Foreground}"
+                                  StrokeThickness="{TemplateBinding StrokeThickness}"
+                                  StrokeLineJoin="Round"
+                                  StrokeStartLineCap="Round"
+                                  StrokeEndLineCap="Round"/>
+                        </Viewbox>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="Filled" Value="True">
+                                <Setter TargetName="Shape" Property="Fill"
+                                        Value="{Binding Foreground, RelativeSource={RelativeSource TemplatedParent}}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        </ResourceDictionary>
     </Application.Resources>
 </Application>
