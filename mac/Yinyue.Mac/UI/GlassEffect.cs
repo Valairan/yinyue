@@ -64,6 +64,35 @@ namespace Yinyue.UI
             Marshal.PtrToStringAnsi(GetClassName(GetClass(view.Handle))) ?? "?";
 
         /// <summary>
+        /// Tints an existing glass view. Safe to call on anything — a view that is not glass
+        /// is left alone, so the caller never has to know which it has.
+        /// </summary>
+        public static void Tint(NSView view, NSColor colour)
+        {
+            if (!IsGlass(view)) return;
+
+            SendPtr(view.Handle, Selector.GetHandle("setTintColor:"), colour.Handle);
+        }
+
+        /// <summary>The tint currently applied, for the suite.</summary>
+        public static NSColor? TintOf(NSView view)
+        {
+            if (!IsGlass(view)) return null;
+
+            IntPtr handle = Send(view.Handle, Selector.GetHandle("tintColor"));
+            return handle == IntPtr.Zero ? null : Runtime.GetNSObject<NSColor>(handle);
+        }
+
+        /// <summary>
+        /// True if this view is the glass wrapper. Matched on the name containing the class
+        /// rather than equalling it: AppKit installs a KVO subclass as soon as anything
+        /// observes the view, so the runtime name comes back as
+        /// NSKVONotifying_NSGlassEffectView and an equality test would say no while the
+        /// material is working perfectly.
+        /// </summary>
+        public static bool IsGlass(NSView view) => ClassNameOf(view).Contains("NSGlassEffectView");
+
+        /// <summary>
         /// Wraps <paramref name="content"/> in a glass view, or returns it unchanged when the
         /// material is unavailable. The caller does not branch; an older machine simply gets
         /// the ordinary tinted panel.

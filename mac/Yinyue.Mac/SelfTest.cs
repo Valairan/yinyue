@@ -134,7 +134,7 @@ namespace Yinyue
 
             if (Yinyue.UI.GlassEffect.IsAvailable)
             {
-                var glassed = new Yinyue.Models.OverlayConfig { LiquidGlass = true };
+                var glassed = new Yinyue.Models.OverlayConfig { LiquidGlass = true, BackgroundOpacity = 0.4 };
                 var glassPanel = new Yinyue.UI.OverlayPanel(glassed, Yinyue.UI.OverlayMetrics.AppletHeight);
 
                 // Contains, not equals: AppKit installs a KVO subclass around the view as
@@ -143,6 +143,27 @@ namespace Yinyue
                 // while the material is working perfectly.
                 string cls = Yinyue.UI.GlassEffect.ClassNameOf(glassPanel.ContentView!);
                 Check("glass wraps the panel when switched on", cls.Contains("NSGlassEffectView"), cls);
+
+                // The glass carries the palette rather than being left as bare system
+                // material, so a glassed overlay is recognisably the same app.
+                var tint = Yinyue.UI.GlassEffect.TintOf(glassPanel.ContentView!);
+                Check("the glass is tinted", tint is not null);
+
+                if (tint is not null)
+                {
+                    var srgb = tint.UsingColorSpace(AppKit.NSColorSpace.SRGBColorSpace) ?? tint;
+
+                    // Catppuccin Base is #1E1E2E.
+                    Check("with Catppuccin Base",
+                        Math.Abs(srgb.RedComponent - 0x1E / 255f) < 0.02
+                        && Math.Abs(srgb.GreenComponent - 0x1E / 255f) < 0.02
+                        && Math.Abs(srgb.BlueComponent - 0x2E / 255f) < 0.02,
+                        $"r={srgb.RedComponent:0.00} g={srgb.GreenComponent:0.00} b={srgb.BlueComponent:0.00}");
+
+                    Check("at the configured strength",
+                        Math.Abs(srgb.AlphaComponent - glassed.BackgroundOpacity) < 0.02,
+                        srgb.AlphaComponent.ToString("0.00"));
+                }
 
                 var plainCfg = new Yinyue.Models.OverlayConfig { LiquidGlass = false };
                 var plainPanel = new Yinyue.UI.OverlayPanel(plainCfg, Yinyue.UI.OverlayMetrics.AppletHeight);

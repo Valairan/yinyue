@@ -110,7 +110,15 @@ namespace Yinyue.UI
             // Glass wraps the content rather than sitting behind it, so the material can read
             // the content's shape. Returns the root untouched when unavailable or switched
             // off, and the caller never branches.
-            return _config.LiquidGlass ? GlassEffect.Wrap(root, OverlayMetrics.RootCornerRadius) : root;
+            if (!_config.LiquidGlass) return root;
+
+            // Tinted here rather than in ApplyBackgroundOpacity, because at this point
+            // ContentView is still whatever it was before — the wrapper does not become the
+            // content view until this method returns, so looking it up there found nothing.
+            var wrapper = GlassEffect.Wrap(root, OverlayMetrics.RootCornerRadius);
+            GlassEffect.Tint(wrapper, TintColour);
+
+            return wrapper;
         }
 
         /// <summary>
@@ -129,6 +137,10 @@ namespace Yinyue.UI
         /// <summary>The view that carries the tint and the content, inside any glass wrapper.</summary>
         private NSView PanelRoot => _panelRoot ?? ContentView!;
 
+        /// <summary>Catppuccin Base at the configured strength — the panel's colour, either way.</summary>
+        private NSColor TintColour =>
+            Theme.Base.ColorWithAlphaComponent((nfloat)_config.BackgroundOpacity);
+
         public void ApplyBackgroundOpacity(NSView? root = null)
         {
             // With glass on, the panel's own fill would sit in front of the material and
@@ -138,7 +150,18 @@ namespace Yinyue.UI
 
             if (_config.LiquidGlass && GlassEffect.IsAvailable)
             {
+                // The panel's own fill would sit in front of the material and hide it, so it
+                // steps aside and the colour goes to the glass instead — same palette, same
+                // setting, drawn by the material rather than over it.
+                //
+                // BackgroundOpacity is the tint strength, so the control keeps one meaning:
+                // 1.0 is an opaque Catppuccin panel whether glass is on or off, and lower
+                // values let progressively more of the material through.
                 layer.BackgroundColor = NSColor.Clear.CGColor;
+
+                if (ContentView is { } wrapper)
+                    GlassEffect.Tint(wrapper, TintColour);
+
                 return;
             }
 
