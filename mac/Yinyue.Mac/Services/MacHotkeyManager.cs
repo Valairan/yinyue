@@ -100,6 +100,19 @@ namespace Yinyue.Services
             /// </summary>
             public bool ShowsDial => RequiresHold || !HotkeyActions.SupportsHoldToggle(Action);
 
+            /// <summary>
+            /// True when the action has a tap and a hold that mean different things, so the
+            /// tap must wait for release to know which was meant.
+            /// </summary>
+            public bool HasEscalation => !HotkeyActions.SupportsHoldToggle(Action);
+
+            /// <summary>
+            /// Volume steps on press and keeps stepping while the key is down, like a
+            /// keyboard's own repeat.
+            /// </summary>
+            public bool RepeatsWhileHeld =>
+                Action is HotkeyActions.VolumeUp or HotkeyActions.VolumeDown;
+
             public DateTime PressedAt { get; set; }
             public NSTimer? HoldTimer { get; set; }
             public bool HoldFired { get; set; }
@@ -218,10 +231,42 @@ namespace Yinyue.Services
             return 0;   // noErr — handled
         }
 
+        /// <summary>
+        /// Matches the keyboard's own repeat: one step immediately, a pause, then a fast
+        /// stream for as long as the key is down.
+        /// </summary>
+        private static readonly TimeSpan RepeatInitialDelay = TimeSpan.FromMilliseconds(400);
+        private static readonly TimeSpan RepeatInterval = TimeSpan.FromMilliseconds(75);
+
         private void OnPressed(Registration registration)
         {
             registration.PressedAt = DateTime.UtcNow;
             registration.HoldFired = false;
+
+            // Volume acts on press and repeats. Waiting for release would make a single tap
+            // feel late, and holding the key would do nothing at all.
+            if (registration.RepeatsWhileHeld)
+            {
+                Raise(registration.Action, held: false);
+
+                registration.HoldTimer?.Invalidate();
+                registration.HoldTimer = NSTimer.CreateRepeatingScheduledTimer(
+                    RepeatInterval.TotalSeconds, _ =>
+                    {
+                        if (DateTime.UtcNow - registration.PressedAt < RepeatInitialDelay) return;
+                        Raise(registration.Action, held: false, repeat: true);
+                    });
+
+                return;
+            }
+
+            // Everything without a tap/hold escalation acts on press too. Only an action
+            // whose tap and hold differ has to wait for release to know which was meant.
+            if (!registration.HasEscalation && !registration.RequiresHold)
+            {
+                Raise(registration.Action, held: false);
+                return;
+            }
 
             bool repeats = registration.Action == HotkeyActions.PlayPause;
 

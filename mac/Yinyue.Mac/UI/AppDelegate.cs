@@ -28,6 +28,7 @@ namespace Yinyue.UI
         private MacSleepTimer? _sleep;
         private SettingsWindow? _settings;
         private NSStatusBarButton? _statusButton;
+        private NSObject? _keyMonitor;
 
         private readonly MusicLibrary _library;
         private readonly JellyfinApiClient _jellyfin;
@@ -75,53 +76,73 @@ namespace Yinyue.UI
         }
 
         /// <summary>
-        /// Keys that reach the overlay rather than the search box.
+        /// Keys belonging to the overlay rather than to the text box.
         ///
-        /// "Is the user typing" is a focus question, not a visibility one — the box is always
-        /// on screen, so testing visibility would be permanently true and Space would never
-        /// reach play/pause again.
+        /// Returns null to swallow the event, or the event itself to let it reach the box.
+        /// Only runs while one of the overlay's own windows is key, so it never touches the
+        /// settings window or anything else.
         /// </summary>
-        private void OnOverlayKey(object? sender, NSEvent e)
+        private NSEvent? HandleKey(NSEvent e)
         {
+            if (_stack is null || _overlay is null) return e;
+            if (!_overlay.IsVisible) return e;
+
+            // Settings is a real window with its own text fields; it must keep every key.
+            if (_settings is { IsKeyWindow: true }) return e;
+
             switch (e.KeyCode)
             {
                 case 53:   // Escape
-                    // A held queue entry goes back where it was picked up; otherwise a search
-                    // in progress is cleared; an already-empty box dismisses the overlay.
-                    if (_stack?.CancelQueueGrab() == true) break;
-                    if (_stack?.HandleEscape() != true) _overlay?.HideOverlay();
-                    break;
+                    // A held queue entry goes back where it was picked up. Otherwise the
+                    // box's CONTENTS decide, exactly as on Windows: a search in progress is
+                    // cleared, and only an already-empty box dismisses the overlay.
+                    if (_stack.CancelQueueGrab()) return null;
+                    if (_stack.QueueIsOpen) { _stack.ToggleQueue(); return null; }
+                    if (!_stack.HandleEscape()) _overlay.HideOverlay();
+                    return null;
 
                 case 36:   // Return
-                    if (_stack?.QueueIsOpen == true) _stack.JumpToQueueSelection();
-                    else _stack?.PlaySelected();
-                    break;
+                    if (_stack.QueueIsOpen) _stack.JumpToQueueSelection();
+                    else _stack.PlaySelected();
+                    return null;
 
                 case 126:  // Up
-                    _stack?.MoveSelection(-1);
-                    break;
+                    _stack.MoveSelection(-1);
+                    return null;
 
                 case 125:  // Down
-                    _stack?.MoveSelection(1);
-                    break;
+                    _stack.MoveSelection(1);
+                    return null;
 
                 case 49 when !IsTyping:   // Space, only when the caret is not in the box
                     Fire(_playback.TogglePlayPauseAsync());
-                    break;
+                    return null;
 
                 default:
                     // Any printable character opens search and keeps the character, so the
                     // overlay can be typed into without aiming at the box first.
                     if (!IsTyping && e.Characters is { Length: > 0 } typed
-                        && !char.IsControl(typed[0]))
+                        && !char.IsControl(typed[0]) && (e.ModifierFlags & ModifierKeys) == 0)
                     {
-                        _stack?.FocusSearch();
-                        _stack?.SearchBar.AppendTyped(typed);
+                        _stack.FocusSearch();
+                        _stack.SearchBar.AppendTyped(typed);
+                        return null;
                     }
-                    break;
+
+                    return e;
             }
         }
 
+        /// <summary>Modifiers that mean a keystroke is a command, not typing.</summary>
+        private const NSEventModifierMask ModifierKeys =
+            NSEventModifierMask.CommandKeyMask | NSEventModifierMask.ControlKeyMask
+            | NSEventModifierMask.AlternateKeyMask;
+
+        /// <summary>
+        /// "Is the user typing" is a focus question, not a visibility one — the box is always
+        /// on screen, so testing visibility would be permanently true and Space would never
+        /// reach play/pause again.
+        /// </summary>
         private bool IsTyping => _stack?.SearchBar.IsKeyWindow == true;
 
         public override void DidFinishLaunching(NSNotification notification)
@@ -145,7 +166,16 @@ namespace Yinyue.UI
             // The stack subscribes to the applet's own Shown/Hidden, so there is nothing to
             // wire here beyond the keys.
             _stack = new OverlayStack(_config.Current.Overlay, _library, _playback, _overlay);
-            _overlay.KeyReceived += OnOverlayKey;
+
+            // A local monitor rather than the panel's KeyDown.
+            //
+            // The search box is the only panel that can become key, so once the caret is in
+            // it every keystroke goes there and the overlay's own KeyDown is never called --
+            // Escape, Return and the arrows all went nowhere. A local monitor sees key events
+            // before they are dispatched to any window in this app, which is the only place
+            // that can arbitrate between the box and the panels around it.
+            _keyMonitor = NSEvent.AddLocalMonitorForEventsMatchingMask(
+                NSEventMask.KeyDown, e => HandleKey(e)!);
 
             BuildSleepTimer();
             BuildHotkeys();
@@ -338,10 +368,7 @@ namespace Yinyue.UI
                     break;
 
                 case HotkeyActions.OpenSettings:
-                    // These need surfaces that do not exist yet: search, the queue panel,
-                    // settings and the sleep timer. Registered now so the combinations are
-                    // claimed and conflicts surface early, rather than appearing to work and
-                    // then being taken by another app later.
+                    ShowSettings();
                     break;
             }
         }
@@ -455,6 +482,7 @@ namespace Yinyue.UI
             // service to read state from.
             _media?.Dispose();
             _hotkeys?.Dispose();
+            if (_keyMonitor is not null) NSEvent.RemoveMonitor(_keyMonitor);
             _stack?.Dispose();
             _sleep?.Dispose();
             _playback.Dispose();

@@ -74,7 +74,15 @@ namespace Yinyue.Services
                 _ => OnProgressTick());
         }
 
-        public bool IsPlaying => _player.TimeControlStatus == AVPlayerTimeControlStatus.Playing;
+        /// <summary>
+        /// Anything but Paused counts as playing.
+        ///
+        /// AVPlayer reaches <c>Playing</c> asynchronously: immediately after Play() it sits in
+        /// <c>WaitingToPlayAtSpecifiedRate</c> while it fills its buffer. Testing for Playing
+        /// alone means the state read back straight after a transport call is still the old
+        /// one — which showed up as the play glyph not changing when playback started.
+        /// </summary>
+        public bool IsPlaying => _player.TimeControlStatus != AVPlayerTimeControlStatus.Paused;
 
         public TimeSpan Position
         {

@@ -588,10 +588,25 @@ namespace Yinyue
             var goneData = SecKeyChain.QueryAsData(query, false, out _);
             Check("deleting it means it is gone", goneData is null);
 
-            // The contract ConfigService relies on: a missing item reads as "not signed in",
-            // not as an error. A throw here would surface as a crash on first launch.
+            // The contract ConfigService relies on: reading is never an error. A missing item
+            // must read as "not signed in" rather than throwing, which would crash first
+            // launch.
+            //
+            // Deliberately NOT asserting that the result is null: this reads the real slot,
+            // and a signed-in user has a token in it. The first version asserted null and
+            // started failing the moment sign-in worked -- a test that only passed while the
+            // feature was unused.
             var store = new KeychainSecretStore();
-            Check("a missing token reads as null, not a throw", store.Unprotect("keychain") is null);
+            try
+            {
+                string? stored = store.Unprotect("keychain");
+                Check("reading the token never throws", true,
+                    stored is null ? "nothing stored" : "a token is stored");
+            }
+            catch (Exception ex)
+            {
+                Check("reading the token never throws", false, ex.GetType().Name);
+            }
         }
 
         /// <summary>
