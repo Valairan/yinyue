@@ -628,6 +628,28 @@ namespace Yinyue
                     Math.Abs(art.Frame.Y - (11 + (148 - 130) / 2)) < 0.5, $"y={art.Frame.Y}");
             }
 
+            // The header buttons sit hard against the right inset and stay there. Adding the
+            // sleep readout's width to their offset pushed the whole header 64 points inboard
+            // -- and every check here still passed, because they all measured the applet and
+            // the artwork rather than the row that moved.
+            double inset = 11;   // RootPadding + RootBorderThickness
+            var rightmost = applet.Subviews.OfType<AppKit.NSButton>()
+                .OrderByDescending(b => b.Frame.X + b.Frame.Width).First();
+
+            Check("the header reaches the right inset",
+                Math.Abs((rightmost.Frame.X + rightmost.Frame.Width) - (420 - inset)) < 0.5,
+                $"right edge at {rightmost.Frame.X + rightmost.Frame.Width}, expected {420 - inset}");
+
+            // And it must not move when the sleep readout appears.
+            double before = rightmost.Frame.X;
+            applet.ShowSleepRemaining(TimeSpan.FromMinutes(30));
+
+            Check("the sleep readout does not move the header",
+                Math.Abs(rightmost.Frame.X - before) < 0.5,
+                $"{rightmost.Frame.X} vs {before}");
+
+            applet.ShowSleepRemaining(TimeSpan.Zero);
+
             // Six transport controls, not three: previous, play, next, shuffle, loop, heart.
             int buttons = applet.Subviews.Count(v => v is AppKit.NSButton);
             Check("ten buttons in all — four header, six transport", buttons == 10, buttons.ToString());

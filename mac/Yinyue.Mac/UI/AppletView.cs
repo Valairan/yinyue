@@ -75,6 +75,8 @@ namespace Yinyue.UI
             _title = Label(Metrics.TitleFontSize, Theme.Text, bold: true);
             _artist = Label(Metrics.ArtistFontSize, Theme.Subtext);
             _sleepRemaining = Label(Metrics.StatusFontSize, Theme.Warning);
+            _sleepRemaining.Hidden = true;
+            _sleepIcon.Hidden = true;
             _elapsed = Label(Metrics.TimeFontSize, Theme.Subtext);
             _total = Label(Metrics.TimeFontSize, Theme.Subtext);
 
@@ -156,45 +158,47 @@ namespace Yinyue.UI
             double buttonsW = buttons.Length * Metrics.ButtonMinWidth
                             + (buttons.Length - 1) * Metrics.HeaderButtonMargin * 2;
 
-            // The sleep readout lives here rather than on the status line, because that line
-            // carries transient messages and would keep overwriting it. Hidden until the
-            // timer runs, and it reserves no space — nothing else moves when it appears,
-            // because it sits between the status text and the buttons and the status text
-            // simply has less room.
-            const double sleepIconW = 12, sleepGap = 4, sleepTextW = 48;
-            double sleepW = sleepIconW + sleepGap + sleepTextW;
-
-            _sleepIcon.Frame = new CGRect(x + width - buttonsW - sleepW,
-                y + (height - sleepIconW) / 2, sleepIconW, sleepIconW);
-            _sleepIcon.Image = Icon.Make(Icons.Moon, sleepIconW, Theme.Warning);
-            _sleepIcon.ImageScaling = NSImageScale.ProportionallyDown;
-            _sleepIcon.Hidden = true;
-            AddSubview(_sleepIcon);
-
-            _sleepRemaining.Frame = new CGRect(x + width - buttonsW - sleepTextW - 4,
-                y + (height - LineHeight(Metrics.StatusFontSize)) / 2,
-                sleepTextW, LineHeight(Metrics.StatusFontSize));
-            _sleepRemaining.Hidden = true;
-            AddSubview(_sleepRemaining);
-
-            buttonsW += sleepW;
-
-            // The status line takes what the buttons leave. The buttons are ALWAYS visible:
-            // collapsing them on Windows once hid the settings cog, and since the overlay
-            // opens into search when nothing is playing, that made settings unreachable on a
-            // fresh install — so no library could ever be added, so nothing could ever play.
-            double statusW = Math.Max(0, width - buttonsW - Metrics.StatusRightGap);
-            _status.Frame = new CGRect(x, y + (height - LineHeight(Metrics.StatusFontSize)) / 2,
-                                       statusW, LineHeight(Metrics.StatusFontSize));
-            AddSubview(_status);
-
+            // The buttons sit hard against the right edge and stay there. They are ALWAYS
+            // visible: collapsing them on Windows once hid the settings cog, and since the
+            // overlay opens into search when nothing is playing, that made settings
+            // unreachable on a fresh install — so no library could ever be added, so nothing
+            // could ever play.
             double bx = x + width - buttonsW;
+
             foreach (var b in buttons)
             {
                 b.Frame = new CGRect(bx, y, Metrics.ButtonMinWidth, height);
                 AddSubview(b);
                 bx += Metrics.ButtonMinWidth + Metrics.HeaderButtonMargin * 2;
             }
+
+            // The sleep readout sits immediately left of them, and only while the timer runs.
+            // It lives here rather than on the status line because that line carries
+            // transient messages and would keep overwriting it.
+            //
+            // Nothing else moves when it appears: the buttons are anchored right, and the
+            // status line simply has less room. Adding its width to the buttons' offset is
+            // what pushed the whole header 64 points off the edge.
+            double right = x + width - buttonsW - SleepGap;
+            double textY = y + (height - LineHeight(Metrics.StatusFontSize)) / 2;
+
+            _sleepRemaining.Frame = new CGRect(right - SleepTextWidth, textY,
+                SleepTextWidth, LineHeight(Metrics.StatusFontSize));
+            _sleepRemaining.Alignment = NSTextAlignment.Right;
+            AddSubview(_sleepRemaining);
+
+            _sleepIcon.Frame = new CGRect(right - SleepTextWidth - SleepGap - SleepIconSize,
+                y + (height - SleepIconSize) / 2, SleepIconSize, SleepIconSize);
+            _sleepIcon.Image = Icon.Make(Icons.Moon, SleepIconSize, Theme.Warning);
+            _sleepIcon.ImageScaling = NSImageScale.ProportionallyDown;
+            AddSubview(_sleepIcon);
+
+            _statusLeft = x;
+            _statusRight = x + width - buttonsW;
+            _statusY = textY;
+
+            AddSubview(_status);
+            LayoutStatus();
         }
 
         private void LayoutMetadata(double x, double y, double width, double height)
@@ -264,6 +268,27 @@ namespace Yinyue.UI
         }
 
         /// <summary>Icon box plus the template's padding on each side, as MediaBtnStyle gives it.</summary>
+        private const double SleepIconSize = 12;
+        private const double SleepGap = 4;
+        private const double SleepTextWidth = 48;
+
+        private double _statusLeft, _statusRight, _statusY;
+
+        /// <summary>
+        /// The status line takes whatever the header leaves — less while the sleep readout is
+        /// showing. Only its width changes; nothing moves.
+        /// </summary>
+        private void LayoutStatus()
+        {
+            double right = _statusRight;
+
+            if (!_sleepRemaining.Hidden)
+                right -= SleepGap + SleepTextWidth + SleepGap + SleepIconSize;
+
+            double w = Math.Max(0, right - _statusLeft - Metrics.StatusRightGap);
+            _status.Frame = new CGRect(_statusLeft, _statusY, w, LineHeight(Metrics.StatusFontSize));
+        }
+
         private static double ButtonHeight => Metrics.IconSize + Metrics.ButtonPadding * 2;
 
         private static double LineHeight(double fontSize) => Math.Ceiling(fontSize * 1.35);
@@ -466,6 +491,8 @@ namespace Yinyue.UI
             _sleepRemaining.ToolTip = running ? $"Playback pauses in {text}" : null;
             _sleepRemaining.Hidden = !running;
             _sleepIcon.Hidden = !running;
+
+            LayoutStatus();
         }
 
         /// <summary>
