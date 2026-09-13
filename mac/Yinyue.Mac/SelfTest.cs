@@ -331,6 +331,46 @@ namespace Yinyue
             Check("nonsense is rejected",
                 !Yinyue.Services.MacHotkeyBinding.TryParse("Ctrl+Alt+Bananas", out _));
 
+            // When each shortcut acts. This cannot be tested through Carbon -- a key press
+            // cannot be synthesised without Accessibility -- so the rules are plain functions
+            // and are checked directly. Getting them wrong made every plain shortcut fire
+            // twice, which looked like the overlay only staying up while its keys were held.
+            var D = typeof(Yinyue.Services.HotkeyDispatch);
+
+            foreach (var action in new[] { Yinyue.Models.HotkeyActions.ToggleOverlay,
+                                           Yinyue.Models.HotkeyActions.QuickSearch,
+                                           Yinyue.Models.HotkeyActions.CycleLoop,
+                                           Yinyue.Models.HotkeyActions.ToggleShuffle,
+                                           Yinyue.Models.HotkeyActions.Mute,
+                                           Yinyue.Models.HotkeyActions.OpenQueue,
+                                           Yinyue.Models.HotkeyActions.OpenSettings })
+            {
+                Check($"{action} acts on press",
+                    !Yinyue.Services.HotkeyDispatch.FiresOnRelease(action, requiresHold: false));
+            }
+
+            foreach (var action in new[] { Yinyue.Models.HotkeyActions.VolumeUp,
+                                           Yinyue.Models.HotkeyActions.VolumeDown })
+            {
+                Check($"{action} acts on press and repeats",
+                    Yinyue.Services.HotkeyDispatch.RepeatsWhileHeld(action)
+                    && !Yinyue.Services.HotkeyDispatch.FiresOnRelease(action, requiresHold: false));
+            }
+
+            // Only these four have a tap and a hold that differ, so only these wait.
+            foreach (var action in new[] { Yinyue.Models.HotkeyActions.PlayPause,
+                                           Yinyue.Models.HotkeyActions.RestartOrPrevious,
+                                           Yinyue.Models.HotkeyActions.AddToQueue,
+                                           Yinyue.Models.HotkeyActions.RemoveFromQueue })
+            {
+                Check($"{action} waits for release",
+                    Yinyue.Services.HotkeyDispatch.FiresOnRelease(action, requiresHold: false));
+            }
+
+            Check("hold-to-activate makes an ordinary action wait",
+                Yinyue.Services.HotkeyDispatch.FiresOnRelease(
+                    Yinyue.Models.HotkeyActions.ToggleOverlay, requiresHold: true));
+
             using var manager = new Yinyue.Services.MacHotkeyManager();
             var refused = manager.Apply(config);
 

@@ -104,14 +104,13 @@ namespace Yinyue.Services
             /// True when the action has a tap and a hold that mean different things, so the
             /// tap must wait for release to know which was meant.
             /// </summary>
-            public bool HasEscalation => !HotkeyActions.SupportsHoldToggle(Action);
+            public bool HasEscalation => HotkeyDispatch.HasEscalation(Action);
 
             /// <summary>
             /// Volume steps on press and keeps stepping while the key is down, like a
             /// keyboard's own repeat.
             /// </summary>
-            public bool RepeatsWhileHeld =>
-                Action is HotkeyActions.VolumeUp or HotkeyActions.VolumeDown;
+            public bool RepeatsWhileHeld => HotkeyDispatch.RepeatsWhileHeld(Action);
 
             public DateTime PressedAt { get; set; }
             public NSTimer? HoldTimer { get; set; }
@@ -262,7 +261,7 @@ namespace Yinyue.Services
 
             // Everything without a tap/hold escalation acts on press too. Only an action
             // whose tap and hold differ has to wait for release to know which was meant.
-            if (!registration.HasEscalation && !registration.RequiresHold)
+            if (!HotkeyDispatch.FiresOnRelease(registration.Action, registration.RequiresHold))
             {
                 Raise(registration.Action, held: false);
                 return;
@@ -323,7 +322,12 @@ namespace Yinyue.Services
             registration.HoldTimer?.Invalidate();
             registration.HoldTimer = null;
 
-            RaiseHoldEnded(registration.Action);
+            if (registration.ShowsDial) RaiseHoldEnded(registration.Action);
+
+            // Volume and every plain action already acted on press. Firing again here is
+            // what made the overlay appear only while the keys were down: Ctrl+Alt+Space
+            // toggled it on press and straight back off on release.
+            if (!HotkeyDispatch.FiresOnRelease(registration.Action, registration.RequiresHold)) return;
 
             // The hold already fired and did the bigger thing; a tap on top would do the
             // small thing as well, which is not what holding meant.
