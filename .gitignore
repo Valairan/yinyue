@@ -32,7 +32,10 @@ mac/**/obj/
 # MSBuild SDK-resolver backups left behind when an IDE without the macos workload loads the Mac project
 *.SdkResolver.*.proj.Backup.tmp
 
-# The landing page carries the current MSI when it is copied to the website; the repo does not
+# The MSI is built on Windows and copied in when the site is assembled; it is not committed.
 website/downloads/*.msi
-website/downloads/*.dmg
+
+# The DMG is committed, so the macOS download works from a clone. It is 85 MB against a 7 MB
+# repository, and git keeps blobs forever — a later change of mind means rewriting history.
+!website/downloads/*.dmg
 installer/obj/
