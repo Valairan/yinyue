@@ -29,11 +29,12 @@ works from any sub-path.
 | `Yinyue-X.Y.Z-arm64.dmg` | macOS on Apple silicon (M1 and later) |
 | `Yinyue-X.Y.Z-x64.dmg` | macOS on Intel |
 
-The macOS card has a processor toggle beside its download button. `script.js` reads the two
-file names from `data-file-arm64` and `data-file-x64` on the card, points every
-`[data-mac-download]` link at the chosen one, and remembers the choice. Apple silicon is the
-default. Without JavaScript the links point at the Apple silicon build and the toggle does
-nothing, so a `<noscript>` line under the card names the Intel file directly.
+The macOS card has a processor toggle beside its download button. It is CSS, not script: two
+radios at the top of `index.html` (`#mac-arm64`, checked by default, and `#mac-x64`) and a
+`~ main` sibling selector show whichever links and toggle label carry the matching
+`mac-only-*` class. Each toggle label is a `<label for>` the *other* radio, which is what makes
+a click flip it. `script.js` only remembers the choice between visits, so the toggle works even
+where scripts are stripped — a portfolio that injects this page's HTML, for instance.
 
 The MSI is gitignored and copied in from the Windows machine at release time. The DMGs are
 committed, so a clone carries them; mind the size, since git keeps every version forever and
@@ -54,8 +55,8 @@ GitHub refuses single files over 100 MB.
    `Yinyue-X.Y.Z-x64.dmg` into `downloads/` and prints each size and SHA-256.
    `./installer/build-mac.sh X.Y.Z universal` builds one bundle carrying both instead, which
    is the sum of the two rather than a saving.
-2. In `index.html`, update `data-file-arm64` and `data-file-x64` on the macOS card, the version
-   text, and the two hashes in the SHA-256 row. The DMGs are separate, so a single link cannot serve both:
+2. In `index.html`, update the four macOS links (two per processor: hero and card), the
+   version text, and the two hashes in the SHA-256 row. The DMGs are separate, so a single link cannot serve both:
    an Intel visitor given the arm64 file gets an app that will not open, which is what the
    processor toggle is for.
 

@@ -301,6 +301,23 @@ h2 {
 .platform__meta { margin: 0 0 1.2rem; color: var(--subtext); font-size: 0.92rem; }
 .platform .facts { margin-top: 1.6rem; }
 
+/* The macOS processor switch is CSS state: two radios at the top of <body>, and everything
+   marked mac-only-* below them shows for the checked one. No script is needed for it to work. */
+.mac-arch {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.mac-only-x64 { display: none; }
+#mac-x64:checked ~ main .mac-only-arm64 { display: none; }
+#mac-x64:checked ~ main .mac-only-x64 { display: inline-flex; }
+/* Keyboard users who focus the hidden radio see the toggle light up instead. */
+.mac-arch:focus-visible ~ main .button--muted { outline: 2px solid var(--accent); outline-offset: 2px; }
+
 /* The macOS button and its processor toggle share a row; on a narrow card they stack. */
 .download-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem; }
 

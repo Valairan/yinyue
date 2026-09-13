@@ -16,6 +16,15 @@
 <body>
 
   <!--
+    Which Mac build the page hands out. Two radios, kept first in <body> so a CSS sibling
+    selector can reach every macOS link and the toggle's label below them — the toggle works
+    with no JavaScript at all, and script.js only remembers the choice between visits. Apple
+    silicon is the default: it is what every Mac sold since 2020 has.
+  -->
+  <input type="radio" name="mac-arch" id="mac-arm64" class="mac-arch" checked>
+  <input type="radio" name="mac-arch" id="mac-x64" class="mac-arch">
+
+  <!--
     Full-page background: a looping GIF of the app's main flows, recorded from the real UI
     (summon, search, play, queue, volume, dismiss). A GIF rather than a video so it needs no
     codecs and loops without a player; the flat dark canvas keeps it small. Under a shade so
@@ -56,7 +65,11 @@
           <img src="assets/icons/app-window.svg" alt="" class="button__icon">
           Download for Windows
         </a>
-        <a class="button button--ghost" href="downloads/Yinyue-0.2.0-arm64.dmg" download data-mac-download>
+        <a class="button button--ghost mac-only-arm64" href="downloads/Yinyue-0.2.0-arm64.dmg" download title="Yinyue for macOS, Apple silicon">
+          <img src="assets/icons/apple.svg" alt="" class="button__icon">
+          Download for macOS
+        </a>
+        <a class="button button--ghost mac-only-x64" href="downloads/Yinyue-0.2.0-x64.dmg" download title="Yinyue for macOS, Intel">
           <img src="assets/icons/apple.svg" alt="" class="button__icon">
           Download for macOS
         </a>
@@ -173,31 +186,36 @@
           </dl>
         </article>
 
-        <article class="platform" data-mac-files
-                 data-file-arm64="downloads/Yinyue-0.2.0-arm64.dmg"
-                 data-file-x64="downloads/Yinyue-0.2.0-x64.dmg">
+        <article class="platform">
           <h3>macOS</h3>
-          <p class="platform__meta">Version 0.2.0 · Disk image · 44 MB · macOS 13 and later</p>
+          <p class="platform__meta">Version 0.2.0 · Disk image · 45 MB · macOS 13 and later</p>
           <div class="download-row">
-            <a class="button button--primary" href="downloads/Yinyue-0.2.0-arm64.dmg" download data-mac-download>
+            <a class="button button--primary mac-only-arm64" href="downloads/Yinyue-0.2.0-arm64.dmg" download title="Yinyue for macOS, Apple silicon">
+              <img src="assets/icons/apple.svg" alt="" class="button__icon">
+              Download for macOS
+            </a>
+            <a class="button button--primary mac-only-x64" href="downloads/Yinyue-0.2.0-x64.dmg" download title="Yinyue for macOS, Intel">
               <img src="assets/icons/apple.svg" alt="" class="button__icon">
               Download for macOS
             </a>
             <!--
-                One build per processor. One button, styled as a quieter sibling of the
-                download: it names the build in hand and flips to the other on click.
+                One build per processor. The toggle is a pair of labels styled as the
+                download's quieter sibling: each names the build in hand and, being a label
+                for the *other* radio, flips to it on click. Only one is shown at a time.
             -->
-            <button type="button" class="button button--muted" data-mac-arch-toggle
-                    title="Switch between the Apple silicon and Intel builds">
+            <label class="button button--muted mac-only-arm64" for="mac-x64" title="Switch to the Intel build">
               <img src="assets/icons/arrow-right-left.svg" alt="" class="button__icon">
-              <span data-mac-arch-name>Apple silicon</span>
-            </button>
+              Apple silicon
+            </label>
+            <label class="button button--muted mac-only-x64" for="mac-arm64" title="Switch to the Apple silicon build">
+              <img src="assets/icons/arrow-right-left.svg" alt="" class="button__icon">
+              Intel
+            </label>
           </div>
           <p class="platform__hint">
             Not sure which Mac you have? Apple menu → About This Mac says “Chip” for Apple silicon
             and “Processor” for Intel. The button beside the download switches builds.
           </p>
-          <noscript><p class="platform__hint">Intel Mac: <a href="downloads/Yinyue-0.2.0-x64.dmg" download>Yinyue-0.2.0-x64.dmg</a></p></noscript>
           <dl class="facts">
             <div><dt>Requires</dt><dd>macOS 13 or later. Apple silicon means an M1 or later chip; every other Mac is Intel.</dd></div>
             <div><dt>Install</dt><dd>Open the disk image and drag Yinyue to Applications. It lives in the menu bar; there is nothing else to set up.</dd></div>
