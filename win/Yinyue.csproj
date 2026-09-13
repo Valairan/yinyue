@@ -23,7 +23,7 @@
     <!-- Binary Metadata -->
     <AssemblyName>Yinyue</AssemblyName>
     <RootNamespace>Yinyue</RootNamespace>
-    <Version>1.0.0</Version>
+    <Version>0.2.0</Version>
     <Title>Yinyue</Title>
     <Description>Lightweight cross-platform background music daemon and overlay.</Description>
   </PropertyGroup>

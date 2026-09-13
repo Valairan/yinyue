@@ -5,7 +5,7 @@
 .DESCRIPTION
     Run from anywhere; paths are resolved against this script.
 
-        .\installer\build.ps1                 # builds installer\out\Yinyue-0.1.0.msi
+        .\installer\build.ps1                 # builds installer\out\Yinyue-0.2.0.msi
         .\installer\build.ps1 -Version 0.2.0
 
     Needs the WiX command-line tool, pinned to v5:
@@ -19,7 +19,7 @@
 #>
 [CmdletBinding()]
 param(
-    [string] $Version = "0.1.0",
+    [string] $Version = "0.2.0",
     [string] $Configuration = "Release"
 )
 
@@ -42,6 +42,7 @@ dotnet publish (Join-Path $repoRoot "win\Yinyue.csproj") `
     -r win-x64 `
     --no-self-contained `
     -p:PublishSingleFile=true `
+    -p:Version=$Version `
     -o $publishDir `
     --nologo
 
