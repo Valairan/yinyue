@@ -46,6 +46,7 @@ namespace Yinyue.UI
         private readonly OverlayConfig _config;
         private readonly NSTextField _text;
         private readonly NSProgressIndicator _level;
+        private readonly HoldDialView _dial;
 
         /// <summary>
         /// Invalidates a pending fade completion. Without it, a toast raised while an earlier
@@ -86,6 +87,12 @@ namespace Yinyue.UI
             };
             ContentView.AddSubview(_level);
 
+            _dial = new HoldDialView(new CGRect(area.X, area.Y + (area.Height - 26) / 2, 26, 26))
+            {
+                Hidden = true,
+            };
+            ContentView.AddSubview(_dial);
+
             OrderOut(null);
         }
 
@@ -97,6 +104,8 @@ namespace Yinyue.UI
         /// </summary>
         public void Show(string message, double? level = null)
         {
+            _dial.Hidden = true;
+            _text.Frame = TextFrame(withDial: false);
             _text.StringValue = message;
 
             _level.Hidden = level is null;
@@ -115,6 +124,45 @@ namespace Yinyue.UI
                 OverlayPositioner.PositionToastRow(this, _config, (int)Role);
                 OrderFrontRegardless();
             }
+        }
+
+        /// <summary>
+        /// Shows the filling dial. There is no ordinary auto-hide while the keys are down —
+        /// but a dial that stops being updated must not stay up for good, so the dismissal
+        /// runs as a watchdog at a short interval, restarted by every update. On Windows the
+        /// hold-to-activate path once succeeded without telling the toast, and the dial
+        /// stayed on screen permanently.
+        /// </summary>
+        public void ShowHold(string label, double fraction)
+        {
+            _dial.Hidden = false;
+            _dial.Fraction = fraction;
+
+            _level.Hidden = true;
+            _text.Frame = TextFrame(withDial: true);
+            _text.StringValue = label;
+
+            _generation++;
+            AlphaValue = 1;
+
+            if (!IsVisible)
+            {
+                OverlayPositioner.PositionToastRow(this, _config, (int)Role);
+                OrderFrontRegardless();
+            }
+
+            Dismiss(HoldStale);
+        }
+
+        /// <summary>How long a dial may go without an update before it is assumed stale.</summary>
+        private static readonly TimeSpan HoldStale = TimeSpan.FromMilliseconds(600);
+
+        private CGRect TextFrame(bool withDial)
+        {
+            var area = ContentArea;
+            double left = withDial ? area.X + 34 : area.X;
+
+            return new CGRect(left, area.Y + area.Height - 20, area.X + area.Width - left, 18);
         }
 
         /// <summary>

@@ -1094,9 +1094,24 @@ What this means in practice:
   the AppKit equivalent of `ShowInTaskbar="False"` plus the tray icon.
 
 **The macOS app is feature-complete for the overlay itself**: playback, search, the queue,
-toasts, global hotkeys, media keys, the sleep timer and settings. Not yet ported: the
-installer, startup-at-login (`SMAppService`), the tray tooltip, and the hold dial's arc —
-the hold row exists and shows a bar rather than a filling arc.
+toasts, global hotkeys, media keys, the sleep timer and settings. Not yet ported: the installer
+and a Hotkeys tab in settings — rebinding still means editing `config.json`.
+
+**Start-at-login registers the bundle, not a path**, which removes the failure the Windows
+one documents: the Run key holds an absolute path, so moving or republishing the app strands
+it and settings has to detect the stale entry and offer to repair it. `SMAppService.MainApp`
+tracks bundle identity, so moving the `.app` cannot leave a dangling registration. The cost
+is that it only works from a real bundle — running the bare binary in development fails, and
+that is correct, since there would be nothing stable to register. macOS can also refuse
+outright when the user has switched it off in System Settings, which an app cannot override;
+settings reports that and puts the switch back rather than showing a lie.
+
+**The hold dial fills from one timer, not two.** The hotkey manager ticks at 1/30 s while a
+key is down and fires the hold on whichever tick crosses the threshold — two timers would
+have to agree about when the hold began. It only runs while a key is actually down, so it
+costs nothing at rest. The dial is shown only where a hold means something: the four
+shortcuts with a built-in escalation, plus anything set to hold-to-activate. Filling a dial
+for a shortcut whose hold does nothing would promise an action that is not coming.
 
 The sleep timer is **duplicated**, not shared: `MacSleepTimer` mirrors the rules of
 `SleepTimerService` because that one ticks on a `DispatcherTimer`. The arithmetic — the

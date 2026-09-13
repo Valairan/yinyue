@@ -261,7 +261,7 @@ namespace Yinyue.UI
             _message.Dismiss(TimeSpan.FromSeconds(2));
         }
 
-        public void ShowHold(string message, double progress) => _hold.Show(message, progress);
+        public void ShowHold(string message, double progress) => _hold.ShowHold(message, progress);
 
         public void EndHold() => _hold.Dismiss(TimeSpan.Zero);
 

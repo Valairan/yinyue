@@ -94,6 +94,12 @@ namespace Yinyue.Services
             /// <summary>Set in settings: this shortcut fires only after being held.</summary>
             public required bool RequiresHold { get; init; }
 
+            /// <summary>
+            /// True when continuing to hold will actually do something — either the shortcut
+            /// carries a built-in escalation, or the user asked it to require a hold.
+            /// </summary>
+            public bool ShowsDial => RequiresHold || !HotkeyActions.SupportsHoldToggle(Action);
+
             public DateTime PressedAt { get; set; }
             public NSTimer? HoldTimer { get; set; }
             public bool HoldFired { get; set; }
@@ -107,6 +113,15 @@ namespace Yinyue.Services
         private double _holdDelaySeconds = 0.8;
 
         public event EventHandler<HotkeyTriggeredEventArgs>? Triggered;
+
+        /// <summary>
+        /// Reports how far through a hold the key is, so the dial can fill. Raised only for
+        /// shortcuts whose hold means something — there is nothing to promise otherwise.
+        /// </summary>
+        public event EventHandler<(string Action, double Fraction)>? HoldProgress;
+
+        /// <summary>Raised when a hold ends, whether it completed or was let go early.</summary>
+        public event EventHandler<string>? HoldEnded;
 
         public IReadOnlyCollection<string> Active =>
             _byId.Values.Select(r => r.Action).ToList();
@@ -213,23 +228,58 @@ namespace Yinyue.Services
             // The hold is a timer armed on press and cancelled on release, which is what
             // having a release event buys us. PlayPause repeats while held, so the queue
             // walks forward a track per interval rather than once per press.
+            //
+            // It ticks far faster than the threshold so the dial can fill smoothly; the hold
+            // fires on whichever tick crosses it. One timer rather than two, because two
+            // would have to agree about when the hold began.
             registration.HoldTimer?.Invalidate();
-            registration.HoldTimer = NSTimer.CreateRepeatingScheduledTimer(
-                _holdDelaySeconds, _ =>
-                {
-                    bool first = !registration.HoldFired;
-                    registration.HoldFired = true;
+            registration.HoldTimer = NSTimer.CreateRepeatingScheduledTimer(DialTick, _ =>
+            {
+                double held = (DateTime.UtcNow - registration.PressedAt).TotalSeconds;
+                double fraction = Math.Clamp(held / _holdDelaySeconds, 0, 1);
 
-                    Raise(registration.Action, held: true, repeat: !first);
+                if (!registration.HoldFired)
+                {
+                    // Only where a hold means something: the four with a built-in escalation,
+                    // and anything the user has set to hold-to-activate. Filling a dial for a
+                    // shortcut whose hold does nothing would promise an action that is not
+                    // coming.
+                    if (registration.ShowsDial) RaiseProgress(registration.Action, fraction);
+
+                    if (fraction < 1) return;
+
+                    registration.HoldFired = true;
+                    if (registration.ShowsDial) RaiseHoldEnded(registration.Action);
+                    Raise(registration.Action, held: true);
 
                     if (!repeats) registration.HoldTimer?.Invalidate();
-                });
+                    return;
+                }
+
+                // Already fired: only a repeating hold has anything left to do, once per
+                // delay rather than once per dial tick.
+                if (!repeats) return;
+
+                if (held >= _holdDelaySeconds)
+                {
+                    registration.PressedAt = DateTime.UtcNow;
+                    Raise(registration.Action, held: true, repeat: true);
+                }
+            });
         }
+
+        /// <summary>
+        /// How often the dial is refreshed while a key is held. Fast enough to read as
+        /// filling rather than stepping, and cheap: it only runs while a key is down.
+        /// </summary>
+        private const double DialTick = 1.0 / 30;
 
         private void OnReleased(Registration registration)
         {
             registration.HoldTimer?.Invalidate();
             registration.HoldTimer = null;
+
+            RaiseHoldEnded(registration.Action);
 
             // The hold already fired and did the bigger thing; a tap on top would do the
             // small thing as well, which is not what holding meant.
@@ -254,6 +304,14 @@ namespace Yinyue.Services
                     Held = held,
                     Repeat = repeat,
                 }));
+
+        private void RaiseProgress(string action, double fraction) =>
+            NSApplication.SharedApplication.BeginInvokeOnMainThread(
+                () => HoldProgress?.Invoke(this, (action, fraction)));
+
+        private void RaiseHoldEnded(string action) =>
+            NSApplication.SharedApplication.BeginInvokeOnMainThread(
+                () => HoldEnded?.Invoke(this, action));
 
         public void Dispose()
         {

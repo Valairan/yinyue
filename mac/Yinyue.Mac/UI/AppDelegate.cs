@@ -27,6 +27,7 @@ namespace Yinyue.UI
         private OverlayStack? _stack;
         private MacSleepTimer? _sleep;
         private SettingsWindow? _settings;
+        private NSStatusBarButton? _statusButton;
 
         private readonly MusicLibrary _library;
         private readonly JellyfinApiClient _jellyfin;
@@ -141,6 +142,7 @@ namespace Yinyue.UI
             // Media keys and the Now Playing panel. Owned here rather than by the overlay,
             // because the overlay is hidden almost all the time and these must work anyway.
             _media = new MacMediaControls(_playback);
+            UpdateTooltip();
 
             // Only deliberate changes are announced. An automatic advance at the end of a
             // track would fire all day for something the user never asked for.
@@ -158,6 +160,29 @@ namespace Yinyue.UI
         /// <summary>Summons the overlay — used by the tray menu and by a second launch.</summary>
         public void ShowOverlay() => _overlay?.ShowOverlay();
 
+        /// <summary>
+        /// The menu-bar tooltip is the one surface always available while the overlay is
+        /// hidden, so it carries the volume and the sleep timer's remaining time. Written
+        /// from one place because it has two sources and they would otherwise overwrite each
+        /// other — the Windows tray tooltip has the same problem and the same fix.
+        /// </summary>
+        private void UpdateTooltip()
+        {
+            if (_statusButton is null) return;
+
+            var parts = new List<string> { "Yinyue" };
+
+            if (_playback.CurrentTrack is { } track)
+                parts.Add($"{track.Title} — {track.DisplayArtist}");
+
+            parts.Add(_playback.IsMuted ? "Muted" : $"Volume {Math.Round(_playback.Volume * 100)}%");
+
+            if (_sleep is { IsRunning: true } sleep)
+                parts.Add($"Sleep in {MacSleepTimer.Describe(sleep.Remaining)}");
+
+            _statusButton.ToolTip = string.Join("  ·  ", parts);
+        }
+
         private void BuildSleepTimer()
         {
             _sleep = new MacSleepTimer
@@ -167,12 +192,28 @@ namespace Yinyue.UI
 
             _sleep.SetSteps(_config.Current.SleepTimer.Steps);
             _sleep.Elapsed += () => Fire(_playback.PauseAsync());
+
+            _sleep.Changed += _ => NSApplication.SharedApplication.BeginInvokeOnMainThread(UpdateTooltip);
+
+            _playback.VolumeChanged += (_, _) =>
+                NSApplication.SharedApplication.BeginInvokeOnMainThread(UpdateTooltip);
+
+            _playback.TrackChanged += (_, _) =>
+                NSApplication.SharedApplication.BeginInvokeOnMainThread(UpdateTooltip);
         }
 
         private void BuildHotkeys()
         {
             _hotkeys = new MacHotkeyManager();
             _hotkeys.Triggered += OnHotkey;
+
+            // The dial is hosted by the toast rather than the overlay, because the overlay is
+            // usually hidden when these gestures are made — play/pause and restart
+            // deliberately do not summon it.
+            _hotkeys.HoldProgress += (_, e) =>
+                _stack?.ShowHold(HoldLabel(e.Action), e.Fraction);
+
+            _hotkeys.HoldEnded += (_, _) => _stack?.EndHold();
 
             var refused = _hotkeys.Apply(_config.Current.Hotkeys);
             if (refused.Count == 0) return;
@@ -294,6 +335,19 @@ namespace Yinyue.UI
             }
         }
 
+        /// <summary>
+        /// What the dial says while the key is held. Names the bigger action, since that is
+        /// what continuing to hold will do — the tap has already been given up by then.
+        /// </summary>
+        private static string HoldLabel(string action) => action switch
+        {
+            HotkeyActions.PlayPause => "Keep holding to skip",
+            HotkeyActions.RestartOrPrevious => "Keep holding to step back",
+            HotkeyActions.AddToQueue => "Keep holding to play next",
+            HotkeyActions.RemoveFromQueue => "Keep holding to clear the queue",
+            _ => HotkeyActions.Describe(action),
+        };
+
         /// <summary>How much one press of the volume shortcuts moves the level.</summary>
         private const double VolumeStep = 0.05;
 
@@ -364,6 +418,7 @@ namespace Yinyue.UI
                 }
 
                 button.ToolTip = "Yinyue";
+                _statusButton = button;
             }
 
             var menu = new NSMenu();

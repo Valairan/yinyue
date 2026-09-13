@@ -33,6 +33,9 @@ namespace Yinyue.UI
         private readonly FolderSource _folderSource = new();
 
         private readonly NSPopUpButton _anchor;
+        private readonly NSButton _startAtLogin;
+        private readonly NSTextField _startupStatus;
+        private readonly MacStartupService _startup = new();
         private readonly NSTextField _libraryStatus;
 
         public SettingsWindow(ConfigService config, JellyfinApiClient jellyfin,
@@ -123,11 +126,39 @@ namespace Yinyue.UI
             _anchor.SelectItem(_config.Current.Overlay.Anchor.ToString());
             content.AddSubview(_anchor);
 
+            y -= 32;
+
+            _startAtLogin = new NSButton(new CGRect(160, y, 200, 22)) { Title = "Start at sign-in" };
+            _startAtLogin.SetButtonType(NSButtonType.Switch);
+            _startAtLogin.State = _startup.IsEnabled ? NSCellStateValue.On : NSCellStateValue.Off;
+            _startAtLogin.Activated += (_, _) => ApplyStartAtLogin();
+            content.AddSubview(_startAtLogin);
+
+            _startupStatus = Caption(string.Empty, 160, y - 18);
+            _startupStatus.TextColor = Theme.Warning;
+            content.AddSubview(_startupStatus);
+
             var save = new NSButton(new CGRect(400, 20, 100, 30)) { Title = "Save", BezelStyle = NSBezelStyle.Rounded };
             save.Activated += (_, _) => Save();
             content.AddSubview(save);
 
             Center();
+        }
+
+        /// <summary>
+        /// macOS can refuse this — the app may not be running from a bundle, or the user may
+        /// have switched it off in System Settings, which an app cannot override. Report what
+        /// happened and put the switch back rather than leaving it showing a lie.
+        /// </summary>
+        private void ApplyStartAtLogin()
+        {
+            bool wanted = _startAtLogin.State == NSCellStateValue.On;
+            string? problem = _startup.SetEnabled(wanted);
+
+            _startupStatus.StringValue = problem ?? string.Empty;
+
+            if (problem is not null)
+                _startAtLogin.State = _startup.IsEnabled ? NSCellStateValue.On : NSCellStateValue.Off;
         }
 
         private string TokenStatus() =>
