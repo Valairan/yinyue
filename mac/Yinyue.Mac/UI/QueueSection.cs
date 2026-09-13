@@ -15,7 +15,7 @@ namespace Yinyue.UI
     /// this is a separate window that deliberately never becomes key, so no keystroke is ever
     /// delivered to it. Either way the grab has to come from outside.
     /// </summary>
-    public sealed class QueuePanel : StackedPanel
+    public sealed class QueueSection : OverlaySection
     {
         private readonly PlaybackService _playback;
 
@@ -37,7 +37,7 @@ namespace Yinyue.UI
 
         private int _heldOrigin = -1;
 
-        public QueuePanel(OverlayConfig config, PlaybackService playback)
+        public QueueSection(OverlayConfig config, PlaybackService playback)
             : base(config, HeightFor(0))
         {
             _playback = playback;
@@ -47,11 +47,11 @@ namespace Yinyue.UI
             _header = Label(area.Y + area.Height - 16, OverlayMetrics.ResultTitleFontSize, Theme.Text, bold: true);
             _hint = Label(area.Y + area.Height - 30, OverlayMetrics.ResultSubtitleFontSize, Theme.Subtext);
 
-            ContentView!.AddSubview(_header);
-            ContentView.AddSubview(_hint);
+            AddSubview(_header);
+            AddSubview(_hint);
 
             _rows = new NSView(new CGRect(area.X, area.Y, area.Width, area.Height - HeaderHeight));
-            ContentView.AddSubview(_rows);
+            AddSubview(_rows);
 
             _playback.QueueChanged += (_, _) =>
                 NSApplication.SharedApplication.BeginInvokeOnMainThread(Refresh);
@@ -76,7 +76,7 @@ namespace Yinyue.UI
         {
             _selected = -1;
             Refresh();
-            OrderFrontRegardless();
+            Shown = true;
         }
 
         public void Refresh()
@@ -98,7 +98,7 @@ namespace Yinyue.UI
 
             if (_tracks.Count > 0 && _held < 0) _hint.StringValue = string.Empty;
 
-            SetHeight(HeightFor(_tracks.Count));
+            SetSectionHeight(HeightFor(_tracks.Count));
 
             var area = ContentArea;
             _header.SetFrameOrigin(new CGPoint(area.X, area.Y + area.Height - 16));

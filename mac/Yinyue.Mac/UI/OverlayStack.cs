@@ -32,9 +32,9 @@ namespace Yinyue.UI
         private readonly PlaybackService _playback;
 
         private readonly OverlayPanel _applet;
-        private readonly SearchBarPanel _searchBar;
-        private readonly SearchResultsPanel _results;
-        private readonly QueuePanel _queue;
+        private readonly SearchBarSection _searchBar;
+        private readonly SearchResultsSection _results;
+        private readonly QueueSection _queue;
 
         // Two toasts, not one: a track change can land while a hold is in progress and one
         // window cannot occupy two rows at once.
@@ -52,23 +52,26 @@ namespace Yinyue.UI
             _playback = playback;
             _applet = applet;
 
-            _searchBar = new SearchBarPanel(config);
-            _results = new SearchResultsPanel(config);
-            _queue = new QueuePanel(config, playback);
+            _searchBar = new SearchBarSection(config);
+            _results = new SearchResultsSection(config);
+            _queue = new QueueSection(config, playback);
 
             _message = new ToastPanel(config, ToastRole.Message);
             _hold = new ToastPanel(config, ToastRole.Hold);
 
             _searchBar.QueryChanged += (_, text) => OnQueryChanged(text);
 
-            // Child windows follow the parent, which is what makes the stack hold together.
-            _applet.AddChildWindow(_searchBar, NSWindowOrderingMode.Above);
-            _applet.AddChildWindow(_results, NSWindowOrderingMode.Above);
-            _applet.AddChildWindow(_queue, NSWindowOrderingMode.Above);
+            // Sections, not child windows. One window means one glass view behind the whole
+            // stack, which is the only way adjacent glass merges into a single material.
+            foreach (var section in Sections)
+            {
+                _applet.StackRoot.AddSubview(section);
+                section.HeightChanged += (_, _) => Layout();
+                section.Interacted += (_, _) => _applet.RestartAutoHide();
+            }
 
-            // The toasts are deliberately NOT children: a child window is hidden with its
-            // parent, and a toast exists to be seen while the overlay is hidden. They place
-            // themselves in their reserved rows when shown.
+            // The toasts stay separate windows: a toast exists to be seen while the overlay
+            // is hidden, and anything inside the overlay's window goes with it.
 
             // The stack owns its relationship to the applet rather than having the delegate
             // wire it: a stack that has not been laid out sits at the window origin, and
@@ -77,56 +80,80 @@ namespace Yinyue.UI
             _applet.Shown += (_, _) => Show();
             _applet.Hidden += (_, _) => Hide();
 
-            // Input anywhere in the stack counts as using the overlay.
-            foreach (var (_, panel) in PanelsForTest)
-                if (panel is StackedPanel stacked)
-                    stacked.Interacted += (_, _) => _applet.RestartAutoHide();
-
-            _results.OrderOut(null);
-            _queue.OrderOut(null);
+            _results.Shown = false;
+            _queue.Shown = false;
             Layout();
         }
 
-        public SearchBarPanel SearchBar => _searchBar;
+        public SearchBarSection SearchBar => _searchBar;
 
         /// <summary>Every surface in the stack, for the alignment checks in the suite.</summary>
-        public IReadOnlyList<(string Name, NSWindow Panel)> PanelsForTest => new (string, NSWindow)[]
+        /// <summary>Every section in the stack, for the suite.</summary>
+        public IReadOnlyList<(string Name, OverlaySection Section)> SectionsForTest =>
+            new (string, OverlaySection)[]
+            {
+                ("search bar", _searchBar),
+                ("results", _results),
+                ("queue", _queue),
+            };
+
+        /// <summary>The toasts, which remain separate windows.</summary>
+        public IReadOnlyList<(string Name, NSWindow Panel)> ToastsForTest => new (string, NSWindow)[]
         {
-            ("search bar", _searchBar),
-            ("results", _results),
-            ("queue", _queue),
             ("toast", _message),
             ("hold", _hold),
         };
 
         /// <summary>
-        /// Accumulates outward from the applet over an ordered list, so each panel clears
-        /// everything between it and the applet and a closed panel leaves no hole. Offsets
-        /// come from each panel's own height, because they grow and shrink with their
-        /// contents — a results panel showing one row and one showing seven push the queue up
-        /// by different amounts.
+        /// Stacks the sections bottom-up inside the window and sizes the window to fit.
+        ///
+        /// The applet sits at the bottom and keeps its place; the window grows upward as
+        /// panels open, which is what a bottom anchor already expects. A hidden section is
+        /// skipped rather than removed, so it leaves no gap and keeps its contents.
         /// </summary>
         public void Layout()
         {
-            var anchor = _applet.Frame;
+            double y = 0;
 
-            // Upward: search bar, then results, then the queue beyond them.
-            double y = anchor.Y + anchor.Height + OverlayMetrics.SideGap;
+            // The applet's own view is placed by the window; the sections stack above it.
+            double appletHeight = OverlayMetrics.AppletHeight;
+            _appletView?.SetFrameOrigin(new CGPoint(0, 0));
+            y += appletHeight;
 
-            foreach (var panel in new NSWindow[] { _searchBar, _results, _queue })
+            foreach (var section in Sections)
             {
-                // Every panel is placed, including hidden ones: a panel that has never been
-                // positioned sits at the screen origin and flashes there for a frame when it
-                // opens. Only a visible panel advances the offset, so a closed one leaves no
-                // hole in the stack.
-                panel.SetFrameOrigin(new CGPoint(anchor.X, y));
+                if (!section.Shown) continue;
 
-                if (panel.IsVisible) y += panel.Frame.Height + OverlayMetrics.SideGap;
+                y += OverlayMetrics.SideGap;
+                section.Frame = new CGRect(0, y, OverlayMetrics.PanelWidth, section.Frame.Height);
+                y += section.Frame.Height;
             }
 
-            // The toast rows are not laid out here. The space below the applet is reserved
-            // for them by the bottom-anchor lift in PositionApplet, but the windows place
-            // themselves when shown — they have to work with no applet on screen at all.
+            _applet.SetStackHeight(y);
+        }
+
+        /// <summary>Bottom-up: the search bar sits on the applet, the results above it, the queue beyond.</summary>
+        private IEnumerable<OverlaySection> Sections
+        {
+            get
+            {
+                yield return _searchBar;
+                yield return _results;
+                yield return _queue;
+            }
+        }
+
+        private AppletView? _appletView;
+
+        /// <summary>
+        /// The applet is a section like the others — it carries the same background, border
+        /// and tint — but it is the anchor rather than part of the stack, so it is laid out
+        /// separately and never hidden.
+        /// </summary>
+        public void SetAppletView(AppletView view)
+        {
+            _appletView = view;
+            view.Interacted += (_, _) => _applet.RestartAutoHide();
         }
 
         /// <summary>Re-applies the background tint across the whole stack.</summary>
@@ -134,14 +161,16 @@ namespace Yinyue.UI
         {
             _applet.ApplyBackgroundOpacity();
 
-            foreach (var (_, panel) in PanelsForTest)
-                if (panel is StackedPanel stacked)
-                    stacked.ApplyBackgroundOpacity();
+            _appletView?.ApplyBackgroundOpacity();
+            foreach (var section in Sections) section.ApplyBackgroundOpacity();
+
+            _message.ApplyBackgroundOpacity();
+            _hold.ApplyBackgroundOpacity();
         }
 
         public void Show()
         {
-            _searchBar.OrderFrontRegardless();
+            _searchBar.Shown = true;
             Layout();
         }
 
@@ -153,18 +182,17 @@ namespace Yinyue.UI
         /// </summary>
         public void Hide()
         {
-            _searchBar.OrderOut(null);
-            _results.OrderOut(null);
-            _queue.OrderOut(null);
+            _searchBar.Shown = false;
+            _results.Shown = false;
+            _queue.Shown = false;
         }
 
         /// <summary>Puts the caret in the box. The box was already there; nothing is revealed.</summary>
         public void FocusSearch()
         {
-            _searchBar.OrderFrontRegardless();
-            _searchBar.MakeKeyAndOrderFront(null);
-            _searchBar.FocusBox();
+            _searchBar.Shown = true;
             Layout();
+            _searchBar.FocusBox();
         }
 
         /// <summary>
@@ -189,7 +217,7 @@ namespace Yinyue.UI
         /// </summary>
         public void MoveSelection(int delta)
         {
-            if (_queue.IsVisible)
+            if (_queue.Shown)
             {
                 _queue.MoveSelection(delta);
                 return;
@@ -206,15 +234,15 @@ namespace Yinyue.UI
             _results.MoveSelection(delta);
         }
 
-        public bool QueueIsOpen => _queue.IsVisible;
+        public bool QueueIsOpen => _queue.Shown;
 
         public void ToggleQueue()
         {
-            if (_queue.IsVisible)
+            if (_queue.Shown)
             {
                 // Closing commits rather than reverts: the moves are already applied, and
                 // undoing them behind a closed panel would be a surprise.
-                _queue.OrderOut(null);
+                _queue.Shown = false;
             }
             else
             {
@@ -394,14 +422,14 @@ namespace Yinyue.UI
             }
 
             _results.Show(result.Tracks, result.Collections);
-            _results.OrderFrontRegardless();
+            _results.Shown = true;
             Layout();
         }
 
         private void ShowResultsMessage(string message)
         {
             _results.ShowMessage(message);
-            _results.OrderFrontRegardless();
+            _results.Shown = true;
             Layout();
         }
 
@@ -411,8 +439,8 @@ namespace Yinyue.UI
             _debounce?.Invalidate();
             _debounce = null;
 
-            _results.OrderOut(null);
-            _queue.OrderOut(null);
+            _results.Shown = false;
+            _queue.Shown = false;
             Layout();
         }
 
@@ -422,8 +450,9 @@ namespace Yinyue.UI
             _search?.Cancel();
             _search?.Dispose();
 
-            _results.Close();
-            _searchBar.Close();
+            _results.RemoveFromSuperview();
+            _searchBar.RemoveFromSuperview();
+            _queue.RemoveFromSuperview();
         }
     }
 }

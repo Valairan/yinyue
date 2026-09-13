@@ -41,8 +41,10 @@ namespace Yinyue.UI
     /// would have hidden it at the only moment it matters. It positions itself against the
     /// anchor instead, exactly as the Windows toast does.
     /// </remarks>
-    public sealed class ToastPanel : StackedPanel
+    public sealed class ToastPanel : NSPanel
     {
+        private readonly NSView _root;
+
         private readonly OverlayConfig _config;
         private readonly NSImageView _glyph;
         private readonly NSTextField _text;
@@ -56,10 +58,40 @@ namespace Yinyue.UI
         private int _generation;
 
         public ToastPanel(OverlayConfig config, ToastRole role)
-            : base(config, OverlayMetrics.ToastRowHeight)
+            : base(new CGRect(0, 0, OverlayMetrics.PanelWidth, OverlayMetrics.ToastRowHeight),
+                   NSWindowStyle.Borderless | NSWindowStyle.NonactivatingPanel | NSWindowStyle.Utility,
+                   NSBackingStore.Buffered, deferCreation: false)
         {
             _config = config;
             Role = role;
+
+            Level = NSWindowLevel.Floating;
+            HidesOnDeactivate = false;
+            IsOpaque = false;
+            BackgroundColor = NSColor.Clear;
+            HasShadow = true;
+            MovableByWindowBackground = false;
+
+            CollectionBehavior = NSWindowCollectionBehavior.CanJoinAllSpaces
+                               | NSWindowCollectionBehavior.FullScreenAuxiliary
+                               | NSWindowCollectionBehavior.IgnoresCycle;
+
+            _root = new NSView(new CGRect(0, 0, OverlayMetrics.PanelWidth, OverlayMetrics.ToastRowHeight))
+            {
+                WantsLayer = true,
+            };
+
+            var layer = _root.Layer!;
+            layer.CornerRadius = (nfloat)OverlayMetrics.RootCornerRadius;
+            layer.BorderWidth = (nfloat)OverlayMetrics.RootBorderThickness;
+            layer.BorderColor = Theme.Surface0.CGColor;
+            layer.MasksToBounds = true;
+
+            ContentView = _config.LiquidGlass
+                ? GlassEffect.WrapAndTint(_root, OverlayMetrics.RootCornerRadius, TintColour)
+                : _root;
+
+            ApplyBackgroundOpacity();
 
             var area = ContentArea;
 
@@ -112,6 +144,43 @@ namespace Yinyue.UI
 
             OrderOut(null);
         }
+
+        /// <summary>Never takes focus: it exists so feedback need not steal the keyboard.</summary>
+        public override bool CanBecomeKeyWindow => false;
+
+        public override bool CanBecomeMainWindow => false;
+
+        private NSColor TintColour =>
+            Theme.Base.ColorWithAlphaComponent((nfloat)_config.BackgroundOpacity);
+
+        /// <summary>
+        /// With glass on the fill steps aside and the colour goes to the material; otherwise
+        /// the root carries it directly.
+        /// </summary>
+        public void ApplyBackgroundOpacity()
+        {
+            if (_root.Layer is not { } layer) return;
+
+            bool glass = _config.LiquidGlass && GlassEffect.IsAvailable;
+
+            layer.BackgroundColor = glass ? NSColor.Clear.CGColor : TintColour.CGColor;
+            layer.BorderWidth = glass ? 0 : (nfloat)OverlayMetrics.RootBorderThickness;
+
+            if (glass && ContentView is { } wrapper) GlassEffect.Tint(wrapper, TintColour);
+        }
+
+        private CGRect ContentArea
+        {
+            get
+            {
+                double inset = OverlayMetrics.RootPadding + OverlayMetrics.RootBorderThickness;
+                return new CGRect(inset, inset,
+                    OverlayMetrics.PanelWidth - inset * 2,
+                    Frame.Height - inset * 2);
+            }
+        }
+
+        private NSView PanelRoot => _root;
 
         public ToastRole Role { get; }
 

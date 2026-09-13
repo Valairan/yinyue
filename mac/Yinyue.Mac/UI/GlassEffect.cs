@@ -92,6 +92,14 @@ namespace Yinyue.UI
         /// </summary>
         public static bool IsGlass(NSView view) => ClassNameOf(view).Contains("NSGlassEffectView");
 
+        /// <summary>Wraps and tints in one call, which is how every caller uses it.</summary>
+        public static NSView WrapAndTint(NSView content, double cornerRadius, NSColor tint)
+        {
+            var wrapper = Wrap(content, cornerRadius);
+            Tint(wrapper, tint);
+            return wrapper;
+        }
+
         /// <summary>
         /// Wraps <paramref name="content"/> in a glass view, or returns it unchanged when the
         /// material is unavailable. The caller does not branch; an older machine simply gets

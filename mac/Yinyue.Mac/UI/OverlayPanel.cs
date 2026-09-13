@@ -28,9 +28,6 @@ namespace Yinyue.UI
     {
         private readonly OverlayConfig _config;
 
-        /// <summary>The applet fills the panel; the stack above it comes later.</summary>
-        public NSView? Content { get; private set; }
-
         public OverlayPanel(OverlayConfig config, double height)
             : base(new CGRect(0, 0, OverlayMetrics.PanelWidth, height),
                    // Borderless for the frameless look; Nonactivating so it never steals
@@ -60,18 +57,44 @@ namespace Yinyue.UI
             // be: the anchor decides where it sits, not the pointer.
             MovableByWindowBackground = false;
 
-            ContentView = BuildRoot(height);
+            // The whole stack lives in this one window, inside one glass view, which is what
+            // lets the sections merge into a single material instead of each sampling its own
+            // backdrop. See OverlaySection.
+            _stackRoot = new NSView(new CGRect(0, 0, OverlayMetrics.PanelWidth, height));
+
+            ContentView = _config.LiquidGlass && GlassEffect.IsAvailable
+                ? GlassEffect.WrapAndTint(_stackRoot, OverlayMetrics.RootCornerRadius, TintColour)
+                : _stackRoot;
+
+            ApplyBackgroundOpacity();
         }
 
+        private readonly NSView _stackRoot;
+
+        /// <summary>Where the sections live. The applet is one of them.</summary>
+        public NSView StackRoot => _stackRoot;
+
+        private NSColor TintColour =>
+            Theme.Base.ColorWithAlphaComponent((nfloat)_config.BackgroundOpacity);
+
         /// <summary>
-        /// Places the applet inside the rounded root. Added rather than replacing the root,
-        /// so the corner radius and border survive.
+        /// Resizes the window to fit the stack and re-anchors it.
+        ///
+        /// The sections are laid out from the bottom up, so the applet keeps its place and
+        /// the window grows upward as panels open — which is what the anchor already expects
+        /// for a bottom-anchored overlay.
         /// </summary>
-        public void SetContent(NSView view)
+        public void SetStackHeight(double height)
         {
-            Content?.RemoveFromSuperview();
-            Content = view;
-            PanelRoot.AddSubview(view);
+            var frame = Frame;
+            SetFrame(new CGRect(frame.X, frame.Y, OverlayMetrics.PanelWidth, height), true);
+
+            _stackRoot.Frame = new CGRect(0, 0, OverlayMetrics.PanelWidth, height);
+
+            if (ContentView is { } view && !ReferenceEquals(view, _stackRoot))
+                view.Frame = new CGRect(0, 0, OverlayMetrics.PanelWidth, height);
+
+            OverlayPositioner.PositionApplet(this, _config, height);
         }
 
         /// <summary>
@@ -86,40 +109,6 @@ namespace Yinyue.UI
         /// </summary>
         public override bool CanBecomeMainWindow => false;
 
-        private NSView BuildRoot(double height)
-        {
-            var root = new NSView(new CGRect(0, 0, OverlayMetrics.PanelWidth, height))
-            {
-                WantsLayer = true,
-            };
-
-            // Held separately: once glass is on, ContentView is the wrapper, and the tint and
-            // the applet both belong to the view inside it.
-            _panelRoot = root;
-
-            var layer = root.Layer!;
-            layer.CornerRadius = (nfloat)OverlayMetrics.RootCornerRadius;
-            layer.BorderWidth = (nfloat)OverlayMetrics.RootBorderThickness;
-            layer.BorderColor = Theme.Surface0.CGColor;
-
-            // Corners have to be clipped for children to respect the radius.
-            layer.MasksToBounds = true;
-
-            ApplyBackgroundOpacity(root);
-
-            // Glass wraps the content rather than sitting behind it, so the material can read
-            // the content's shape. Returns the root untouched when unavailable or switched
-            // off, and the caller never branches.
-            if (!_config.LiquidGlass) return root;
-
-            // Tinted here rather than in ApplyBackgroundOpacity, because at this point
-            // ContentView is still whatever it was before — the wrapper does not become the
-            // content view until this method returns, so looking it up there found nothing.
-            var wrapper = GlassEffect.Wrap(root, OverlayMetrics.RootCornerRadius);
-            GlassEffect.Tint(wrapper, TintColour);
-
-            return wrapper;
-        }
 
         /// <summary>
         /// Summons the panel at its anchor. OrderFrontRegardless rather than MakeKeyAndOrderFront
@@ -128,44 +117,26 @@ namespace Yinyue.UI
         /// </summary>
         /// <summary>
         /// Re-reads the tint. Applied on every config change rather than cached, so the
-        /// setting takes effect without a restart — the same rule the Windows overlay
-        /// follows, and the reason it is a panel tint rather than window opacity: fading the
-        /// window would take the text and the artwork with it.
+        /// setting takes effect without a restart.
+        ///
+        /// With glass on, the colour goes to the material rather than over it — the glass is
+        /// one view behind the whole stack, so anything painting its own background would
+        /// punch an opaque hole through it. BackgroundOpacity is the tint strength either
+        /// way, so the control keeps one meaning: 1.0 is an opaque Catppuccin panel with or
+        /// without glass, and lower values let progressively more material through.
         /// </summary>
-        private NSView? _panelRoot;
-
-        /// <summary>The view that carries the tint and the content, inside any glass wrapper.</summary>
-        private NSView PanelRoot => _panelRoot ?? ContentView!;
-
-        /// <summary>Catppuccin Base at the configured strength — the panel's colour, either way.</summary>
-        private NSColor TintColour =>
-            Theme.Base.ColorWithAlphaComponent((nfloat)_config.BackgroundOpacity);
-
-        public void ApplyBackgroundOpacity(NSView? root = null)
+        public void ApplyBackgroundOpacity()
         {
-            // With glass on, the panel's own fill would sit in front of the material and
-            // hide it. The glass provides the background; the tint steps aside.
-            var view = root ?? _panelRoot;
-            if (view?.Layer is not { } layer) return;
-
             if (_config.LiquidGlass && GlassEffect.IsAvailable)
             {
-                // The panel's own fill would sit in front of the material and hide it, so it
-                // steps aside and the colour goes to the glass instead — same palette, same
-                // setting, drawn by the material rather than over it.
-                //
-                // BackgroundOpacity is the tint strength, so the control keeps one meaning:
-                // 1.0 is an opaque Catppuccin panel whether glass is on or off, and lower
-                // values let progressively more of the material through.
-                layer.BackgroundColor = NSColor.Clear.CGColor;
-
-                if (ContentView is { } wrapper)
-                    GlassEffect.Tint(wrapper, TintColour);
-
+                if (ContentView is { } wrapper) GlassEffect.Tint(wrapper, TintColour);
                 return;
             }
 
-            layer.BackgroundColor = Theme.Base.WithAlpha(_config.BackgroundOpacity).CGColor;
+            // Without glass each section paints its own background and supplies the rounded
+            // corners; the window's own root stays clear.
+            _stackRoot.WantsLayer = true;
+            if (_stackRoot.Layer is { } layer) layer.BackgroundColor = NSColor.Clear.CGColor;
         }
 
         /// <summary>Raised after the panel is placed and shown, so the stack can follow it.</summary>

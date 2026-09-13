@@ -563,15 +563,29 @@ and nothing to reclaim. Measured with the transparent overlay on screen: **0.0% 
 and the same hidden. Resting memory is **170 MB** against WPF's 101 MB, which is the .NET
 runtime plus AppKit and is the honest cost of this shell.
 
-**On macOS the stacked panels are child windows, and that removes a whole class of bug.**
-`OverlayStack` adds the search bar and the results to the applet with `AddChildWindow`, so
-they move with it by construction. The WPF note immediately below — that a Popup is placed
-once and never again, stranding every panel when the overlay moves — has no counterpart here,
-and there is no `ReplacePanels` to write. The stack still has to be laid out **once** after
-the children are added, which is why `OverlayStack` subscribes to the applet's own
-`Shown`/`Hidden` rather than leaving that to the delegate: a stack nobody laid out sits at the
-window origin, and making it someone else's job is how it ends up laid out in one path and not
-the other.
+**On macOS the whole stack is one window, and Liquid Glass is why.**
+The applet, the search bar, the results and the queue are `OverlaySection` *views* inside a
+single `NSPanel`. They began as child windows — which followed the applet for free and cost
+nothing until glass arrived. A glass view samples and refracts what is behind it, and
+`NSGlassEffectContainerView`, Apple's mechanism for making adjacent glass merge into one
+material, groups **sibling views**. It cannot span windows. So separate windows meant every
+panel was its own material sampling its own backdrop, and the stack read as several different
+surfaces beside each other.
+
+What the child-window arrangement bought comes free from being inside one window: the sections
+move with the applet because they are part of it, and focus is an ordinary responder chain
+rather than a negotiation between windows. The WPF note below — that a Popup is placed once
+and never again — has no counterpart either way.
+
+- The window **resizes to fit whatever is open** and re-anchors on every change, so a
+  bottom-anchored overlay keeps its bottom edge while growing upward.
+- A hidden section is `Hidden`, not removed, so it keeps its contents and the layout simply
+  skips it.
+- **The toasts stay separate windows.** A toast exists to be seen while the overlay is
+  *hidden*, and anything inside the overlay's window goes with it.
+- With glass on, the sections' own fills step aside and the colour goes to the material —
+  one glass view sits behind the whole stack, so a section painting its own background would
+  punch an opaque hole through it.
 
 **A Popup does not follow its window.** It is placed when it opens and never again, so moving
 the overlay — a changed anchor, a different monitor — strands every panel where the overlay

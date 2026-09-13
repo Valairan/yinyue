@@ -161,7 +161,8 @@ namespace Yinyue.UI
         /// on screen, so testing visibility would be permanently true and Space would never
         /// reach play/pause again.
         /// </summary>
-        private bool IsTyping => _stack?.SearchBar.IsKeyWindow == true;
+        private bool IsTyping =>
+            _overlay?.FirstResponder is NSText or NSTextField or NSTextView;
 
         public override void DidFinishLaunching(NSNotification notification)
         {
@@ -176,7 +177,7 @@ namespace Yinyue.UI
             // reserved toast rows are the next piece of work.
             _overlay = new OverlayPanel(_config.Current.Overlay, OverlayMetrics.AppletHeight);
 
-            var applet = new AppletView(_playback);
+            var applet = new AppletView(_config.Current.Overlay, _playback);
             applet.ShowArtwork(_playback.CurrentArtworkPath);
             applet.SettingsRequested += (_, _) => ShowSettings();
             applet.QueueRequested += (_, _) => _stack?.ToggleQueue();
@@ -184,11 +185,13 @@ namespace Yinyue.UI
             applet.ShuffleFavoritesRequested += (_, _) => _ = ShuffleFavoritesAsync();
             applet.FavoriteRequested += (_, _) => _ = ToggleFavoriteAsync();
             _applet = applet;
-            _overlay.SetContent(applet);
+            _overlay.StackRoot.AddSubview(applet);
 
             // The stack subscribes to the applet's own Shown/Hidden, so there is nothing to
             // wire here beyond the keys.
             _stack = new OverlayStack(_config.Current.Overlay, _library, _playback, _overlay);
+            _stack.SetAppletView(applet);
+            _stack.Layout();
 
             _overlay.WatchForFocusLoss();
 
