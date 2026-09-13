@@ -247,6 +247,19 @@ namespace Yinyue.UI
             // Everything from here is the user's doing, so it may announce itself.
             _ready = true;
 
+            // A deliberate pause or resume gets a readout while the overlay is hidden. The
+            // play/pause key is used from other windows and deliberately does not summon the
+            // overlay, so until now a tap gave nothing back and the ears had to confirm it.
+            //
+            // PlayPauseRequested rather than PlayingStateChanged: the latter also fires when
+            // the engine changes state on its own between tracks and at the end of a queue,
+            // and toasting that would announce "Playing" all day.
+            _playback.PlayPauseRequested += (_, playing) => NSApplication.SharedApplication
+                .BeginInvokeOnMainThread(() => AnnouncePlayPause(playing));
+
+            _playback.PlayingStateChanged += (_, _) => NSApplication.SharedApplication
+                .BeginInvokeOnMainThread(UpdateTooltip);
+
             // Only deliberate changes are announced. An automatic advance at the end of a
             // track would fire all day for something the user never asked for.
             _playback.TrackChanged += (_, args) => NSApplication.SharedApplication
@@ -346,6 +359,11 @@ namespace Yinyue.UI
             if (_playback.CurrentTrack is { } track)
                 parts.Add($"{track.Title} — {track.DisplayArtist}");
 
+            // The one persistent surface, so the state a toast showed a minute ago can still
+            // be found by opening the menu bar.
+            if (_playback.IsPlaying) parts.Add("playing");
+            else if (_playback.CurrentTrack is not null) parts.Add("paused");
+
             parts.Add(_playback.IsMuted ? "Muted" : $"Volume {Math.Round(_playback.Volume * 100)}%");
 
             if (_sleep is { IsRunning: true } sleep)
@@ -364,7 +382,9 @@ namespace Yinyue.UI
             _sleep.SetSteps(_config.Current.SleepTimer.Steps);
             _sleep.Elapsed += () =>
             {
-                Fire(_playback.PauseAsync());
+                // announce: false — the sleep timer raises its own message below, and two
+                // readouts of one event would fight for the same row.
+                Fire(_playback.PauseAsync(announce: false));
 
                 NSApplication.SharedApplication.BeginInvokeOnMainThread(
                     () => _stack?.Toast("Sleep timer finished — paused", Icons.Moon));
@@ -549,6 +569,17 @@ namespace Yinyue.UI
             _stack?.Toast(muted ? "Muted" : $"Volume {Math.Round(level * 100)}%",
                 muted ? Icons.VolumeX : Icons.Volume2,
                 level, evenWhileOverlayShown: true);
+        }
+
+        private void AnnouncePlayPause(bool playing)
+        {
+            UpdateTooltip();
+
+            var track = _playback.CurrentTrack;
+            string what = track is null ? string.Empty : $" · {track.Title} — {track.DisplayArtist}";
+
+            _stack?.Toast((playing ? "Playing" : "Paused") + what,
+                playing ? Icons.Play : Icons.Pause);
         }
 
         /// <summary>

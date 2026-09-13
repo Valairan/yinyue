@@ -35,6 +35,7 @@ namespace Yinyue
             if (which is "all" or "windows") WindowsOpen();
             if (which is "all" or "opacity") BackgroundOpacity();
             if (which is "all" or "toast") ToastLayout();
+            if (which is "all" or "playpause") PlayPauseFeedback();
 
             Console.WriteLine();
             Console.WriteLine(_failed == 0 ? "PASS" : $"FAIL — {_failed} check(s)");
@@ -46,6 +47,60 @@ namespace Yinyue
             if (!ok) _failed++;
             Console.WriteLine($"  [{(ok ? "ok" : "FAIL")}] {label}{(detail is null ? "" : $"  — {detail}")}");
             Console.Out.Flush();
+        }
+
+        /// <summary>
+        /// A deliberate pause or resume is announced; the engine's own transitions are not.
+        ///
+        /// The distinction is the whole point: PlayingStateChanged also fires between tracks
+        /// and at the end of a queue, so a readout driven from it would say "Playing" all day
+        /// for something nobody asked for.
+        /// </summary>
+        private static void PlayPauseFeedback()
+        {
+            Console.WriteLine("\nPlay/pause feedback");
+
+            var audio = new Yinyue.Services.MacAudioPlayer();
+            var config = new Yinyue.Services.ConfigService();
+            var library = new Yinyue.Services.MusicLibrary(config);
+            using var playback = new Yinyue.Services.PlaybackService(audio, library);
+
+            // A track must be current: PlayAsync returns early with an empty queue, which is
+            // correct and made the first version of this test measure nothing.
+            var track = new Yinyue.Models.Track { Id = "t1", Title = "Something", Artist = "Someone" };
+            playback.RestoreQueue(new[] { track }, 0,
+                TimeSpan.Zero, shuffle: false, Yinyue.Services.LoopMode.Off);
+
+            int requested = 0, stateChanges = 0;
+            bool? lastRequested = null;
+
+            playback.PlayPauseRequested += (_, playing) => { requested++; lastRequested = playing; };
+            playback.PlayingStateChanged += (_, _) => stateChanges++;
+
+            playback.PauseAsync().GetAwaiter().GetResult();
+            Check("a pause is announced", requested == 1 && lastRequested == false,
+                $"{requested} request(s), last={lastRequested}");
+
+            playback.PlayAsync().GetAwaiter().GetResult();
+            Check("a resume is announced", requested == 2 && lastRequested == true,
+                $"{requested} request(s), last={lastRequested}");
+
+            // The sleep timer pauses with announce: false, because it raises its own message
+            // and two readouts of one event would fight for the same row.
+            int requestsBefore = requested;
+            int statesBefore = stateChanges;
+            playback.PauseAsync(announce: false).GetAwaiter().GetResult();
+
+            Check("an unannounced pause raises no request",
+                requested == requestsBefore, $"{requestsBefore} then {requested}");
+
+            // It must still change state, or SMTC and the glyph would be left showing the
+            // old one. Measured as a delta rather than against the request count, which
+            // compared two unrelated totals.
+            Check("but the state still changed",
+                stateChanges == statesBefore + 1, $"{statesBefore} then {stateChanges}");
+
+            audio.Dispose();
         }
 
         /// <summary>
