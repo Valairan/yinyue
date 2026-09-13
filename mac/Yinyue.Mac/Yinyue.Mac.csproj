@@ -24,6 +24,14 @@
 
   <ItemGroup>
     <!--
+      Hand-written rather than generated, because LSUIElement is not something the SDK
+      properties can express and it is the key that makes this a menu-bar app at all.
+    -->
+    <None Include="Info.plist" LogicalName="Info.plist" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!--
       The platform-neutral half. Everything below the window — the queue, play order,
       shuffle, loop, retry, prebuffer, the Jellyfin client, the library, search and
       persistence — comes from here unmodified and is the same code the Windows app runs.

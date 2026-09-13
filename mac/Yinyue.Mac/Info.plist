@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleName</key>
+	<string>Yinyue</string>
+	<key>CFBundleDisplayName</key>
+	<string>Yinyue</string>
+	<key>CFBundleIdentifier</key>
+	<string>com.yinyue.player</string>
+	<key>CFBundleExecutable</key>
+	<string>Yinyue</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>1.0.0</string>
+	<key>CFBundleVersion</key>
+	<string>1</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>13.0</string>
+
+	<!--
+	  Menu-bar only: no Dock icon, no app-switcher entry. This is the AppKit equivalent of
+	  the Windows app's ShowInTaskbar="False" plus its tray icon, and it is what makes
+	  product requirement 1 hold — "summon overlay, not a window".
+
+	  It also means there is no Dock right-click and no Cmd-Q target, so the menu-bar item
+	  is the only non-overlay way out of the app. Keep a Quit there, for the same reason the
+	  Windows tray menu carries its own Settings item: the overlay can auto-hide at an
+	  inconvenient moment and must never be the only door.
+	-->
+	<key>LSUIElement</key>
+	<true/>
+</dict>
+</plist>

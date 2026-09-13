@@ -2,6 +2,7 @@ using AppKit;
 using Foundation;
 using Yinyue.Models;
 using Yinyue.Services;
+using Yinyue.UI;
 
 namespace Yinyue
 {
@@ -50,9 +51,9 @@ namespace Yinyue
             library.Register(new LocalMusicSource(indexer, artwork));
             library.Register(new JellyfinMusicSource(jellyfin, artwork));
 
-            using var playback = new PlaybackService(audio, library);
+            var playback = new PlaybackService(audio, library);
 
-            if (!check) return RunApp();
+            if (!check) return RunApp(config, playback);
 
             Console.WriteLine("Yinyue — macOS seam check");
             Console.WriteLine(new string('-', 52));
@@ -83,9 +84,11 @@ namespace Yinyue
         private static string Describe(string? token) =>
             token is null ? "none stored (expected before sign-in)" : $"{token.Length} chars";
 
-        private static int RunApp()
+        private static int RunApp(ConfigService config, PlaybackService playback)
         {
-            Console.WriteLine("The overlay is not built yet. Run with --check for the seam report.");
+            var app = NSApplication.SharedApplication;
+            app.Delegate = new AppDelegate(config, playback);
+            app.Run();
             return 0;
         }
     }

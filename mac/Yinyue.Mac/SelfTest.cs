@@ -25,6 +25,7 @@ namespace Yinyue
 
             if (which is "all" or "keychain") KeychainRoundTrip();
             if (which is "all" or "audio") AudioPlaysAFile();
+            if (which is "all" or "overlay") OverlayAnchors();
 
             Console.WriteLine();
             Console.WriteLine(_failed == 0 ? "PASS" : $"FAIL — {_failed} check(s)");
@@ -36,6 +37,64 @@ namespace Yinyue
             if (!ok) _failed++;
             Console.WriteLine($"  [{(ok ? "ok" : "FAIL")}] {label}{(detail is null ? "" : $"  — {detail}")}");
             Console.Out.Flush();
+        }
+
+        /// <summary>
+        /// Every anchor must land the panel inside the screen's work area, touching the edge
+        /// it names. Measured against the real NSScreen rather than reasoned about, because
+        /// AppKit's origin is bottom-left and the Windows arithmetic reads inverted here —
+        /// a port that swapped top and bottom would look right on a centred window.
+        /// </summary>
+        private static void OverlayAnchors()
+        {
+            Console.WriteLine("\nOverlay anchoring");
+
+            var config = new Yinyue.Models.OverlayConfig { MarginX = 16, MarginY = 16 };
+            var panel = new Yinyue.UI.OverlayPanel(config, height: 170);
+            var work = AppKit.NSScreen.MainScreen.VisibleFrame;
+
+            Check("work area excludes menu bar and Dock",
+                work.Height < AppKit.NSScreen.MainScreen.Frame.Height,
+                $"{work.Height} of {AppKit.NSScreen.MainScreen.Frame.Height}");
+
+            foreach (var anchor in Enum.GetValues<Yinyue.Models.OverlayAnchor>())
+            {
+                config.Anchor = anchor;
+                Yinyue.UI.OverlayPositioner.PositionApplet(panel, config);
+
+                var f = panel.Frame;
+                bool inside = f.X >= work.X - 0.5
+                           && f.Y >= work.Y - 0.5
+                           && f.X + f.Width <= work.X + work.Width + 0.5
+                           && f.Y + f.Height <= work.Y + work.Height + 0.5;
+
+                Check($"{anchor} stays on screen", inside, $"x={f.X:0} y={f.Y:0}");
+            }
+
+            // The specific claim the coordinate flip would break: a top anchor must sit high
+            // on the screen and a bottom anchor low. Inverting the arithmetic passes the
+            // on-screen check above while placing every window at the wrong end.
+            config.Anchor = Yinyue.Models.OverlayAnchor.TopRight;
+            Yinyue.UI.OverlayPositioner.PositionApplet(panel, config);
+            double topY = panel.Frame.Y;
+
+            config.Anchor = Yinyue.Models.OverlayAnchor.BottomRight;
+            Yinyue.UI.OverlayPositioner.PositionApplet(panel, config);
+            double bottomY = panel.Frame.Y;
+
+            Check("top anchors sit above bottom anchors", topY > bottomY, $"top y={topY:0}, bottom y={bottomY:0}");
+
+            // A bottom-anchored overlay is lifted clear of the two reserved toast rows;
+            // nothing else is, because everywhere else there is already room below.
+            Check("the bottom anchor is lifted clear of the toast rows",
+                bottomY >= work.Y + config.MarginY + Yinyue.UI.OverlayPositioner.ReservedForToasts - 0.5,
+                $"y={bottomY:0}, reserved={Yinyue.UI.OverlayPositioner.ReservedForToasts}");
+
+            Check("the panel is PanelWidth wide",
+                Math.Abs(panel.Frame.Width - Yinyue.UI.Theme.PanelWidth) < 0.5,
+                panel.Frame.Width.ToString());
+
+            panel.Close();
         }
 
         /// <summary>
