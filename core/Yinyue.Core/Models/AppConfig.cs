@@ -72,6 +72,20 @@ namespace Yinyue.Models
                 Math.Clamp(value, MinAnimationMilliseconds, MaxAnimationMilliseconds);
         }
 
+        /// <summary>
+        /// Liquid Glass behind the overlay — macOS 26 and later, and <b>off by default</b>.
+        ///
+        /// Part of the shared schema so the file stays one format, but only the Mac shell
+        /// reads it; Windows has no equivalent material and ignores it.
+        ///
+        /// Off by default deliberately. A backdrop material resamples whatever is behind it
+        /// whenever that changes, which is a real and ongoing GPU cost — exactly the kind of
+        /// thing requirement 4 exists to refuse. It is bounded here by the overlay being
+        /// hidden almost all day, so it is defensible as a choice; it is not defensible as a
+        /// default. Someone who turns it on is taken to have accepted the trade.
+        /// </summary>
+        public bool LiquidGlass { get; set; }
+
         public const double DefaultBackgroundOpacity = 1.0;
         public const double MinBackgroundOpacity = 0.2;
         public const double MaxBackgroundOpacity = 1.0;

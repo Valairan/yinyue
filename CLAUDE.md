@@ -487,6 +487,11 @@ was reading. A fixed slot for everything is worth the pixels.
 
 - Rows are a **fixed `ToastRowHeight`**, so a toast gaining or losing its level bar cannot
   resize the window and shift the stack.
+- **The mark's cell is reserved too.** One fixed 22-unit column holds the glyph or the hold
+  dial, never both, and keeps its width when it holds neither — so the text starts at the
+  same x every time. A readout that shifted sideways as the dial appeared would be worse than
+  one with no dial at all, because the dial appears exactly when that row is being watched.
+  The text is centred on the row, and centres as a pair with the level bar when there is one.
 - Only bottom anchors need the lift. Anywhere else there is already room below, so the
   overlay stays where the anchor puts it and the rows follow beneath it.
 - `ToastRowHeight` appears twice — the resource in `App.xaml` sizes the window, the constant
@@ -537,6 +542,26 @@ library. Measured in fresh processes: 2, 3 and 4 hits laid out at 24px, 6 at 222
 same 3-hit search made second was fine. `OpenPanelBeforeFilling` opens the popup and runs its
 layout, then the list is filled while on screen. The suite reproduces the two-hit first search
 on both panels.
+
+**Liquid Glass is available on macOS, and off by default.** `OverlayConfig.LiquidGlass` is
+part of the shared schema but only the Mac shell reads it. `NSGlassEffectView` is macOS 26
+and the .NET 8 workload builds against the macOS 15 SDK, so it is absent from the bindings
+and present at runtime — `GlassEffect` reaches it by selector and degrades to the ordinary
+tinted panel on an older system rather than failing to launch.
+
+Off by default is the deliberate part. A backdrop material resamples whatever is behind it
+whenever that changes, which is the ongoing GPU cost requirement 4 exists to refuse. What
+makes it offerable at all is that this overlay is hidden almost all day and auto-hides after
+ten seconds, so the cost is bounded by the seconds it is on screen — an argument for offering
+it, not for switching it on.
+
+**The Windows animations switch does not need porting as a performance control.** There it
+turns off `AllowsTransparency`, which is what puts a WPF window on a *software-composited*
+path — a real per-frame cost in the app's own process. Every macOS window is GPU-composited
+by WindowServer whether or not it is transparent, so there is no equivalent path to fall off
+and nothing to reclaim. Measured with the transparent overlay on screen: **0.0% of a core**,
+and the same hidden. Resting memory is **170 MB** against WPF's 101 MB, which is the .NET
+runtime plus AppKit and is the honest cost of this shell.
 
 **On macOS the stacked panels are child windows, and that removes a whole class of bug.**
 `OverlayStack` adds the search bar and the results to the applet with `AddChildWindow`, so

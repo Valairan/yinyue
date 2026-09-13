@@ -71,7 +71,7 @@ namespace Yinyue.UI
         {
             Content?.RemoveFromSuperview();
             Content = view;
-            ContentView!.AddSubview(view);
+            PanelRoot.AddSubview(view);
         }
 
         /// <summary>
@@ -93,6 +93,10 @@ namespace Yinyue.UI
                 WantsLayer = true,
             };
 
+            // Held separately: once glass is on, ContentView is the wrapper, and the tint and
+            // the applet both belong to the view inside it.
+            _panelRoot = root;
+
             var layer = root.Layer!;
             layer.CornerRadius = (nfloat)OverlayMetrics.RootCornerRadius;
             layer.BorderWidth = (nfloat)OverlayMetrics.RootBorderThickness;
@@ -102,7 +106,11 @@ namespace Yinyue.UI
             layer.MasksToBounds = true;
 
             ApplyBackgroundOpacity(root);
-            return root;
+
+            // Glass wraps the content rather than sitting behind it, so the material can read
+            // the content's shape. Returns the root untouched when unavailable or switched
+            // off, and the caller never branches.
+            return _config.LiquidGlass ? GlassEffect.Wrap(root, OverlayMetrics.RootCornerRadius) : root;
         }
 
         /// <summary>
@@ -116,10 +124,23 @@ namespace Yinyue.UI
         /// follows, and the reason it is a panel tint rather than window opacity: fading the
         /// window would take the text and the artwork with it.
         /// </summary>
+        private NSView? _panelRoot;
+
+        /// <summary>The view that carries the tint and the content, inside any glass wrapper.</summary>
+        private NSView PanelRoot => _panelRoot ?? ContentView!;
+
         public void ApplyBackgroundOpacity(NSView? root = null)
         {
-            var view = root ?? ContentView;
+            // With glass on, the panel's own fill would sit in front of the material and
+            // hide it. The glass provides the background; the tint steps aside.
+            var view = root ?? _panelRoot;
             if (view?.Layer is not { } layer) return;
+
+            if (_config.LiquidGlass && GlassEffect.IsAvailable)
+            {
+                layer.BackgroundColor = NSColor.Clear.CGColor;
+                return;
+            }
 
             layer.BackgroundColor = Theme.Base.WithAlpha(_config.BackgroundOpacity).CGColor;
         }

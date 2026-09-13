@@ -34,6 +34,7 @@ namespace Yinyue
             if (which is "all" or "sleep") SleepTimerRules();
             if (which is "all" or "windows") WindowsOpen();
             if (which is "all" or "opacity") BackgroundOpacity();
+            if (which is "all" or "toast") ToastLayout();
 
             Console.WriteLine();
             Console.WriteLine(_failed == 0 ? "PASS" : $"FAIL — {_failed} check(s)");
@@ -45,6 +46,56 @@ namespace Yinyue
             if (!ok) _failed++;
             Console.WriteLine($"  [{(ok ? "ok" : "FAIL")}] {label}{(detail is null ? "" : $"  — {detail}")}");
             Console.Out.Flush();
+        }
+
+        /// <summary>
+        /// Nothing in a toast may move as its contents change.
+        ///
+        /// The mark's cell is reserved whether it holds the glyph, the dial, or nothing, so
+        /// the text starts at the same x every time. A readout that shifted sideways as the
+        /// dial appeared would be worse than one with no dial at all — and the dial appears
+        /// precisely when the user is watching that row.
+        /// </summary>
+        private static void ToastLayout()
+        {
+            Console.WriteLine("\nToast layout");
+
+            var config = new Yinyue.Models.OverlayConfig();
+            var toast = new Yinyue.UI.ToastPanel(config, Yinyue.UI.ToastRole.Message);
+
+            toast.Show("plain");
+            var plain = toast.TextFrameForTest;
+
+            toast.Show("with a mark", Yinyue.UI.Icons.Volume2);
+            var withGlyph = toast.TextFrameForTest;
+
+            toast.ShowHold("holding", 0.5);
+            var withDial = toast.TextFrameForTest;
+
+            toast.Show("plain again");
+            var back = toast.TextFrameForTest;
+
+            Check("a mark does not move the text",
+                Math.Abs(plain.X - withGlyph.X) < 0.01, $"{plain.X} vs {withGlyph.X}");
+
+            Check("the dial does not move the text",
+                Math.Abs(plain.X - withDial.X) < 0.01, $"{plain.X} vs {withDial.X}");
+
+            Check("and it returns to where it was",
+                Math.Abs(plain.X - back.X) < 0.01, $"{plain.X} vs {back.X}");
+
+            Check("the text is vertically centred",
+                Math.Abs((plain.Y + plain.Height / 2) - toast.ContentMidY) < 0.01,
+                $"{plain.Y + plain.Height / 2} vs {toast.ContentMidY}");
+
+            // The window height is fixed, so a level bar cannot resize the row -- it only
+            // re-centres the pair inside it.
+            var before = toast.Frame.Height;
+            toast.Show("with a level", Yinyue.UI.Icons.Volume2, 0.5);
+            Check("a level bar does not resize the row",
+                Math.Abs(toast.Frame.Height - before) < 0.01, toast.Frame.Height.ToString());
+
+            toast.Close();
         }
 
         /// <summary>
@@ -74,6 +125,34 @@ namespace Yinyue
                     Math.Abs(panel.AlphaValue - 1.0) < 0.01, panel.AlphaValue.ToString("0.00"));
 
                 panel.Close();
+            }
+
+            // Liquid Glass, when the machine can draw it. Checked by class name rather than
+            // by the setting having been read: a silent fall-through would look identical
+            // from the outside and leave the toggle lying.
+            Console.WriteLine($"  (Liquid Glass available: {Yinyue.UI.GlassEffect.IsAvailable})");
+
+            if (Yinyue.UI.GlassEffect.IsAvailable)
+            {
+                var glassed = new Yinyue.Models.OverlayConfig { LiquidGlass = true };
+                var glassPanel = new Yinyue.UI.OverlayPanel(glassed, Yinyue.UI.OverlayMetrics.AppletHeight);
+
+                // Contains, not equals: AppKit installs a KVO subclass around the view as
+                // soon as anything observes it, so the runtime name comes back as
+                // NSKVONotifying_NSGlassEffectView. An equality check reads as a failure
+                // while the material is working perfectly.
+                string cls = Yinyue.UI.GlassEffect.ClassNameOf(glassPanel.ContentView!);
+                Check("glass wraps the panel when switched on", cls.Contains("NSGlassEffectView"), cls);
+
+                var plainCfg = new Yinyue.Models.OverlayConfig { LiquidGlass = false };
+                var plainPanel = new Yinyue.UI.OverlayPanel(plainCfg, Yinyue.UI.OverlayMetrics.AppletHeight);
+
+                Check("and not when it is off",
+                    !Yinyue.UI.GlassEffect.ClassNameOf(plainPanel.ContentView!).Contains("Glass"),
+                    Yinyue.UI.GlassEffect.ClassNameOf(plainPanel.ContentView!));
+
+                glassPanel.Close();
+                plainPanel.Close();
             }
 
             // Changing the setting must take effect without a restart, as on Windows. Read

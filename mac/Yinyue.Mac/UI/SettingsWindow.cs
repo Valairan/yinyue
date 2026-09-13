@@ -41,6 +41,7 @@ namespace Yinyue.UI
         private readonly NSTextField _scanStatus;
 
         // General
+        private readonly NSButton _liquidGlass;
         private readonly NSButton _runAtLogin, _animations, _hideOnFocusLoss, _autoHide, _sleepEnabled;
         private readonly NSTextField _startupStatus, _marginX, _marginY, _animationMs,
                                      _backgroundOpacity, _autoHideSeconds, _volumeStep, _sleepSteps;
@@ -181,7 +182,15 @@ namespace Yinyue.UI
             _animationMs = general.Row("Fade (ms)", Controls.Field(overlay.AnimationMilliseconds.ToString(), 80));
             _backgroundOpacity = general.Row("Background opacity",
                 Controls.Field(overlay.BackgroundOpacity.ToString("0.00"), 80));
-            general.Note("Tints the panel behind the content, so text and artwork stay legible. Needs animations on.");
+            general.Note("Tints the panel behind the content, so text and artwork stay legible.");
+
+            _liquidGlass = general.Add(Controls.Check("Liquid Glass behind the overlay",
+                overlay.LiquidGlass), 20);
+            _liquidGlass.Enabled = GlassEffect.IsAvailable;
+
+            general.Note(GlassEffect.IsAvailable
+                ? "Off by default: a backdrop material redraws whenever anything behind it moves. The overlay is hidden most of the time, so the cost is brief — but it is a real one. Needs a restart."
+                : "Needs macOS 26 or later.");
 
             general.Gap(10);
             general.Heading("Dismissing");
@@ -455,6 +464,7 @@ namespace Yinyue.UI
             config.Overlay.Animations = _animations.State == NSCellStateValue.On;
             config.Overlay.AnimationMilliseconds = (int)Number(_animationMs, config.Overlay.AnimationMilliseconds);
             config.Overlay.BackgroundOpacity = Number(_backgroundOpacity, config.Overlay.BackgroundOpacity);
+            config.Overlay.LiquidGlass = _liquidGlass.State == NSCellStateValue.On;
             config.Overlay.HideOnFocusLoss = _hideOnFocusLoss.State == NSCellStateValue.On;
             config.Overlay.AutoHide = _autoHide.State == NSCellStateValue.On;
             config.Overlay.AutoHideSeconds = Number(_autoHideSeconds, config.Overlay.AutoHideSeconds);

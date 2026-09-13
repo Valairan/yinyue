@@ -63,19 +63,23 @@ namespace Yinyue.UI
 
             var area = ContentArea;
 
-            // Every toast carries a mark, as on Windows: volume, loop, shuffle, the track,
-            // the sleep timer. It says at a glance which of them this is, before the text has
-            // been read at all.
+            // The mark's cell is RESERVED, exactly as it is on Windows: one fixed 22-unit
+            // column that holds either the glyph or the dial, never both, and keeps its width
+            // when it holds neither. The text column starts at a constant x and therefore
+            // never moves — a readout that shifted as the dial appeared would be worse than
+            // one with no dial at all.
+            double markY = area.Y + (area.Height - MarkSize) / 2;
+
             _glyph = new NSImageView
             {
-                Frame = new CGRect(area.X, area.Y + area.Height - 22, 18, 18),
+                Frame = new CGRect(area.X, markY, MarkSize, MarkSize),
                 ImageScaling = NSImageScale.ProportionallyDown,
             };
-            ContentView!.AddSubview(_glyph);
+            PanelRoot.AddSubview(_glyph);
 
             _text = new NSTextField
             {
-                Frame = new CGRect(area.X, area.Y + area.Height - 20, area.Width, 18),
+                Frame = TextFrame(withLevel: false),
                 Editable = false,
                 Selectable = false,
                 Bezeled = false,
@@ -86,9 +90,9 @@ namespace Yinyue.UI
                 StringValue = string.Empty,
                 Cell = { UsesSingleLineMode = true },
             };
-            ContentView.AddSubview(_text);
+            PanelRoot.AddSubview(_text);
 
-            _level = new NSProgressIndicator(new CGRect(area.X, area.Y + 4, area.Width, 4))
+            _level = new NSProgressIndicator(new CGRect(area.X, LevelY, area.Width, LevelHeight))
             {
                 Style = NSProgressIndicatorStyle.Bar,
                 Indeterminate = false,
@@ -96,18 +100,26 @@ namespace Yinyue.UI
                 MaxValue = 1,
                 Hidden = true,
             };
-            ContentView.AddSubview(_level);
+            PanelRoot.AddSubview(_level);
 
-            _dial = new HoldDialView(new CGRect(area.X, area.Y + (area.Height - 26) / 2, 26, 26))
+            // The same reserved cell the glyph uses, so swapping one for the other moves
+            // nothing.
+            _dial = new HoldDialView(new CGRect(area.X, markY, MarkSize, MarkSize))
             {
                 Hidden = true,
             };
-            ContentView.AddSubview(_dial);
+            PanelRoot.AddSubview(_dial);
 
             OrderOut(null);
         }
 
         public ToastRole Role { get; }
+
+        /// <summary>For the suite: where the text actually is, so drift can be asserted.</summary>
+        public CGRect TextFrameForTest => _text.Frame;
+
+        /// <summary>For the suite: the vertical centre the text should sit on.</summary>
+        public double ContentMidY => ContentArea.Y + ContentArea.Height / 2;
 
         /// <summary>
         /// Shows or updates the toast. A repeat call swaps the text and nothing else — no
@@ -118,9 +130,11 @@ namespace Yinyue.UI
             _dial.Hidden = true;
 
             _glyph.Hidden = icon is null;
-            if (icon is not null) _glyph.Image = Icon.Make(icon, 18, Theme.Text);
+            if (icon is not null) _glyph.Image = Icon.Make(icon, MarkSize, Theme.Text);
 
-            _text.Frame = TextFrame(withDial: false, withGlyph: icon is not null);
+            // The text moves only when the level bar appears, and then only because the pair
+            // is centred as a group — it never moves for the mark, which has its own cell.
+            _text.Frame = TextFrame(withLevel: level is not null);
             _text.StringValue = message;
 
             _level.Hidden = level is null;
@@ -150,7 +164,7 @@ namespace Yinyue.UI
 
             _glyph.Hidden = true;
             _level.Hidden = true;
-            _text.Frame = TextFrame(withDial: true, withGlyph: false);
+            _text.Frame = TextFrame(withLevel: false);
             _text.StringValue = label;
 
             _holding = true;
@@ -185,7 +199,6 @@ namespace Yinyue.UI
 
             _holding = false;
             _dial.Hidden = true;
-            _text.Frame = TextFrame(withDial: false, withGlyph: !_glyph.Hidden);
 
             Dismiss(VisibleFor);
         }
@@ -238,12 +251,43 @@ namespace Yinyue.UI
 
         private NSTimer? _fade;
 
-        private CGRect TextFrame(bool withDial, bool withGlyph)
+        /// <summary>The reserved cell for the glyph or the dial, and the gap after it.</summary>
+        private const double MarkSize = 22;
+        private const double MarkGap = 10;
+
+        private const double TextHeight = 18;
+        private const double LevelHeight = 4;
+        private const double LevelGap = 4;
+
+        /// <summary>
+        /// The text, vertically centred.
+        ///
+        /// With a level bar the two are centred as a pair, which is what the Windows toast
+        /// does — a centred StackPanel holding the text row and then the bar. Without one the
+        /// text alone is centred. The horizontal position never changes: the mark's column is
+        /// reserved whether or not anything is in it.
+        /// </summary>
+        private CGRect TextFrame(bool withLevel)
         {
             var area = ContentArea;
-            double left = withDial || withGlyph ? area.X + 26 : area.X;
+            double left = area.X + MarkSize + MarkGap;
 
-            return new CGRect(left, area.Y + area.Height - 20, area.X + area.Width - left, 18);
+            double groupHeight = withLevel ? TextHeight + LevelGap + LevelHeight : TextHeight;
+            double top = area.Y + (area.Height + groupHeight) / 2;
+
+            return new CGRect(left, top - TextHeight, area.X + area.Width - left, TextHeight);
+        }
+
+        /// <summary>Directly under the text when both are centred as a pair.</summary>
+        private double LevelY
+        {
+            get
+            {
+                var area = ContentArea;
+                double groupHeight = TextHeight + LevelGap + LevelHeight;
+
+                return area.Y + (area.Height - groupHeight) / 2;
+            }
         }
 
         /// <summary>
