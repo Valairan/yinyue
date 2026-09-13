@@ -27,8 +27,9 @@ namespace Yinyue.UI
         ///
         /// Not a template image. A template would let AppKit tint it automatically, but it
         /// would tint to the system's colours rather than to Catppuccin, and the palette is
-        /// the thing the two apps share. The menu-bar mark is the one exception — see
-        /// <see cref="Template"/>.
+        /// the thing the two apps share. The menu-bar mark is the exception: it is a
+        /// template image, built from the shared masters by make-mac-assets.swift rather than
+        /// stroked here, so AppKit can invert it against a light or dark menu bar.
         /// </summary>
         public static NSImage Make(string pathData, double size, NSColor color)
         {
@@ -40,18 +41,6 @@ namespace Yinyue.UI
             });
 
             return image!;
-        }
-
-        /// <summary>
-        /// A template image, which AppKit inverts automatically against light and dark menu
-        /// bars. This is the macOS answer to the tray-light/tray-dark pair on Windows: one
-        /// asset instead of two, and no need to watch for a theme change at all.
-        /// </summary>
-        public static NSImage Template(string pathData, double size)
-        {
-            var image = Make(pathData, size, NSColor.Black);
-            image.Template = true;
-            return image;
         }
 
         /// <summary>

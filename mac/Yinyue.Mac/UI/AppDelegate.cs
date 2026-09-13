@@ -239,6 +239,11 @@ namespace Yinyue.UI
             // points, play counts, and "now playing" in other clients all come from this.
             _reporter = new JellyfinPlaybackReporter(_playback, _jellyfin);
 
+            // A rejected token has to be announced. Unhandled, it means search quietly
+            // returns nothing for ever: an unauthenticated client reports no results rather
+            // than an error, so the app looks like it has simply lost the user's music.
+            _jellyfin.Unauthorized += OnJellyfinUnauthorized;
+
             applet.ShowOffline(_config.Current.OfflineMode);
             applet.ApplyShortcutHints(_config.Current.Hotkeys);
 
@@ -638,6 +643,22 @@ namespace Yinyue.UI
 
             _stack?.Toast(_playback.Shuffle ? $"{loop} · shuffle on" : loop, icon);
         }
+
+        /// <summary>
+        /// The server rejected the stored token — it expired, or was revoked. Clear it and
+        /// say so, rather than leaving a client that answers every search with nothing.
+        /// </summary>
+        private void OnJellyfinUnauthorized(object? sender, EventArgs e) =>
+            NSApplication.SharedApplication.BeginInvokeOnMainThread(() =>
+            {
+                _config.ClearCredentials();
+                _jellyfin.SignOut();
+
+                _stack?.Toast("Jellyfin sign-in expired — open settings to sign in again",
+                    Icons.CloudOff, evenWhileOverlayShown: true);
+
+                _applet?.ShowStatus("Jellyfin sign-in expired" + KeyHint(HotkeyActions.OpenSettings));
+            });
 
         private void ToggleOffline()
         {

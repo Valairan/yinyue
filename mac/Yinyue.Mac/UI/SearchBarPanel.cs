@@ -24,9 +24,6 @@ namespace Yinyue.UI
         /// <summary>Raised as the text changes, already debounced by the owner.</summary>
         public event EventHandler<string>? QueryChanged;
 
-        /// <summary>Enter, Escape, and the arrows the results list needs.</summary>
-        public event EventHandler<NSEvent>? KeyPressed;
-
         public SearchBarPanel(OverlayConfig config)
             : base(config, OverlayMetrics.SearchBarHeight)
         {
@@ -132,6 +129,5 @@ namespace Yinyue.UI
             QueryChanged?.Invoke(this, _box.StringValue);
         }
 
-        public void RaiseKey(NSEvent e) => KeyPressed?.Invoke(this, e);
     }
 }

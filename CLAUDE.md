@@ -1348,6 +1348,31 @@ owner's verdict was that a remote control for another player is not useful here.
 alternative — reading and steering any app's now-playing session through the same system
 Yinyue uses for its own media keys — was noted and not pursued either.
 
+## Finding wiring that does nothing
+
+A whole class of bug here is invisible: a setting that saves a value nothing reads, an event
+nobody subscribes to, a control wired to an empty handler. Everything about them looks right —
+the field accepts input, the file gets the number, the build is clean — and only the behaviour
+is missing. Three shipped on macOS before anyone noticed, and the only reason they were found
+is that someone asked whether one of them worked.
+
+Three sweeps catch them, and they are worth repeating after any run of feature work:
+
+1. **Every config property against its consumers.** List the properties in `AppConfig.cs` and
+   grep the shell for each, *excluding* the settings window — a property read only by the code
+   that writes it is doing nothing. Mind the indirection: `VolumeStepPercent` is read through
+   `VolumeStep`, and `Bindings` through `For()`, so both look unread and are not.
+2. **Every event in Core against `+=` in the shell.** This found `Unauthorized` unhandled on
+   macOS, which meant an expired Jellyfin token made search return nothing for ever — an
+   unauthenticated client reports no results rather than an error, so it reads as the app
+   losing your music.
+3. **Every public member against its call sites.** Interface dispatch produces false positives
+   (`ISecretStore.Protect`, `IAudioPlayer.PrepareAsync`), so check before deleting.
+
+**Do not write a test that lists which settings are wired.** It can only be a table maintained
+by hand, so it asserts its own contents and passes for exactly the reason the bug survives.
+Assert the behaviour instead: that `AdjustVolume` moves the level by the configured step.
+
 ## Known issues
 
 Verified against the current tree — these are real, not speculative.

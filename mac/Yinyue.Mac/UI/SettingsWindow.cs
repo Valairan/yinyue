@@ -38,6 +38,7 @@ namespace Yinyue.UI
         private readonly NSTableView _folders;
         private readonly FolderSource _folderSource = new();
         private readonly NSButton _scanOnStartup;
+        private readonly NSProgressIndicator _scanProgress;
         private readonly NSTextField _scanStatus;
 
         // General
@@ -147,6 +148,16 @@ namespace Yinyue.UI
 
             _scanOnStartup = local.Add(Controls.Check("Scan at startup",
                 _config.Current.Library.ScanOnStartup), 20);
+
+            _scanProgress = new NSProgressIndicator(new CGRect(0, 0, SettingsTab.Width, 6))
+            {
+                Style = NSProgressIndicatorStyle.Bar,
+                Indeterminate = false,
+                MinValue = 0,
+                MaxValue = 1,
+                Hidden = true,
+            };
+            local.Add(_scanProgress, 6);
 
             _scanStatus = local.Note("…");
             _ = RefreshCountAsync();
@@ -369,7 +380,22 @@ namespace Yinyue.UI
         private async Task ScanAsync()
         {
             _scanStatus.StringValue = "Scanning…";
+            _scanProgress.Hidden = false;
+            _scanProgress.DoubleValue = 0;
             Save();
+
+            // Without this a large library looks frozen: the count only appears at the end,
+            // and there is no other sign anything is happening.
+            void OnProgress(int done, int total) =>
+                NSApplication.SharedApplication.BeginInvokeOnMainThread(() =>
+                {
+                    if (total <= 0) return;
+
+                    _scanProgress.DoubleValue = (double)done / total;
+                    _scanStatus.StringValue = $"Scanning… {done} of {total}";
+                });
+
+            _indexer.OnScanProgress += OnProgress;
 
             try
             {
@@ -379,6 +405,13 @@ namespace Yinyue.UI
                 // Rows whose files or folders have gone are dropped, rather than left to
                 // surface later as a playback error.
                 await _indexer.PruneAsync(_folderSource.Folders).ConfigureAwait(false);
+
+                // Recorded so the next launch and the Windows app can both say when the
+                // library was last looked at. Nothing wrote it before, so it stayed null
+                // however many times a Mac scanned.
+                _config.Current.Library.LastScanUtc = DateTime.UtcNow;
+                _config.Save();
+
                 await RefreshCountAsync().ConfigureAwait(false);
             }
             catch (Exception ex)
@@ -386,14 +419,26 @@ namespace Yinyue.UI
                 NSApplication.SharedApplication.BeginInvokeOnMainThread(
                     () => _scanStatus.StringValue = ex.Message);
             }
+            finally
+            {
+                _indexer.OnScanProgress -= OnProgress;
+
+                NSApplication.SharedApplication.BeginInvokeOnMainThread(
+                    () => _scanProgress.Hidden = true);
+            }
         }
 
         private async Task RefreshCountAsync()
         {
             int count = await _indexer.GetTrackCountAsync().ConfigureAwait(false);
+            var last = _config.Current.Library.LastScanUtc;
+
+            string when = last is null
+                ? string.Empty
+                : $" · last scanned {last.Value.ToLocalTime():d MMM HH:mm}";
 
             NSApplication.SharedApplication.BeginInvokeOnMainThread(
-                () => _scanStatus.StringValue = $"{count} tracks indexed");
+                () => _scanStatus.StringValue = $"{count} tracks indexed{when}");
         }
 
         // ---------------------------------------------------------------- General
