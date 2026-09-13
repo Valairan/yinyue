@@ -1002,6 +1002,24 @@ shortcuts depend on it and Core cannot answer it.
 build on a Mac. That is expected, not a defect — but `core/` and `tests/Yinyue.Core.Tests`
 build and pass on either, which is what makes Mac-side work possible at all.
 
+## Scope
+
+**The Windows app is feature complete** as of September 2026. Remaining work is bug reports,
+small polish, and keeping Core buildable for the macOS shell. Do not propose features
+unprompted; new *sources* were always meant to be streaming backends (Navidrome/Subsonic,
+Plex) behind `IMusicSource`, and nothing else.
+
+**Spotify integration was assessed and rejected.** The only viable shape is a Spotify Connect
+remote over the Web API: search and playlists in the overlay, with the audio playing in the
+Spotify desktop app rather than in Yinyue. Spotify has no native desktop playback SDK
+(libspotify was shut down in 2022, the Web Playback SDK is browser-only) and librespot breaks
+the terms of service. The remote would need Premium for every playback-control endpoint, a
+per-user Spotify client ID because development-mode apps are capped at 25 users and extended
+quota now goes to organisations only, and a second `IAudioPlayer` that polls for position. The
+owner's verdict was that a remote control for another player is not useful here. The lighter
+alternative — reading and steering any app's now-playing session through the same system
+Yinyue uses for its own media keys — was noted and not pursued either.
+
 ## Known issues
 
 Verified against the current tree — these are real, not speculative.
