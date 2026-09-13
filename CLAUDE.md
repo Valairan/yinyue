@@ -1015,58 +1015,37 @@ DWM rounded corners), shared by the overlay and the toast.
 
 ## Branding assets
 
-`Common/` holds everything both apps draw from: the logo masters (including `Logo.ai`) and
-`Common/Icons/` — the Lucide SVGs that generate the in-app icon set. `win/Assets/` and
-`mac/Assets/` hold the per-platform derivatives, and both are generated, never hand-edited.
+`Common/` holds the masters: `Logo.ai`, and two SVG exports of it — **`Logo.svg`, the full 音乐
+mark, and `ShortLogo.svg`, 音 alone.** `Dark.png`/`Light.png` are older raster exports; **`Dark`
+and `Light` name the colour of the mark, not the theme it belongs to** — `Dark.png` is the
+black mark for light backgrounds, `Light.png` the white one for dark backgrounds. Getting this
+backwards makes the mark invisible rather than merely wrong, which is how it goes unnoticed.
 
-**The two apps must show the same marks, and the only way to guarantee that is one source.**
-`Common/Icons/generate.py` emits both `win/Icons.xaml` (WPF geometries) and
-`mac/Yinyue.Mac/UI/Icons.g.cs` (the same path data as C# strings) from one run, so an icon
-added there appears on both platforms or on neither. Neither toolkit renders SVG and neither
-would be worth a renderer for twenty line drawings.
+**Small sizes get the short mark.** The full mark is more than twice as tall as it is wide, so
+at the tray's 16 px each character gets seven pixels and no stroke survives — as a vector or a
+bitmap; the SVG makes it sharp, not legible. Every icon frame of 24 px and under therefore
+carries 音 alone, which is roughly square and gives each stroke twice the pixels; the full mark
+returns from 32 px up. Windows picks the exact frame for the size it asks for, so both live in
+one `.ico`. The same rule applies on the website: the nav shows the short mark, the hero the
+full one.
 
-- The Mac output is reduced to **four commands — M, L, C, Z**. The generator turns H and V
-  into lines and converts arcs to cubics, because AppKit has no endpoint-arc API: its arcs
-  are drawn from a centre and an angle. That arithmetic belongs at generation time where it
-  can be read and diffed, not in a runtime parser. WPF renders arcs natively, so the Windows
-  output is byte-identical to before the split.
-- **SF Symbols are not an option for these.** They exist only on macOS and are drawn to
-  Apple's metrics, so using them would make the Mac overlay quietly different. They are the
-  obvious shortcut and the wrong answer.
-- **The y axis flips.** SVG grows downward, AppKit upward, so `Icon.cs` mirrors every point.
-  Skipping it turns skip-back, repeat and the heart into different icons rather than into an
-  obvious bug, which is why the suite counts opaque pixels rather than only checking that the
-  data parsed.
-- Lucide's geometry — a 24-unit box, a 2-unit round stroke, no fill — is applied by the
-  drawing code on both platforms, not carried in the path data.
-
-`Common/make-mac-assets.sh` generates `mac/Assets/` from the same masters: the menu-bar mark
-and `Yinyue.icns`.
-
-**The menu bar needs one asset where the tray needs two.** A macOS template image is a mask —
-AppKit reads only its alpha and draws it in whatever colour the menu bar requires, inverting
-automatically between light and dark. So there is no `menubar-light`/`menubar-dark` pair and
-nothing watches for a theme change, which is `App.ApplyTrayIcon`'s entire job on Windows. **`Dark` and `Light` name the colour of the mark, not the
-theme it belongs to** — `Dark.png` is the black 音樂 for light backgrounds, `Light.png` the
-white one for dark backgrounds. Getting this backwards makes the mark invisible rather than
-merely wrong, which is how it goes unnoticed.
-
-Generated from those masters, all multi-frame (16/20/24/32/48/64/128/256):
+`python Common/make-win-assets.py` regenerates everything below from the two SVGs (needs
+ImageMagick with librsvg, which the Windows build ships). Do not edit the outputs by hand.
 
 | File | Use |
 |---|---|
-| `Assets/yinyue.ico` | `ApplicationIcon` — the mark on a rounded `#1E1E2E` plate, because a bare transparent glyph disappears against a matching Explorer background |
-| `Assets/tray-light.ico` | Tray, dark taskbar |
-| `Assets/tray-dark.ico` | Tray, light taskbar |
-| `Resources/placeholder.png` | Album-art fallback |
+| `win/Assets/yinyue.ico` | `ApplicationIcon` — the mark on a rounded `#1E1E2E` plate, because a bare transparent glyph disappears against a matching Explorer background |
+| `win/Assets/tray-light.ico` | Tray, dark taskbar |
+| `win/Assets/tray-dark.ico` | Tray, light taskbar |
+| `website/assets/mark.svg`, `mark-short.svg`, `favicon.svg` | The site's marks as vectors; the favicon is the short mark on the plate |
+| `win/Resources/placeholder.png` | Album-art fallback |
 
 `App.ApplyTrayIcon` picks between the two tray marks from
 `HKCU\...\Themes\Personalize\SystemUsesLightTheme` and re-applies on
 `SystemEvents.UserPreferenceChanged`, so the icon survives a theme switch. It requests the
 exact `SystemInformation.SmallIconSize` frame rather than letting Windows rescale a larger
-one — the mark is dense and downscales badly.
-
-Regenerate the icons from `Common/` rather than editing them directly.
+one — the mark is dense and downscales badly, and that exact frame is where the short mark
+lives.
 
 ## Performance budget
 

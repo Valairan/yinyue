@@ -105,6 +105,7 @@ code {
   letter-spacing: 0.01em;
 }
 .nav__brand:hover { text-decoration: none; }
+/* The short mark (音 alone): the full 音乐 is twice as tall as wide and unreadable this small. */
 .nav__mark { height: 22px; width: auto; }
 
 .nav__links { display: flex; gap: 1.4rem; font-size: 0.95rem; }
@@ -126,7 +127,7 @@ main { max-width: var(--max); margin: 0 auto; padding: 0 clamp(1rem, 4vw, 2.5rem
 }
 
 .hero__mark {
-  height: 96px;
+  height: 150px;
   width: auto;
   margin-bottom: 1.6rem;
   filter: drop-shadow(0 10px 30px rgba(0, 0, 0, 0.5));
