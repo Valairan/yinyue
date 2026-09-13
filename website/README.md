@@ -15,11 +15,10 @@ works from any sub-path.
   that shows the overlay, plays a fake track, opens each panel and composites the windows onto
   a dark canvas). Regenerate them when the UI changes; the `<figcaption>`s say what each shows.
 
-## Two placeholders that need a URL or a file
+## Placeholders
 
-- **Buy Me a Coffee** — the QR code in the Support section is `assets/buymeacoffee.png`
-  (resized to 720px for the web). Add your page's URL as a link around the image so people at
-  a desktop can click instead of scan.
+- **Buy Me a Coffee** — the Support card links to buymeacoffee.com/valairan as a whole; the QR
+  code inside it is `assets/buymeacoffee.png`, resized to 720px for the web.
 - **macOS download** — both "Download for macOS" buttons are inert (`button--soon`, no
   `href`). When the Mac build ships, add the `href`, drop the `button--soon` class and the
   `soon` tag, and fill in the macOS facts.

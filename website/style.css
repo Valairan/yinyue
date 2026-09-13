@@ -340,10 +340,13 @@ h2 {
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
 }
+.support:hover { text-decoration: none; border-color: rgba(255, 255, 255, 0.18); background: rgba(30, 30, 46, 0.9); transform: translateY(-1px); }
+.support { color: inherit; transition: transform 120ms ease, border-color 120ms ease, background 120ms ease; }
 .support__qr { margin: 0; flex: 0 0 auto; }
 .support__qr img { display: block; width: 180px; height: 180px; border-radius: 10px; background: #fff; padding: 8px; }
 .support__text h2 { text-align: left; margin-bottom: 0.5rem; font-size: 1.5rem; }
 .support__text p { margin: 0; color: var(--subtext); }
+.support__link { margin-top: 0.8rem !important; color: var(--accent) !important; font-weight: 600; }
 
 @media (max-width: 640px) {
   .support { flex-direction: column; text-align: center; }
