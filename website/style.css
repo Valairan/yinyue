@@ -303,14 +303,17 @@ h2 {
 
 /* The macOS processor switch is CSS state: two radios at the top of <body>, and everything
    marked mac-only-* below them shows for the checked one. No script is needed for it to work. */
+/* Fixed, not absolute: clicking a label focuses its radio, and the browser scrolls a focused
+   element into view. An absolutely positioned radio at the top of the body dragged the page
+   back to the top on every click; a fixed one is always in the viewport, so nothing moves. */
 .mac-arch {
-  position: absolute;
+  position: fixed;
+  top: 0;
+  left: 0;
   width: 1px;
   height: 1px;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
 }
 .mac-only-x64 { display: none; }
 #mac-x64:checked ~ main .mac-only-arm64 { display: none; }
