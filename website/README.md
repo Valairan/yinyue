@@ -6,10 +6,10 @@ works from any sub-path.
 
 ## Placeholders to fill in
 
-- **Background video** — `media/demo.mp4` (and optionally `media/demo.webm`). A screen
-  recording of the app in use, looped. Keep it short and small: 15–30 s, 1080p or 1440p,
-  no audio track (the video is muted anyway). Until the file exists the page shows
-  `media/poster-applet.png`, a real render of the applet, so nothing looks broken.
+- **Background loop** — `media/demo.gif`, a 15 s recording of the main flows made by the same
+  harness as the screenshots (its `--gif` mode drives the real UI and writes frames;
+  `assemble_gif.py` folds still frames and builds the GIF with one shared palette). Regenerate
+  it when the UI changes. `media/poster-applet.png` is shown instead for reduced-motion users.
 - **Screenshots** — `media/screenshot-*.png` are real captures of the app driven with sample
   tracks and rendered at 2x by a small harness (a console project referencing `win/Yinyue.csproj`
   that shows the overlay, plays a fake track, opens each panel and composites the windows onto

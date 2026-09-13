@@ -15,16 +15,13 @@
 <body>
 
   <!--
-    Full-page background video. Drop the recording in as media/demo.mp4 (and optionally
-    media/demo.webm for smaller files). Until it exists, the poster shows instead, so the page
-    never looks broken. Muted + playsinline are what let browsers autoplay it.
+    Full-page background: a looping GIF of the app's main flows, recorded from the real UI
+    (summon, search, play, queue, volume, dismiss). A GIF rather than a video so it needs no
+    codecs and loops without a player; the flat dark canvas keeps it small. Under a shade so
+    the text stays legible. Reduced-motion users get the still poster instead.
   -->
   <div class="backdrop" aria-hidden="true">
-    <video class="backdrop__video" autoplay muted loop playsinline preload="metadata"
-           poster="media/poster-applet.png">
-      <source src="media/demo.webm" type="video/webm">
-      <source src="media/demo.mp4" type="video/mp4">
-    </video>
+    <img class="backdrop__loop" src="media/demo.gif" alt="">
     <div class="backdrop__shade"></div>
   </div>
 
